@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Trading Bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #1a1a2e);
+            color: var(--tg-theme-text-color, white);
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .balance-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .balance-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        
+        .balance-amount {
+            font-size: 48px;
+            font-weight: bold;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .button {
+            background: var(--tg-theme-button-color, #00ff88);
+            color: var(--tg-theme-button-text-color, black);
+            border: none;
+            border-radius: 12px;
+            padding: 18px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 8px 0;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .button:active {
+            transform: scale(0.95);
+        }
+        
+        .signal-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .signal-card.active {
+            display: block;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Trading Dashboard</h1>
+    </div>
+
+    <div class="balance-card">
+        <div class="balance-label">Баланс</div>
+        <div class="balance-amount" id="balance">$0.00</div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="trades">0</div>
+            <div class="stat-label">Сделок</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="winrate">0%</div>
+            <div class="stat-label">Win Rate</div>
+        </div>
+    </div>
+
+    <button class="button" onclick="getSignal()">🔄 Получить сигнал</button>
+    <button class="button" onclick="showStats()">📊 Статистика</button>
+    <button class="button" onclick="trainModel()">🧠 Обучить ML</button>
+
+    <div class="signal-card" id="signalCard">
+        <h3>Сигнал:</h3>
+        <div id="signalContent"></div>
+    </div>
+
+    <div class="loading" id="loading" style="display:none;">Загрузка...</div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.enableClosingConfirmation();
+        
+        // Получаем данные пользователя
+        let userId = tg.initDataUnsafe?.user?.id || 0;
+        
+        // Функции взаимодействия
+        function getSignal() {
+            tg.sendData(JSON.stringify({
+                action: 'get_signal',
+                userId: userId
+            }));
+        }
+        
+        function showStats() {
+            tg.sendData(JSON.stringify({
+                action: 'show_stats',
+                userId: userId
+            }));
+        }
+        
+        function trainModel() {
+            tg.sendData(JSON.stringify({
+                action: 'train_model',
+                userId: userId
+            }));
+        }
+        
+        // Инициализация при загрузке
+        window.addEventListener('load', function() {
+            // Запрос данных при открытии
+            tg.sendData(JSON.stringify({
+                action: 'get_data',
+                userId: userId
+            }));
+        });
+        
+        // Применяем цвета темы Telegram
+        document.body.style.backgroundColor = tg.themeParams.bg_color || '#1a1a2e';
+        document.body.style.color = tg.themeParams.text_color || 'white';
+    </script>
+</body>
+</html>
