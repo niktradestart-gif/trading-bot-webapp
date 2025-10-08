@@ -1,0 +1,23 @@
+{
+  "69662105": {
+    "name": "Admin",
+    "role": "admin",
+    "telegram_id": 5129282647,
+    "registered_at": "2024-01-15T10:30:00",
+    "status": "active"
+  },
+  "5489888474": {
+    "name": "\"User1\"",
+    "role": "user",
+    "telegram_id": null,
+    "registered_at": "2025-10-08T14:07:22.296581",
+    "status": "active"
+  },
+  "5632717908": {
+    "name": "\"User2\"",
+    "role": "user",
+    "telegram_id": null,
+    "registered_at": "2025-10-08T14:07:26.450505",
+    "status": "active"
+  }
+}
