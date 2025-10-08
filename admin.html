@@ -109,6 +109,10 @@
             color: white;
         }
         
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+        
         /* Navigation */
         .admin-nav {
             display: flex;
@@ -447,17 +451,6 @@
                 grid-template-columns: repeat(4, 1fr);
             }
         }
-        
-        /* Animations */
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        
-        .pulse {
-            animation: pulse 2s infinite;
-        }
     </style>
 </head>
 <body>
@@ -473,6 +466,9 @@
                 <div class="user-actions">
                     <button class="btn btn-primary" onclick="switchToUserView()">
                         <i class="fas fa-eye"></i> Вид пользователя
+                    </button>
+                    <button class="btn btn-primary" onclick="goToSignals()">
+                        <i class="fas fa-chart-line"></i> Сигналы
                     </button>
                     <button class="btn btn-danger" onclick="logout()">
                         <i class="fas fa-sign-out-alt"></i> Выйти
@@ -914,6 +910,21 @@
             }
         ];
 
+        // Основные функции навигации
+        function logout() {
+            if (confirm('Вы уверены, что хотите выйти?')) {
+                window.location.href = 'login.html';
+            }
+        }
+
+        function switchToUserView() {
+            window.location.href = 'user.html';
+        }
+
+        function goToSignals() {
+            window.location.href = 'admin signals.html';
+        }
+
         // Показать секцию
         function showSection(sectionName) {
             // Скрыть все секции
@@ -1126,40 +1137,10 @@
             alert('Проверка обновлений системы...');
         }
 
-        function switchToUserView() {
-            alert('Переключение в режим пользователя...');
-        }
-
-        function logout() {
-            if (confirm('Вы уверены, что хотите выйти?')) {
-                alert('Выход из системы...');
-            }
-        }
-
         // Инициализация
         document.addEventListener('DOMContentLoaded', function() {
             loadUsersTable();
             loadAnalyticsCharts();
-            
-            // Обновление времени каждую секунду
-            setInterval(() => {
-                document.querySelectorAll('.timer').forEach(timer => {
-                    const timeParts = timer.textContent.split(':');
-                    let minutes = parseInt(timeParts[0]);
-                    let seconds = parseInt(timeParts[1]);
-                    
-                    if (seconds > 0) {
-                        seconds--;
-                    } else {
-                        if (minutes > 0) {
-                            minutes--;
-                            seconds = 59;
-                        }
-                    }
-                    
-                    timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                });
-            }, 1000);
         });
     </script>
 </body>
