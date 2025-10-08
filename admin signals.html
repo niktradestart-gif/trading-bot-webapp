@@ -3,804 +3,536 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Сигналы Администратора - Трейдинг Сигналы</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Управление сигналами - Трейдинг Бот</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --secondary: #64748b;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --background: #0f172a;
-            --card-bg: #1e293b;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --border: #334155;
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
-        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
+
         body {
-            background: var(--background);
-            color: var(--text-primary);
-            line-height: 1.6;
-            padding: 0;
-            font-size: 14px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: white;
             min-height: 100vh;
         }
-        
-        .container {
+
+        .signals-container {
             max-width: 100%;
             margin: 0 auto;
-            padding: 16px;
+            padding: 15px;
         }
-        
-        /* Header */
-        .header {
-            background: var(--card-bg);
-            padding: 16px;
-            box-shadow: var(--card-shadow);
-            margin-bottom: 20px;
-            border-radius: 12px;
-            border-left: 4px solid var(--warning);
-        }
-        
-        .header-content {
+
+        .signals-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #334155;
         }
-        
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
         .logo {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-        
-        .status-badge {
-            background: var(--success);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        .admin-badge {
-            background: var(--warning);
-            color: var(--background);
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 700;
-            margin-left: 8px;
-        }
-        
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 14px;
-        }
-        
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-        
-        .btn:hover {
-            transform: translateY(-1px);
-        }
-        
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: var(--card-bg);
-            padding: 16px;
-            border-radius: 12px;
-            box-shadow: var(--card-shadow);
-            text-align: center;
-            border: 1px solid var(--border);
-        }
-        
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            margin: 8px 0;
-            color: var(--text-primary);
-        }
-        
-        .stat-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-        
-        /* Signal Card */
-        .signal-card {
-            background: var(--card-bg);
-            border-radius: 16px;
-            box-shadow: var(--card-shadow);
-            margin-bottom: 20px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-        }
-        
-        .signal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: linear-gradient(135deg, var(--card-bg) 0%, #2d3748 100%);
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .signal-pair {
-            font-weight: 700;
-            font-size: 22px;
-            color: var(--text-primary);
-        }
-        
-        .signal-direction {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 14px;
-            text-transform: uppercase;
-        }
-        
-        .signal-buy {
-            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-            color: white;
-        }
-        
-        .signal-sell {
-            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
-            color: white;
-        }
-        
-        .signal-confidence {
-            background: var(--primary);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 14px;
-        }
-        
-        .signal-content {
-            padding: 20px;
-        }
-        
-        .signal-details {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-        
-        .signal-detail {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .detail-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-            font-weight: 500;
-        }
-        
-        .detail-value {
-            font-weight: 600;
-            font-size: 16px;
-            color: var(--text-primary);
-        }
-        
-        .chart-container {
-            height: 250px;
-            position: relative;
-            margin: 20px 0;
-            background: var(--background);
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid var(--border);
-        }
-        
-        .signal-timer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: var(--background);
-            border-top: 1px solid var(--border);
-        }
-        
-        .timer {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary);
-            font-feature-settings: "tnum";
-        }
-        
-        .signal-result {
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 700;
-            text-align: center;
-            font-size: 14px;
-        }
-        
-        .win {
-            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-            color: white;
-        }
-        
-        .loss {
-            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
-            color: white;
-        }
-        
-        .pending {
-            background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
-            color: white;
-        }
-        
-        /* Smart Money Analysis */
-        .analysis-panel {
-            background: var(--background);
-            padding: 16px;
-            border-radius: 12px;
-            margin: 16px 0;
-            border: 1px solid var(--border);
-        }
-        
-        .analysis-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 12px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #f59e0b;
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        
-        .analysis-grid {
+
+        .admin-badge {
+            background: #f59e0b;
+            color: #0f172a;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #374151;
+            color: white;
+            border: 1px solid #4b5563;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .signals-controls {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
+            margin-bottom: 25px;
         }
-        
-        .analysis-item {
-            display: flex;
-            flex-direction: column;
+
+        .control-card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
-        
-        .analysis-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
+
+        .control-card:hover {
+            transform: translateY(-2px);
+            border-color: #3b82f6;
         }
-        
-        .analysis-value {
+
+        .control-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #60a5fa;
+        }
+
+        .control-title {
             font-weight: 600;
-            font-size: 14px;
-            color: var(--text-primary);
+            margin-bottom: 5px;
         }
-        
-        .trend-bearish {
-            color: var(--danger);
+
+        .control-desc {
+            font-size: 0.8rem;
+            color: #94a3b8;
         }
-        
-        .trend-bullish {
-            color: var(--success);
+
+        .signals-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
         }
-        
-        .strength-high {
-            color: var(--success);
-        }
-        
-        .strength-moderate {
-            color: var(--warning);
-        }
-        
-        .strength-low {
-            color: var(--danger);
-        }
-        
-        /* Empty State */
-        .empty-state {
+
+        .stat-card {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #334155;
             text-align: center;
-            padding: 60px 20px;
-            color: var(--text-secondary);
         }
-        
-        .empty-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            opacity: 0.5;
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #60a5fa;
+            margin-bottom: 5px;
         }
-        
-        .empty-text {
-            font-size: 16px;
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .signals-list {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            margin-bottom: 20px;
+        }
+
+        .signals-list h3 {
+            margin-bottom: 15px;
+            color: #e2e8f0;
+        }
+
+        .signal-item {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 15px;
+            padding: 12px;
+            background: #334155;
+            border-radius: 8px;
             margin-bottom: 8px;
+            align-items: center;
         }
-        
-        .empty-subtext {
-            font-size: 14px;
+
+        .signal-pair {
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        .signal-direction {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.8rem;
+        }
+
+        .signal-buy {
+            background: #10b981;
+            color: white;
+        }
+
+        .signal-sell {
+            background: #ef4444;
+            color: white;
+        }
+
+        .signal-confidence {
+            color: #f59e0b;
+            font-weight: 500;
+        }
+
+        .signal-time {
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .signal-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        .ml-controls {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .ml-controls h3 {
+            margin-bottom: 15px;
+            color: #e2e8f0;
+        }
+
+        .ml-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+
+        .loading {
             opacity: 0.7;
+            pointer-events: none;
         }
-        
-        /* Responsive */
-        @media (min-width: 768px) {
-            .container {
-                max-width: 800px;
-                padding: 20px;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 16px;
-            }
-            
-            .signal-details {
-                grid-template-columns: repeat(4, 1fr);
-            }
-            
-            .analysis-grid {
-                grid-template-columns: repeat(4, 1fr);
-            }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: bold;
         }
-        
-        /* Animations */
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
+
+        .status-active {
+            background: #10b981;
+            color: white;
         }
-        
-        .pulse {
-            animation: pulse 2s infinite;
+
+        .status-pending {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .status-completed {
+            background: #6b7280;
+            color: white;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-content">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.enableClosingConfirmation();
+
+    function sendToBot(action, data = {}) {
+        const payload = JSON.stringify({ action, ...data });
+        tg.sendData(payload);
+        showNotification(`Команда отправлена: ${action}`);
+    }
+
+    function showNotification(message) {
+        const notification = document.getElementById('notification');
+        if (notification) {
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Кнопка возврата
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                window.location.href = 'admin.html';
+            });
+        }
+
+        // Кнопка выхода
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                tg.close();
+            });
+        }
+
+        // Загрузка данных сигналов
+        loadSignalsData();
+    });
+
+    function loadSignalsData() {
+        // Демо-данные сигналов
+        updateSignalsList([
+            {
+                pair: 'EURUSD',
+                direction: 'BUY',
+                confidence: 8,
+                price: 1.08542,
+                time: '2 мин назад',
+                status: 'active',
+                source: 'SMC'
+            },
+            {
+                pair: 'GBPUSD',
+                direction: 'SELL',
+                confidence: 7,
+                price: 1.26518,
+                time: '5 мин назад',
+                status: 'completed',
+                source: 'ML'
+            },
+            {
+                pair: 'USDJPY',
+                direction: 'BUY',
+                confidence: 6,
+                price: 148.923,
+                time: '8 мин назад',
+                status: 'completed',
+                source: 'GPT'
+            }
+        ]);
+    }
+
+    function updateSignalsList(signals) {
+        const container = document.getElementById('signalsList');
+        if (!container) return;
+
+        container.innerHTML = signals.map(signal => `
+            <div class="signal-item">
+                <div>
+                    <div class="signal-pair">${signal.pair}</div>
+                    <div class="signal-time">${signal.time} • ${signal.source}</div>
+                </div>
+                <div>
+                    <span class="signal-direction ${signal.direction === 'BUY' ? 'signal-buy' : 'signal-sell'}">
+                        ${signal.direction}
+                    </span>
+                    <div class="signal-confidence">${signal.confidence}/10</div>
+                </div>
+                <div class="signal-actions">
+                    <span class="status-badge ${getStatusClass(signal.status)}">
+                        ${getStatusText(signal.status)}
+                    </span>
+                    <button class="btn btn-small btn-primary" onclick="analyzePair('${signal.pair}')">
+                        Анализ
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function getStatusClass(status) {
+        switch(status) {
+            case 'active': return 'status-active';
+            case 'pending': return 'status-pending';
+            case 'completed': return 'status-completed';
+            default: return 'status-completed';
+        }
+    }
+
+    function getStatusText(status) {
+        switch(status) {
+            case 'active': return 'Активна';
+            case 'pending': return 'Ожидание';
+            case 'completed': return 'Завершена';
+            default: return 'Завершена';
+        }
+    }
+
+    function analyzePair(pair) {
+        sendToBot('analyze_pair', { pair: pair });
+    }
+
+    function forceSignal() {
+        sendToBot('get_signal');
+    }
+
+    function testAllPairs() {
+        sendToBot('test_all_pairs');
+    }
+
+    function clearSignals() {
+        if (confirm('Очистить все сигналы?')) {
+            sendToBot('clear_signals');
+        }
+    }
+    </script>
+
+    <div class="signals-container">
+        <div class="signals-header">
+            <div class="header-left">
                 <div class="logo">
-                    <i class="fas fa-robot"></i>
-                    Трейдинг Сигналы
-                    <span class="admin-badge" id="adminBadge">ADMIN</span>
+                    <i class="fas fa-bolt"></i>
+                    Управление сигналами
                 </div>
-                <div class="user-info">
-                    <span id="userStatus">Активен</span>
-                    <div class="status-badge" id="connectionStatus">ONLINE</div>
-                    <button class="btn btn-primary" onclick="goToAdminPanel()" style="margin-left: 10px;">
-                        <i class="fas fa-cog"></i> Панель
-                    </button>
-                    <button class="btn btn-danger" onclick="logout()">
-                        <i class="fas fa-sign-out-alt"></i> Выйти
-                    </button>
+                <div class="admin-badge">АДМИНИСТРАТОР</div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="backBtn">
+                    <i class="fas fa-arrow-left"></i>
+                    Панель
+                </button>
+                <button class="btn btn-danger" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Выйти
+                </button>
+            </div>
+        </div>
+
+        <div class="signals-stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalSignals">24</div>
+                <div class="stat-label">Всего сигналов</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeSignals">3</div>
+                <div class="stat-label">Активных</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="successRate">68%</div>
+                <div class="stat-label">Успешность</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgConfidence">7.2</div>
+                <div class="stat-label">Средняя уверенность</div>
+            </div>
+        </div>
+
+        <div class="signals-controls">
+            <div class="control-card" onclick="forceSignal()">
+                <div class="control-icon">
+                    <i class="fas fa-search"></i>
                 </div>
+                <div class="control-title">Принудительный поиск</div>
+                <div class="control-desc">Запуск поиска сигналов по всем парам</div>
+            </div>
+            
+            <div class="control-card" onclick="testAllPairs()">
+                <div class="control-icon">
+                    <i class="fas fa-vial"></i>
+                </div>
+                <div class="control-title">Тест всех пар</div>
+                <div class="control-desc">Анализ всех торговых пар</div>
+            </div>
+            
+            <div class="control-card" onclick="sendToBot('repairml')">
+                <div class="control-icon">
+                    <i class="fas fa-tools"></i>
+                </div>
+                <div class="control-title">Восстановить ML</div>
+                <div class="control-desc">Восстановление ML фичей</div>
+            </div>
+            
+            <div class="control-card" onclick="clearSignals()">
+                <div class="control-icon">
+                    <i class="fas fa-broom"></i>
+                </div>
+                <div class="control-title">Очистить сигналы</div>
+                <div class="control-desc">Очистка истории сигналов</div>
             </div>
         </div>
-        
-        <!-- Статистика -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Точность</div>
-                <div class="stat-value">78%</div>
-                <div class="stat-label">за сегодня</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Сигналы</div>
-                <div class="stat-value" id="signalsCount">3</div>
-                <div class="stat-label">активно</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Время</div>
-                <div class="stat-value" id="currentTime">--:--</div>
-                <div class="stat-label">сервера</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Статус</div>
-                <div class="stat-value" id="botStatus">🟢</div>
-                <div class="stat-label">бота</div>
+
+        <div class="signals-list">
+            <h3>Последние сигналы</h3>
+            <div id="signalsList">
+                <!-- Сигналы будут загружены через JavaScript -->
             </div>
         </div>
-        
-        <!-- Контейнер для сигналов -->
-        <div id="signalsContainer">
-            <!-- Сигналы будут добавляться здесь -->
-        </div>
-        
-        <!-- Состояние когда нет сигналов -->
-        <div id="emptyState" class="empty-state" style="display: none;">
-            <div class="empty-icon">
-                <i class="fas fa-chart-line"></i>
+
+        <div class="ml-controls">
+            <h3>Управление ML моделью</h3>
+            <div class="ml-actions">
+                <button class="btn btn-primary" onclick="sendToBot('modelstats')">
+                    <i class="fas fa-chart-bar"></i>
+                    Статистика ML
+                </button>
+                <button class="btn btn-success" onclick="sendToBot('retrain')">
+                    <i class="fas fa-retweet"></i>
+                    Переобучить
+                </button>
+                <button class="btn btn-secondary" onclick="sendToBot('forceml')">
+                    <i class="fas fa-power-off"></i>
+                    Принудительно ВКЛ
+                </button>
             </div>
-            <div class="empty-text">Нет активных сигналов</div>
-            <div class="empty-subtext">Ожидайте новые торговые сигналы</div>
         </div>
     </div>
 
-    <script>
-        // Данные для демонстрации
-        const adminSignals = [
-            {
-                id: 392,
-                pair: "AUDCHF",
-                direction: "SELL",
-                entryPrice: "0.52550",
-                expiry: 2,
-                confidence: 6,
-                status: "active",
-                timer: 120,
-                analysis: {
-                    trend: "BEARISH",
-                    strength: "MODERATE",
-                    rsi: "NEUTRAL",
-                    ob: 0,
-                    zones: 1,
-                    patterns: 0
-                },
-                chartData: {
-                    labels: ['10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30'],
-                    datasets: [{
-                        label: 'AUDCHF',
-                        data: [0.5260, 0.5258, 0.5255, 0.5253, 0.5252, 0.5251, 0.5250],
-                        borderColor: '#ef4444',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        borderWidth: 3
-                    }]
-                }
-            },
-            {
-                id: 393,
-                pair: "EURUSD",
-                direction: "BUY",
-                entryPrice: "1.07200",
-                expiry: 2,
-                confidence: 8,
-                status: "active",
-                timer: 45,
-                analysis: {
-                    trend: "BULLISH",
-                    strength: "HIGH",
-                    rsi: "OVERBOUGHT",
-                    ob: 2,
-                    zones: 3,
-                    patterns: 1
-                },
-                chartData: {
-                    labels: ['10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30'],
-                    datasets: [{
-                        label: 'EURUSD',
-                        data: [1.0710, 1.0715, 1.0718, 1.0720, 1.0722, 1.0725, 1.0728],
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        borderWidth: 3
-                    }]
-                }
-            },
-            {
-                id: 394,
-                pair: "GBPCHF",
-                direction: "SELL",
-                entryPrice: "1.07193",
-                expiry: 2,
-                confidence: 7,
-                status: "active",
-                timer: 90,
-                analysis: {
-                    trend: "BEARISH",
-                    strength: "HIGH",
-                    rsi: "OVERSOLD",
-                    ob: 1,
-                    zones: 2,
-                    patterns: 1
-                },
-                chartData: {
-                    labels: ['10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30'],
-                    datasets: [{
-                        label: 'GBPCHF',
-                        data: [1.0725, 1.0722, 1.0719, 1.0718, 1.0717, 1.0716, 1.0715],
-                        borderColor: '#ef4444',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        borderWidth: 3
-                    }]
-                }
-            }
-        ];
-
-        // Функции навигации
-        function logout() {
-            if (confirm('Вы уверены, что хотите выйти?')) {
-                window.location.href = 'login.html';
-            }
-        }
-
-        function goToAdminPanel() {
-            window.location.href = 'admin.html';
-        }
-
-        // Создание карточек сигналов
-        function createSignalCards() {
-            const container = document.getElementById('signalsContainer');
-            const emptyState = document.getElementById('emptyState');
-            
-            if (adminSignals.length === 0) {
-                container.style.display = 'none';
-                emptyState.style.display = 'block';
-                return;
-            }
-            
-            container.style.display = 'block';
-            emptyState.style.display = 'none';
-            container.innerHTML = '';
-            
-            // Обновляем количество сигналов
-            document.getElementById('signalsCount').textContent = adminSignals.length;
-            
-            adminSignals.forEach(signal => {
-                const card = document.createElement('div');
-                card.className = 'signal-card';
-                card.innerHTML = generateSignalHTML(signal);
-                container.appendChild(card);
-                
-                // Инициализация графика
-                setTimeout(() => {
-                    initializeChart(signal.id, signal.chartData);
-                }, 100);
-            });
-        }
-
-        // Генерация HTML для сигнала
-        function generateSignalHTML(signal) {
-            return `
-                <div class="signal-header">
-                    <div class="signal-pair">${signal.pair}</div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <span class="signal-direction ${signal.direction === 'BUY' ? 'signal-buy' : 'signal-sell'}">
-                            ${signal.direction}
-                        </span>
-                        <span class="signal-confidence">
-                            ${signal.confidence}/10
-                        </span>
-                    </div>
-                </div>
-                
-                <div class="signal-content">
-                    <!-- Детали сигнала -->
-                    <div class="signal-details">
-                        <div class="signal-detail">
-                            <div class="detail-label">ID СДЕЛКИ</div>
-                            <div class="detail-value">#${signal.id}</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="detail-label">ЦЕНА ВХОДА</div>
-                            <div class="detail-value">${signal.entryPrice}</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="detail-label">ЭКСПИРАЦИЯ</div>
-                            <div class="detail-value">${signal.expiry} мин</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="detail-label">ТАЙМЕР</div>
-                            <div class="detail-value timer-display">${formatTime(signal.timer)}</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Smart Money Analysis -->
-                    <div class="analysis-panel">
-                        <div class="analysis-title">
-                            <i class="fas fa-brain"></i>
-                            SMART MONEY ANALYSIS
-                        </div>
-                        <div class="analysis-grid">
-                            <div class="analysis-item">
-                                <div class="analysis-label">TREND</div>
-                                <div class="analysis-value trend-${signal.analysis.trend.toLowerCase()}">
-                                    ${signal.analysis.trend}
-                                </div>
-                            </div>
-                            <div class="analysis-item">
-                                <div class="analysis-label">STRENGTH</div>
-                                <div class="analysis-value strength-${signal.analysis.strength.toLowerCase()}">
-                                    ${signal.analysis.strength}
-                                </div>
-                            </div>
-                            <div class="analysis-item">
-                                <div class="analysis-label">RSI</div>
-                                <div class="analysis-value">${signal.analysis.rsi}</div>
-                            </div>
-                            <div class="analysis-item">
-                                <div class="analysis-label">ORDER BLOCKS</div>
-                                <div class="analysis-value">${signal.analysis.ob}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- График -->
-                    <div class="chart-container">
-                        <canvas id="chart-${signal.id}"></canvas>
-                    </div>
-                </div>
-                
-                <div class="signal-timer">
-                    <div class="timer pulse">${formatTime(signal.timer)}</div>
-                    <div class="signal-result pending">
-                        ⏳ ОЖИДАНИЕ РЕЗУЛЬТАТА
-                    </div>
-                </div>
-            `;
-        }
-
-        // Инициализация графика
-        function initializeChart(signalId, chartData) {
-            const canvas = document.getElementById(`chart-${signalId}`);
-            if (!canvas) return;
-            
-            const ctx = canvas.getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: chartData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            displayColors: false,
-                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                            titleFont: {
-                                size: 12
-                            },
-                            bodyFont: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            display: true,
-                            grid: {
-                                color: 'rgba(255,255,255,0.1)'
-                            },
-                            ticks: {
-                                color: 'rgba(255,255,255,0.7)',
-                                maxTicksLimit: 6
-                            }
-                        },
-                        y: {
-                            display: true,
-                            grid: {
-                                color: 'rgba(255,255,255,0.1)'
-                            },
-                            ticks: {
-                                color: 'rgba(255,255,255,0.7)'
-                            }
-                        }
-                    },
-                    elements: {
-                        point: {
-                            radius: 0,
-                            hoverRadius: 4
-                        }
-                    },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    }
-                }
-            });
-        }
-
-        // Форматирование времени
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        // Обновление времени сервера
-        function updateServerTime() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('ru-RU', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: false 
-            });
-            document.getElementById('currentTime').textContent = timeString;
-        }
-
-        // Имитация обновления таймеров
-        function updateTimers() {
-            document.querySelectorAll('.timer').forEach(timer => {
-                const timeParts = timer.textContent.split(':');
-                let minutes = parseInt(timeParts[0]);
-                let seconds = parseInt(timeParts[1]);
-                
-                if (seconds > 0) {
-                    seconds--;
-                } else {
-                    if (minutes > 0) {
-                        minutes--;
-                        seconds = 59;
-                    }
-                }
-                
-                timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                
-                // Обновляем также в деталях
-                const detailTimer = timer.closest('.signal-card')?.querySelector('.timer-display');
-                if (detailTimer) {
-                    detailTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                }
-            });
-        }
-
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', function() {
-            createSignalCards();
-            updateServerTime();
-            
-            // Обновление времени каждую секунду
-            setInterval(updateTimers, 1000);
-            setInterval(updateServerTime, 1000);
-            
-            // Имитация получения нового сигнала каждые 2 минуты
-            setInterval(() => {
-                console.log("Проверка новых сигналов...");
-            }, 120000);
-        });
-    </script>
+    <div class="notification" id="notification"></div>
 </body>
 </html>
