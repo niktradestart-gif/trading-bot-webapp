@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трейдинг Сигналы</title>
+    <title>Панель пользователя - Трейдинг Сигналы</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -83,6 +83,25 @@
             border-radius: 6px;
             font-size: 12px;
             font-weight: 600;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
         }
         
         /* Navigation */
@@ -491,7 +510,9 @@
         }
         
         /* Buttons */
-        .btn {
+        .btn-primary {
+            background: var(--primary);
+            color: white;
             padding: 12px 24px;
             border: none;
             border-radius: 8px;
@@ -499,11 +520,6 @@
             cursor: pointer;
             transition: all 0.3s;
             font-size: 14px;
-        }
-        
-        .btn-primary {
-            background: var(--primary);
-            color: white;
         }
         
         .btn-block {
@@ -559,6 +575,9 @@
                 <div class="user-info">
                     <span id="userStatus">Активен</span>
                     <div class="status-badge" id="connectionStatus">ONLINE</div>
+                    <button class="btn btn-danger" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Выйти
+                    </button>
                 </div>
             </div>
         </div>
@@ -735,7 +754,7 @@
                 </div>
             </div>
             
-            <button class="btn btn-primary btn-block">
+            <button class="btn-primary btn-block">
                 <i class="fas fa-save"></i> Сохранить настройки
             </button>
         </div>
@@ -814,6 +833,13 @@
                 time: "11:15"
             }
         ];
+
+        // Функция выхода
+        function logout() {
+            if (confirm('Вы уверены, что хотите выйти?')) {
+                window.location.href = 'login.html';
+            }
+        }
 
         // Показать секцию
         function showSection(sectionName) {
