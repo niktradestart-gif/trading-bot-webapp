@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ Панель - Трейдинг Бот</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --background: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 0;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        
+        /* Header */
+        .header {
+            background: var(--card-bg);
+            padding: 16px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 20px;
+            border-radius: 12px;
+            border-left: 4px solid var(--warning);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .admin-badge {
+            background: var(--warning);
+            color: var(--background);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+        
+        .user-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        /* Navigation */
+        .admin-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+        
+        .admin-nav::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .nav-btn {
+            padding: 12px 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        
+        .nav-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 8px 0;
+            color: var(--text-primary);
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        /* Admin Sections */
+        .admin-section {
+            display: none;
+        }
+        
+        .admin-section.active {
+            display: block;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 20px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        
+        .card-header {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, var(--card-bg) 0%, #2d3748 100%);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--text-primary);
+        }
+        
+        .card-content {
+            padding: 20px;
+        }
+        
+        /* Tables */
+        .table-responsive {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th {
+            background: var(--background);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        td {
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        
+        tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .status-active {
+            color: var(--success);
+            font-weight: 600;
+        }
+        
+        .status-inactive {
+            color: var(--danger);
+            font-weight: 600;
+        }
+        
+        /* Search */
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 45px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+        
+        /* Admin Functions */
+        .functions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .function-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .function-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+        }
+        
+        .function-icon {
+            font-size: 24px;
+            margin-bottom: 12px;
+            color: var(--primary);
+        }
+        
+        .function-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        
+        .function-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        /* Charts */
+        .chart-container {
+            height: 300px;
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* System Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        /* Logs */
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background: var(--background);
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid var(--border);
+        }
+        
+        .log-entry {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-info {
+            color: var(--primary);
+        }
+        
+        .log-success {
+            color: var(--success);
+        }
+        
+        .log-warning {
+            color: var(--warning);
+        }
+        
+        .log-error {
+            color: var(--danger);
+        }
+        
+        /* Responsive */
+        @media (min-width: 768px) {
+            .container {
+                max-width: 1200px;
+                padding: 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 16px;
+            }
+            
+            .admin-nav {
+                justify-content: center;
+            }
+            
+            .functions-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .metrics-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-shield-alt"></i>
+                    АДМИН ПАНЕЛЬ
+                    <span class="admin-badge">SUPER ADMIN</span>
+                </div>
+                <div class="user-actions">
+                    <button class="btn btn-primary" onclick="switchToUserView()">
+                        <i class="fas fa-eye"></i> Вид пользователя
+                    </button>
+                    <button class="btn btn-danger" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Выйти
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation -->
+        <div class="admin-nav">
+            <button class="nav-btn active" onclick="showSection('overview')">
+                <i class="fas fa-tachometer-alt"></i> Обзор
+            </button>
+            <button class="nav-btn" onclick="showSection('users')">
+                <i class="fas fa-users"></i> Пользователи
+            </button>
+            <button class="nav-btn" onclick="showSection('signals')">
+                <i class="fas fa-chart-line"></i> Сигналы
+            </button>
+            <button class="nav-btn" onclick="showSection('analytics')">
+                <i class="fas fa-chart-bar"></i> Аналитика
+            </button>
+            <button class="nav-btn" onclick="showSection('ml')">
+                <i class="fas fa-brain"></i> ML Модель
+            </button>
+            <button class="nav-btn" onclick="showSection('system')">
+                <i class="fas fa-cog"></i> Система
+            </button>
+            <button class="nav-btn" onclick="showSection('settings')">
+                <i class="fas fa-sliders-h"></i> Настройки
+            </button>
+        </div>
+        
+        <!-- Статистика -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Активных пользователей</div>
+                <div class="stat-value">142</div>
+                <div class="stat-label">из 203</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Точность бота</div>
+                <div class="stat-value">76.4%</div>
+                <div class="stat-label">за все время</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Активных сигналов</div>
+                <div class="stat-value">18</div>
+                <div class="stat-label">в реальном времени</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Доход системы</div>
+                <div class="stat-value">2.4%</div>
+                <div class="stat-label">комиссия</div>
+            </div>
+        </div>
+        
+        <!-- Overview Section -->
+        <div id="overview" class="admin-section active">
+            <div class="section-title">
+                <i class="fas fa-tachometer-alt"></i> Обзор системы
+            </div>
+            
+            <div class="functions-grid">
+                <div class="function-card" onclick="showSection('users')">
+                    <div class="function-icon">
+                        <i class="fas fa-users-cog"></i>
+                    </div>
+                    <div class="function-title">Управление пользователями</div>
+                    <div class="function-desc">Просмотр, активация, блокировка пользователей</div>
+                </div>
+                
+                <div class="function-card" onclick="trainMLModel()">
+                    <div class="function-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <div class="function-title">Обучение ML модели</div>
+                    <div class="function-desc">Переобучение нейросети на новых данных</div>
+                </div>
+                
+                <div class="function-card" onclick="showSection('analytics')">
+                    <div class="function-icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div class="function-title">Детальная аналитика</div>
+                    <div class="function-desc">Статистика по парам и эффективности</div>
+                </div>
+                
+                <div class="function-card" onclick="showSection('system')">
+                    <div class="function-icon">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <div class="function-title">Системные метрики</div>
+                    <div class="function-desc">Мониторинг производительности системы</div>
+                </div>
+                
+                <div class="function-card" onclick="sendBroadcast()">
+                    <div class="function-icon">
+                        <i class="fas fa-bullhorn"></i>
+                    </div>
+                    <div class="function-title">Рассылка сообщений</div>
+                    <div class="function-desc">Отправка уведомлений всем пользователям</div>
+                </div>
+                
+                <div class="function-card" onclick="backupSystem()">
+                    <div class="function-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="function-title">Резервное копирование</div>
+                    <div class="function-desc">Создание бэкапа базы данных</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Последние действия</div>
+                </div>
+                <div class="card-content">
+                    <div class="log-container">
+                        <div class="log-entry log-info">
+                            [INFO] 2024-01-15 14:23:45 - ML модель переобучена с точностью 82.3%
+                        </div>
+                        <div class="log-entry log-success">
+                            [SUCCESS] 2024-01-15 14:15:30 - Сделка #392 завершена с прибылью
+                        </div>
+                        <div class="log-entry log-warning">
+                            [WARNING] 2024-01-15 13:58:12 - Высокая волатильность на паре GBPCHF
+                        </div>
+                        <div class="log-entry log-info">
+                            [INFO] 2024-01-15 13:45:22 - Новый пользователь зарегистрирован (ID: 5489888474)
+                        </div>
+                        <div class="log-entry log-error">
+                            [ERROR] 2024-01-15 13:30:15 - Ошибка подключения к бирже, повторная попытка...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Users Section -->
+        <div id="users" class="admin-section">
+            <div class="section-title">
+                <i class="fas fa-users"></i> Управление пользователями
+            </div>
+            
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="search-input" placeholder="Поиск по ID пользователя (например: 5489888474)" oninput="searchUsers(this.value)">
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Список пользователей</div>
+                    <div>
+                        <button class="btn btn-success" style="margin-right: 10px;">
+                            <i class="fas fa-check"></i> Активировать
+                        </button>
+                        <button class="btn btn-danger">
+                            <i class="fas fa-ban"></i> Заблокировать
+                        </button>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox"></th>
+                                    <th>ID</th>
+                                    <th>Имя</th>
+                                    <th>Регистрация</th>
+                                    <th>Активность</th>
+                                    <th>Точность</th>
+                                    <th>Статус</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTable">
+                                <!-- Users will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Signals Section -->
+        <div id="signals" class="admin-section">
+            <div class="section-title">
+                <i class="fas fa-chart-line"></i> Управление сигналами
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Активные сигналы всех пользователей</div>
+                    <button class="btn btn-primary" onclick="forceCloseAll()">
+                        <i class="fas fa-times"></i> Закрыть все
+                    </button>
+                </div>
+                <div class="card-content">
+                    <div id="adminSignalsContainer">
+                        <!-- Active signals will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Analytics Section -->
+        <div id="analytics" class="admin-section">
+            <div class="section-title">
+                <i class="fas fa-chart-bar"></i> Детальная аналитика
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Эффективность по парам</div>
+                </div>
+                <div class="card-content">
+                    <div class="chart-container">
+                        <canvas id="pairsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Статистика догонов</div>
+                </div>
+                <div class="card-content">
+                    <div class="chart-container">
+                        <canvas id="martingaleChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ML Model Section -->
+        <div id="ml" class="admin-section">
+            <div class="section-title">
+                <i class="fas fa-brain"></i> Управление ML Моделью
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Текущее состояние модели</div>
+                </div>
+                <div class="card-content">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value">82.3%</div>
+                            <div class="metric-label">Текущая точность</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">15,842</div>
+                            <div class="metric-label">Обучение на сделках</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">24ч</div>
+                            <div class="metric-label">Время обучения</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value">v3.2.1</div>
+                            <div class="metric-label">Версия модели</div>
+                        </div>
+                    </div>
+                    
+                    <div class="functions-grid">
+                        <div class="function-card" onclick="trainMLModel()">
+                            <div class="function-icon">
+                                <i class="fas fa-retweet"></i>
+                            </div>
+                            <div class="function-title">Переобучить модель</div>
+                            <div class="function-desc">Обучение на новых данных</div>
+                        </div>
+                        
+                        <div class="function-card" onclick="downloadModel()">
+                            <div class="function-icon">
+                                <i class="fas fa-download"></i>
+                            </div>
+                            <div class="function-title">Экспорт модели</div>
+                            <div class="function-desc">Скачать текущую версию</div>
+                        </div>
+                        
+                        <div class="function-card" onclick="resetModel()">
+                            <div class="function-icon">
+                                <i class="fas fa-trash"></i>
+                            </div>
+                            <div class="function-title">Сброс модели</div>
+                            <div class="function-desc">Начать обучение заново</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Section -->
+        <div id="system" class="admin-section">
+            <div class="section-title">
+                <i class="fas fa-cog"></i> Системные метрики
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">18д 4ч</div>
+                    <div class="metric-label">Время работы</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">24%</div>
+                    <div class="metric-label">Использование CPU</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">1.2GB</div>
+                    <div class="metric-label">Использование памяти</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">12</div>
+                    <div class="metric-label">Активных потоков</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Системные команды</div>
+                </div>
+                <div class="card-content">
+                    <div class="functions-grid">
+                        <div class="function-card" onclick="restartBot()">
+                            <div class="function-icon">
+                                <i class="fas fa-power-off"></i>
+                            </div>
+                            <div class="function-title">Перезапустить бота</div>
+                            <div class="function-desc">Soft restart системы</div>
+                        </div>
+                        
+                        <div class="function-card" onclick="clearCache()">
+                            <div class="function-icon">
+                                <i class="fas fa-broom"></i>
+                            </div>
+                            <div class="function-title">Очистить кэш</div>
+                            <div class="function-desc">Удаление временных файлов</div>
+                        </div>
+                        
+                        <div class="function-card" onclick="updateSystem()">
+                            <div class="function-icon">
+                                <i class="fas fa-sync"></i>
+                            </div>
+                            <div class="function-title">Обновить систему</div>
+                            <div class="function-desc">Установка последней версии</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Section -->
+        <div id="settings" class="admin-section">
+            <div class="section-title">
+                <i class="fas fa-sliders-h"></i> Настройки системы
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Основные настройки</div>
+                </div>
+                <div class="card-content">
+                    <div class="form-group">
+                        <label class="form-label">Минимальная уверенность сигнала</label>
+                        <input type="range" class="form-control" min="1" max="10" value="6">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Максимальное количество догонов</label>
+                        <input type="number" class="form-control" value="5" min="1" max="10">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Авто-обучение ML модели</label>
+                        <select class="form-control">
+                            <option>Каждые 24 часа</option>
+                            <option>Каждые 12 часов</option>
+                            <option>Каждые 6 часов</option>
+                            <option>Отключено</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-primary" style="width: 100%;">
+                        <i class="fas fa-save"></i> Сохранить настройки
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Данные для демонстрации
+        const sampleUsers = [
+            { id: "5489888474", name: "Иван Петров", regDate: "15.01.2024", activity: "Высокая", accuracy: "78%", status: "active" },
+            { id: "5489888475", name: "Мария Сидорова", regDate: "14.01.2024", activity: "Средняя", accuracy: "82%", status: "active" },
+            { id: "5489888476", name: "Алексей Козлов", regDate: "13.01.2024", activity: "Низкая", accuracy: "65%", status: "inactive" },
+            { id: "5489888477", name: "Ольга Новикова", regDate: "12.01.2024", activity: "Высокая", accuracy: "88%", status: "active" }
+        ];
+
+        const adminSignals = [
+            {
+                id: 392,
+                pair: "AUDCHF",
+                direction: "SELL",
+                entryPrice: "0.52550",
+                expiry: 2,
+                confidence: 6,
+                status: "active",
+                timer: 45,
+                userId: "5489888474",
+                userName: "Иван Петров"
+            },
+            {
+                id: 393,
+                pair: "EURUSD",
+                direction: "BUY",
+                entryPrice: "1.07200",
+                expiry: 2,
+                confidence: 8,
+                status: "active",
+                timer: 120,
+                userId: "5489888475",
+                userName: "Мария Сидорова"
+            },
+            {
+                id: 394,
+                pair: "GBPCHF",
+                direction: "SELL",
+                entryPrice: "1.07193",
+                expiry: 2,
+                confidence: 7,
+                status: "active",
+                timer: 90,
+                userId: "5489888477",
+                userName: "Ольга Новикова"
+            }
+        ];
+
+        // Показать секцию
+        function showSection(sectionName) {
+            // Скрыть все секции
+            document.querySelectorAll('.admin-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Показать выбранную секцию
+            document.getElementById(sectionName).classList.add('active');
+            
+            // Обновить активную кнопку навигации
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Загрузить данные для секции
+            if (sectionName === 'users') {
+                loadUsersTable();
+            } else if (sectionName === 'signals') {
+                loadAdminSignals();
+            } else if (sectionName === 'analytics') {
+                loadAnalyticsCharts();
+            }
+        }
+
+        // Загрузка таблицы пользователей
+        function loadUsersTable() {
+            const container = document.getElementById('usersTable');
+            container.innerHTML = '';
+            
+            sampleUsers.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="checkbox"></td>
+                    <td>${user.id}</td>
+                    <td>${user.name}</td>
+                    <td>${user.regDate}</td>
+                    <td>${user.activity}</td>
+                    <td>${user.accuracy}</td>
+                    <td class="${user.status === 'active' ? 'status-active' : 'status-inactive'}">
+                        ${user.status === 'active' ? 'Активен' : 'Неактивен'}
+                    </td>
+                    <td>
+                        <button class="btn" style="padding: 6px 12px; font-size: 12px;">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                    </td>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        // Загрузка сигналов админа
+        function loadAdminSignals() {
+            const container = document.getElementById('adminSignalsContainer');
+            container.innerHTML = '';
+            
+            adminSignals.forEach(signal => {
+                const signalCard = document.createElement('div');
+                signalCard.className = 'card';
+                signalCard.style.marginBottom = '16px';
+                signalCard.innerHTML = `
+                    <div class="card-header">
+                        <div class="card-title">${signal.pair} - ${signal.direction}</div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span style="color: var(--text-secondary); font-size: 14px;">
+                                Пользователь: ${signal.userName}
+                            </span>
+                            <span class="signal-confidence" style="background: var(--primary); color: white; padding: 6px 12px; border-radius: 6px;">
+                                ${signal.confidence}/10
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                            <div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">ID сделки</div>
+                                <div style="font-weight: 600;">#${signal.id}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Цена входа</div>
+                                <div style="font-weight: 600;">${signal.entryPrice}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Таймер</div>
+                                <div style="font-weight: 600; color: var(--primary);">${formatTime(signal.timer)}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">ID пользователя</div>
+                                <div style="font-weight: 600;">${signal.userId}</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-danger" style="width: 100%;">
+                            <i class="fas fa-times"></i> Принудительно закрыть сделку
+                        </button>
+                    </div>
+                `;
+                container.appendChild(signalCard);
+            });
+        }
+
+        // Загрузка аналитических графиков
+        function loadAnalyticsCharts() {
+            // График эффективности по парам
+            const pairsCtx = document.getElementById('pairsChart').getContext('2d');
+            new Chart(pairsCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDCHF', 'GBPCHF'],
+                    datasets: [{
+                        label: 'Точность %',
+                        data: [76.6, 73.5, 78.2, 71.1, 68.9],
+                        backgroundColor: [
+                            'rgba(37, 99, 235, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(139, 92, 246, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // График догонов
+            const martingaleCtx = document.getElementById('martingaleChart').getContext('2d');
+            new Chart(martingaleCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Успешные догоны', 'Неуспешные догоны'],
+                    datasets: [{
+                        data: [68, 32],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(239, 68, 68, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        // Поиск пользователей
+        function searchUsers(query) {
+            if (query.length >= 3) {
+                console.log(`Поиск пользователей: ${query}`);
+                // В реальном приложении здесь будет запрос к API
+            }
+        }
+
+        // Форматирование времени
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Функции админа
+        function trainMLModel() {
+            alert('Запущено обучение ML модели...');
+        }
+
+        function sendBroadcast() {
+            alert('Открывается форма рассылки сообщений...');
+        }
+
+        function backupSystem() {
+            alert('Запущено резервное копирование системы...');
+        }
+
+        function forceCloseAll() {
+            if (confirm('Вы уверены, что хотите принудительно закрыть все активные сделки?')) {
+                alert('Все активные сделки будут закрыты...');
+            }
+        }
+
+        function downloadModel() {
+            alert('Начинается экспорт ML модели...');
+        }
+
+        function resetModel() {
+            if (confirm('Вы уверены, что хотите сбросить ML модель? Все данные обучения будут потеряны.')) {
+                alert('ML модель будет сброшена...');
+            }
+        }
+
+        function restartBot() {
+            if (confirm('Вы уверены, что хотите перезапустить бота?')) {
+                alert('Бот будет перезапущен...');
+            }
+        }
+
+        function clearCache() {
+            alert('Кэш системы очищен');
+        }
+
+        function updateSystem() {
+            alert('Проверка обновлений системы...');
+        }
+
+        function switchToUserView() {
+            alert('Переключение в режим пользователя...');
+        }
+
+        function logout() {
+            if (confirm('Вы уверены, что хотите выйти?')) {
+                alert('Выход из системы...');
+            }
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUsersTable();
+            loadAnalyticsCharts();
+            
+            // Обновление времени каждую секунду
+            setInterval(() => {
+                document.querySelectorAll('.timer').forEach(timer => {
+                    const timeParts = timer.textContent.split(':');
+                    let minutes = parseInt(timeParts[0]);
+                    let seconds = parseInt(timeParts[1]);
+                    
+                    if (seconds > 0) {
+                        seconds--;
+                    } else {
+                        if (minutes > 0) {
+                            minutes--;
+                            seconds = 59;
+                        }
+                    }
+                    
+                    timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                });
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

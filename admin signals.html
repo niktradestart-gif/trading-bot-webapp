@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Трейдинг Сигналы</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --background: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 0;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        
+        /* Header */
+        .header {
+            background: var(--card-bg);
+            padding: 16px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 20px;
+            border-radius: 12px;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .status-badge {
+            background: var(--success);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 8px 0;
+            color: var(--text-primary);
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        /* Signal Card */
+        .signal-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 20px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        
+        .signal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--card-bg) 0%, #2d3748 100%);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .signal-pair {
+            font-weight: 700;
+            font-size: 22px;
+            color: var(--text-primary);
+        }
+        
+        .signal-direction {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        
+        .signal-buy {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            color: white;
+        }
+        
+        .signal-sell {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+            color: white;
+        }
+        
+        .signal-confidence {
+            background: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        
+        .signal-content {
+            padding: 20px;
+        }
+        
+        .signal-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .signal-detail {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .detail-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        
+        .detail-value {
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--text-primary);
+        }
+        
+        .chart-container {
+            height: 250px;
+            position: relative;
+            margin: 20px 0;
+            background: var(--background);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border);
+        }
+        
+        .signal-timer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: var(--background);
+            border-top: 1px solid var(--border);
+        }
+        
+        .timer {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            font-feature-settings: "tnum";
+        }
+        
+        .signal-result {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .win {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            color: white;
+        }
+        
+        .loss {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+            color: white;
+        }
+        
+        .pending {
+            background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+            color: white;
+        }
+        
+        /* Smart Money Analysis */
+        .analysis-panel {
+            background: var(--background);
+            padding: 16px;
+            border-radius: 12px;
+            margin: 16px 0;
+            border: 1px solid var(--border);
+        }
+        
+        .analysis-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        .analysis-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .analysis-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        
+        .analysis-value {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+        
+        .trend-bearish {
+            color: var(--danger);
+        }
+        
+        .trend-bullish {
+            color: var(--success);
+        }
+        
+        .strength-high {
+            color: var(--success);
+        }
+        
+        .strength-moderate {
+            color: var(--warning);
+        }
+        
+        .strength-low {
+            color: var(--danger);
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .empty-text {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .empty-subtext {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        /* Admin Badge */
+        .admin-badge {
+            background: var(--warning);
+            color: var(--background);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+        
+        /* Responsive */
+        @media (min-width: 768px) {
+            .container {
+                max-width: 600px;
+                padding: 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 16px;
+            }
+            
+            .signal-details {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .analysis-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .container {
+                max-width: 800px;
+            }
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-robot"></i>
+                    Трейдинг Сигналы
+                    <span class="admin-badge" id="adminBadge" style="display: none;">ADMIN</span>
+                </div>
+                <div class="user-info">
+                    <span id="userStatus">Активен</span>
+                    <div class="status-badge" id="connectionStatus">ONLINE</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Статистика -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Точность</div>
+                <div class="stat-value">78%</div>
+                <div class="stat-label">за сегодня</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Сигналы</div>
+                <div class="stat-value" id="signalsCount">1</div>
+                <div class="stat-label">активно</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Время</div>
+                <div class="stat-value" id="currentTime">--:--</div>
+                <div class="stat-label">сервера</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Статус</div>
+                <div class="stat-value" id="botStatus">🟢</div>
+                <div class="stat-label">бота</div>
+            </div>
+        </div>
+        
+        <!-- Контейнер для сигналов -->
+        <div id="signalsContainer">
+            <!-- Сигналы будут добавляться здесь -->
+        </div>
+        
+        <!-- Состояние когда нет сигналов -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="empty-text">Нет активных сигналов</div>
+            <div class="empty-subtext">Ожидайте новые торговые сигналы</div>
+        </div>
+    </div>
+
+    <script>
+        // Данные для демонстрации
+        const userSignals = [
+            {
+                id: 392,
+                pair: "AUDCHF",
+                direction: "SELL",
+                entryPrice: "0.52550",
+                expiry: 2,
+                confidence: 6,
+                status: "active",
+                timer: 120,
+                analysis: {
+                    trend: "BEARISH",
+                    strength: "MODERATE",
+                    rsi: "NEUTRAL",
+                    ob: 0,
+                    zones: 1,
+                    patterns: 0
+                },
+                chartData: {
+                    labels: ['10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30'],
+                    datasets: [{
+                        label: 'AUDCHF',
+                        data: [0.5260, 0.5258, 0.5255, 0.5253, 0.5252, 0.5251, 0.5250],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        borderWidth: 3
+                    }]
+                }
+            }
+        ];
+
+        const adminSignals = [
+            ...userSignals,
+            {
+                id: 393,
+                pair: "EURUSD",
+                direction: "BUY",
+                entryPrice: "1.07200",
+                expiry: 2,
+                confidence: 8,
+                status: "active",
+                timer: 45,
+                analysis: {
+                    trend: "BULLISH",
+                    strength: "HIGH",
+                    rsi: "OVERBOUGHT",
+                    ob: 2,
+                    zones: 3,
+                    patterns: 1
+                },
+                chartData: {
+                    labels: ['10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30'],
+                    datasets: [{
+                        label: 'EURUSD',
+                        data: [1.0710, 1.0715, 1.0718, 1.0720, 1.0722, 1.0725, 1.0728],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        borderWidth: 3
+                    }]
+                }
+            },
+            {
+                id: 394,
+                pair: "GBPCHF",
+                direction: "SELL",
+                entryPrice: "1.07193",
+                expiry: 2,
+                confidence: 7,
+                status: "active",
+                timer: 90,
+                analysis: {
+                    trend: "BEARISH",
+                    strength: "HIGH",
+                    rsi: "OVERSOLD",
+                    ob: 1,
+                    zones: 2,
+                    patterns: 1
+                },
+                chartData: {
+                    labels: ['10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30'],
+                    datasets: [{
+                        label: 'GBPCHF',
+                        data: [1.0725, 1.0722, 1.0719, 1.0718, 1.0717, 1.0716, 1.0715],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        borderWidth: 3
+                    }]
+                }
+            }
+        ];
+
+        // Определяем тип пользователя
+        const isAdmin = true; // В реальном приложении будет определяться по логину
+        const currentSignals = isAdmin ? adminSignals : userSignals;
+
+        // Создание карточек сигналов
+        function createSignalCards() {
+            const container = document.getElementById('signalsContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (currentSignals.length === 0) {
+                container.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            container.style.display = 'block';
+            emptyState.style.display = 'none';
+            container.innerHTML = '';
+            
+            // Показываем бейдж админа если нужно
+            document.getElementById('adminBadge').style.display = isAdmin ? 'inline-block' : 'none';
+            
+            // Обновляем количество сигналов
+            document.getElementById('signalsCount').textContent = currentSignals.length;
+            
+            currentSignals.forEach(signal => {
+                const card = document.createElement('div');
+                card.className = 'signal-card';
+                card.innerHTML = generateSignalHTML(signal);
+                container.appendChild(card);
+                
+                // Инициализация графика
+                setTimeout(() => {
+                    initializeChart(signal.id, signal.chartData);
+                }, 100);
+            });
+        }
+
+        // Генерация HTML для сигнала
+        function generateSignalHTML(signal) {
+            return `
+                <div class="signal-header">
+                    <div class="signal-pair">${signal.pair}</div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <span class="signal-direction ${signal.direction === 'BUY' ? 'signal-buy' : 'signal-sell'}">
+                            ${signal.direction}
+                        </span>
+                        <span class="signal-confidence">
+                            ${signal.confidence}/10
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="signal-content">
+                    <!-- Детали сигнала -->
+                    <div class="signal-details">
+                        <div class="signal-detail">
+                            <div class="detail-label">ID СДЕЛКИ</div>
+                            <div class="detail-value">#${signal.id}</div>
+                        </div>
+                        <div class="signal-detail">
+                            <div class="detail-label">ЦЕНА ВХОДА</div>
+                            <div class="detail-value">${signal.entryPrice}</div>
+                        </div>
+                        <div class="signal-detail">
+                            <div class="detail-label">ЭКСПИРАЦИЯ</div>
+                            <div class="detail-value">${signal.expiry} мин</div>
+                        </div>
+                        <div class="signal-detail">
+                            <div class="detail-label">ТАЙМЕР</div>
+                            <div class="detail-value timer-display">${formatTime(signal.timer)}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Smart Money Analysis -->
+                    <div class="analysis-panel">
+                        <div class="analysis-title">
+                            <i class="fas fa-brain"></i>
+                            SMART MONEY ANALYSIS
+                        </div>
+                        <div class="analysis-grid">
+                            <div class="analysis-item">
+                                <div class="analysis-label">TREND</div>
+                                <div class="analysis-value trend-${signal.analysis.trend.toLowerCase()}">
+                                    ${signal.analysis.trend}
+                                </div>
+                            </div>
+                            <div class="analysis-item">
+                                <div class="analysis-label">STRENGTH</div>
+                                <div class="analysis-value strength-${signal.analysis.strength.toLowerCase()}">
+                                    ${signal.analysis.strength}
+                                </div>
+                            </div>
+                            <div class="analysis-item">
+                                <div class="analysis-label">RSI</div>
+                                <div class="analysis-value">${signal.analysis.rsi}</div>
+                            </div>
+                            <div class="analysis-item">
+                                <div class="analysis-label">ORDER BLOCKS</div>
+                                <div class="analysis-value">${signal.analysis.ob}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- График -->
+                    <div class="chart-container">
+                        <canvas id="chart-${signal.id}"></canvas>
+                    </div>
+                </div>
+                
+                <div class="signal-timer">
+                    <div class="timer pulse">${formatTime(signal.timer)}</div>
+                    <div class="signal-result pending">
+                        ⏳ ОЖИДАНИЕ РЕЗУЛЬТАТА
+                    </div>
+                </div>
+            `;
+        }
+
+        // Инициализация графика
+        function initializeChart(signalId, chartData) {
+            const canvas = document.getElementById(`chart-${signalId}`);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            displayColors: false,
+                            backgroundColor: 'rg(30, 41, 59, 0.9)',
+                            titleFont: {
+                                size: 12
+                            },
+                            bodyFont: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            grid: {
+                                color: 'rgba(255,255,255,0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255,255,255,0.7)',
+                                maxTicksLimit: 6
+                            }
+                        },
+                        y: {
+                            display: true,
+                            grid: {
+                                color: 'rgba(255,255,255,0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255,255,255,0.7)'
+                            }
+                        }
+                    },
+                    elements: {
+                        point: {
+                            radius: 0,
+                            hoverRadius: 4
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        // Форматирование времени
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Обновление времени сервера
+        function updateServerTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ru-RU', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+            });
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        // Имитация обновления таймеров
+        function updateTimers() {
+            document.querySelectorAll('.timer').forEach(timer => {
+                const timeParts = timer.textContent.split(':');
+                let minutes = parseInt(timeParts[0]);
+                let seconds = parseInt(timeParts[1]);
+                
+                if (seconds > 0) {
+                    seconds--;
+                } else {
+                    if (minutes > 0) {
+                        minutes--;
+                        seconds = 59;
+                    }
+                }
+                
+                timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Обновляем также в деталях
+                const detailTimer = timer.closest('.signal-card')?.querySelector('.timer-display');
+                if (detailTimer) {
+                    detailTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            });
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            createSignalCards();
+            updateServerTime();
+            
+            // Обновление времени каждую секунду
+            setInterval(updateTimers, 1000);
+            setInterval(updateServerTime, 1000);
+            
+            // Имитация получения нового сигнала каждые 2 минуты
+            setInterval(() => {
+                console.log("Проверка новых сигналов...");
+            }, 120000);
+        });
+    </script>
+</body>
+</html>
