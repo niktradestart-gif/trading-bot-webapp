@@ -215,6 +215,26 @@
             font-weight: bold;
             margin-left: 5px;
         }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border: 2px solid #e9ecef;
+            display: none;
+        }
+
+        .user-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .user-role {
+            color: #666;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -224,7 +244,15 @@
     tg.expand();
     tg.enableClosingConfirmation();
 
-    let currentUserId = null;
+    // Список валидных ID из pocket_users.json
+    const VALID_POCKET_IDS = {
+        '69662105': { name: 'Admin', role: 'admin' },
+        '5489888474': { name: 'User1', role: 'user' },
+        '5632717908': { name: 'User2', role: 'user' }
+    };
+
+    let currentPocketId = null;
+    let currentUserInfo = null;
 
     function showMessage(elementId, message) {
         const element = document.getElementById(elementId);
@@ -240,10 +268,16 @@
         const authBtn = document.getElementById('authBtn');
         const errorDiv = document.getElementById('errorMessage');
         const successDiv = document.getElementById('successMessage');
+        const proceedBtn = document.getElementById('proceedBtn');
+        const regButtons = document.getElementById('regButtons');
+        const userInfoDiv = document.getElementById('userInfo');
 
         // Скрываем предыдущие сообщения
         errorDiv.style.display = 'none';
         successDiv.style.display = 'none';
+        proceedBtn.style.display = 'none';
+        regButtons.style.display = 'none';
+        userInfoDiv.style.display = 'none';
 
         // Проверка формата ID
         if (!pocketId) {
@@ -260,42 +294,45 @@
         authBtn.disabled = true;
         authBtn.innerHTML = '<div class="loading"></div> Проверка ID...';
 
-        // Получаем Telegram user_id если доступен
-        const telegramId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
-
         // Отправляем запрос боту на проверку
         const payload = JSON.stringify({ 
             action: 'check_pocket_id',
             pocket_id: pocketId,
-            telegram_id: telegramId
+            telegram_id: tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null
         });
         
         tg.sendData(payload);
 
-        // Демо-ответ (в реальности будет ответ от бота)
+        // Имитация проверки с реальными данными
         setTimeout(() => {
-            // Здесь будет реальная проверка через API Pocket Option
-            // Сейчас используем демо-логику
-            
-            const validIds = ['69662105', '12345678', '87654321']; // Демо-валидные ID
-            
-            if (validIds.includes(pocketId)) {
-                successDiv.innerHTML = `
-                    ✅ <strong>ID подтвержден!</strong><br>
-                    Добро пожаловать в торговую систему!
-                `;
-                successDiv.style.display = 'block';
-                authBtn.disabled = false;
-                authBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Перейти в систему';
-                authBtn.className = 'auth-btn success-btn';
-                currentUserId = pocketId;
+            if (VALID_POCKET_IDS[pocketId]) {
+                currentUserInfo = VALID_POCKET_IDS[pocketId];
+                currentPocketId = pocketId;
                 
-                // Сохраняем ID в localStorage
+                // Показываем информацию о пользователе
+                userInfoDiv.innerHTML = `
+                    <div class="user-name">👤 ${currentUserInfo.name}</div>
+                    <div class="user-role">🛡️ ${currentUserInfo.role === 'admin' ? 'Администратор' : 'Пользователь'}</div>
+                    <div class="user-role">🆔 ${pocketId}</div>
+                `;
+                userInfoDiv.style.display = 'block';
+                
+                successDiv.innerHTML = `✅ <strong>ID подтвержден!</strong>`;
+                successDiv.style.display = 'block';
+                
+                // Сохраняем ID
                 localStorage.setItem('pocket_user_id', pocketId);
+                localStorage.setItem('pocket_user_name', currentUserInfo.name);
+                localStorage.setItem('pocket_user_role', currentUserInfo.role);
+                
+                // Показываем кнопку перехода
+                proceedBtn.style.display = 'block';
+                authBtn.style.display = 'none';
+                
             } else {
                 errorDiv.innerHTML = `
                     ❌ <strong>ID не найден в реферальной системе</strong><br>
-                    Зарегистрируйтесь по ссылке ниже
+                    Ваш ID: ${pocketId}
                 `;
                 errorDiv.style.display = 'block';
                 authBtn.disabled = false;
@@ -303,21 +340,20 @@
                 authBtn.className = 'auth-btn';
                 
                 // Показываем кнопки регистрации и поддержки
-                document.getElementById('regButtons').style.display = 'block';
+                regButtons.style.display = 'block';
             }
-        }, 2000);
+        }, 1500);
     }
 
     function proceedToApp() {
-        if (currentUserId) {
-            // Определяем роль пользователя (в реальности бот определит)
-            const isAdmin = currentUserId === '69662105'; // Демо-админ
-            
-            if (isAdmin) {
+        if (currentPocketId && currentUserInfo) {
+            if (currentUserInfo.role === 'admin') {
                 window.location.href = 'admin.html';
             } else {
                 window.location.href = 'user.html';
             }
+        } else {
+            showMessage('errorMessage', '❌ Сначала проверьте ID');
         }
     }
 
@@ -334,8 +370,16 @@
     // Проверяем сохраненный ID при загрузке
     document.addEventListener('DOMContentLoaded', function() {
         const savedId = localStorage.getItem('pocket_user_id');
-        if (savedId) {
+        const savedName = localStorage.getItem('pocket_user_name');
+        const savedRole = localStorage.getItem('pocket_user_role');
+        
+        if (savedId && savedName && savedRole) {
             document.getElementById('pocketId').value = savedId;
+            currentPocketId = savedId;
+            currentUserInfo = { name: savedName, role: savedRole };
+            
+            // Автоматически проверяем сохраненный ID
+            setTimeout(checkPocketId, 500);
         }
     });
     </script>
@@ -369,6 +413,8 @@
                                placeholder="69662105" pattern="\d+" required>
                     </div>
                 </div>
+                
+                <div class="user-info" id="userInfo"></div>
                 
                 <div class="error-message" id="errorMessage"></div>
                 <div class="success-message" id="successMessage"></div>
