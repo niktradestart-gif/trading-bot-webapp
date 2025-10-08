@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трейдинг Сигналы</title>
+    <title>Сигналы Администратора - Трейдинг Сигналы</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -51,6 +51,7 @@
             box-shadow: var(--card-shadow);
             margin-bottom: 20px;
             border-radius: 12px;
+            border-left: 4px solid var(--warning);
         }
         
         .header-content {
@@ -83,6 +84,40 @@
             border-radius: 6px;
             font-size: 12px;
             font-weight: 600;
+        }
+        
+        .admin-badge {
+            background: var(--warning);
+            color: var(--background);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
         }
         
         /* Stats Grid */
@@ -330,21 +365,10 @@
             opacity: 0.7;
         }
         
-        /* Admin Badge */
-        .admin-badge {
-            background: var(--warning);
-            color: var(--background);
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 700;
-            margin-left: 8px;
-        }
-        
         /* Responsive */
         @media (min-width: 768px) {
             .container {
-                max-width: 600px;
+                max-width: 800px;
                 padding: 20px;
             }
             
@@ -359,12 +383,6 @@
             
             .analysis-grid {
                 grid-template-columns: repeat(4, 1fr);
-            }
-        }
-        
-        @media (min-width: 1024px) {
-            .container {
-                max-width: 800px;
             }
         }
         
@@ -388,11 +406,17 @@
                 <div class="logo">
                     <i class="fas fa-robot"></i>
                     Трейдинг Сигналы
-                    <span class="admin-badge" id="adminBadge" style="display: none;">ADMIN</span>
+                    <span class="admin-badge" id="adminBadge">ADMIN</span>
                 </div>
                 <div class="user-info">
                     <span id="userStatus">Активен</span>
                     <div class="status-badge" id="connectionStatus">ONLINE</div>
+                    <button class="btn btn-primary" onclick="goToAdminPanel()" style="margin-left: 10px;">
+                        <i class="fas fa-cog"></i> Панель
+                    </button>
+                    <button class="btn btn-danger" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Выйти
+                    </button>
                 </div>
             </div>
         </div>
@@ -406,7 +430,7 @@
             </div>
             <div class="stat-card">
                 <div class="stat-label">Сигналы</div>
-                <div class="stat-value" id="signalsCount">1</div>
+                <div class="stat-value" id="signalsCount">3</div>
                 <div class="stat-label">активно</div>
             </div>
             <div class="stat-card">
@@ -438,7 +462,7 @@
 
     <script>
         // Данные для демонстрации
-        const userSignals = [
+        const adminSignals = [
             {
                 id: 392,
                 pair: "AUDCHF",
@@ -468,11 +492,7 @@
                         borderWidth: 3
                     }]
                 }
-            }
-        ];
-
-        const adminSignals = [
-            ...userSignals,
+            },
             {
                 id: 393,
                 pair: "EURUSD",
@@ -535,16 +555,23 @@
             }
         ];
 
-        // Определяем тип пользователя
-        const isAdmin = true; // В реальном приложении будет определяться по логину
-        const currentSignals = isAdmin ? adminSignals : userSignals;
+        // Функции навигации
+        function logout() {
+            if (confirm('Вы уверены, что хотите выйти?')) {
+                window.location.href = 'login.html';
+            }
+        }
+
+        function goToAdminPanel() {
+            window.location.href = 'admin.html';
+        }
 
         // Создание карточек сигналов
         function createSignalCards() {
             const container = document.getElementById('signalsContainer');
             const emptyState = document.getElementById('emptyState');
             
-            if (currentSignals.length === 0) {
+            if (adminSignals.length === 0) {
                 container.style.display = 'none';
                 emptyState.style.display = 'block';
                 return;
@@ -554,13 +581,10 @@
             emptyState.style.display = 'none';
             container.innerHTML = '';
             
-            // Показываем бейдж админа если нужно
-            document.getElementById('adminBadge').style.display = isAdmin ? 'inline-block' : 'none';
-            
             // Обновляем количество сигналов
-            document.getElementById('signalsCount').textContent = currentSignals.length;
+            document.getElementById('signalsCount').textContent = adminSignals.length;
             
-            currentSignals.forEach(signal => {
+            adminSignals.forEach(signal => {
                 const card = document.createElement('div');
                 card.className = 'signal-card';
                 card.innerHTML = generateSignalHTML(signal);
@@ -674,7 +698,7 @@
                             mode: 'index',
                             intersect: false,
                             displayColors: false,
-                            backgroundColor: 'rg(30, 41, 59, 0.9)',
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
                             titleFont: {
                                 size: 12
                             },
