@@ -3,457 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель пользователя - Трейдинг Сигналы</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Панель пользователя - Трейдинг Бот</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --secondary: #64748b;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --background: #0f172a;
-            --card-bg: #1e293b;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --border: #334155;
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
-        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
+
         body {
-            background: var(--background);
-            color: var(--text-primary);
-            line-height: 1.6;
-            padding: 0;
-            font-size: 14px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: white;
             min-height: 100vh;
         }
-        
-        .container {
+
+        .dashboard-container {
             max-width: 100%;
             margin: 0 auto;
-            padding: 16px;
+            padding: 15px;
         }
-        
-        /* Header */
-        .header {
-            background: var(--card-bg);
-            padding: 16px;
-            box-shadow: var(--card-shadow);
-            margin-bottom: 20px;
-            border-radius: 12px;
-        }
-        
-        .header-content {
+
+        .dashboard-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #334155;
         }
-        
-        .logo {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text-primary);
+
+        .header-left {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
         }
-        
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #60a5fa;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .user-info {
             display: flex;
-            align-items: center;
-            gap: 12px;
-            color: var(--text-secondary);
-            font-size: 14px;
+            flex-direction: column;
         }
-        
-        .status-badge {
-            background: var(--success);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 12px;
+
+        .user-name {
             font-weight: 600;
+            font-size: 1.1rem;
         }
-        
-        .btn {
-            padding: 8px 16px;
+
+        .user-status {
+            font-size: 0.8rem;
+            color: #10b981;
+        }
+
+        .btn-logout {
+            background: #ef4444;
+            color: white;
             border: none;
+            padding: 10px 15px;
             border-radius: 8px;
-            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
-            font-size: 14px;
-        }
-        
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-        
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-        
-        /* Navigation */
-        .user-nav {
             display: flex;
-            gap: 8px;
-            margin-bottom: 20px;
-            overflow-x: auto;
-            padding-bottom: 8px;
+            align-items: center;
+            gap: 5px;
+            font-weight: 500;
         }
-        
-        .user-nav::-webkit-scrollbar {
-            display: none;
-        }
-        
-        .nav-btn {
-            padding: 12px 20px;
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text-secondary);
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-        
-        .nav-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-        
-        /* Stats Grid */
+
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
-        
+
         .stat-card {
-            background: var(--card-bg);
-            padding: 16px;
+            background: #1e293b;
+            padding: 15px;
             border-radius: 12px;
-            box-shadow: var(--card-shadow);
-            text-align: center;
-            border: 1px solid var(--border);
+            border: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .stat-info {
+            flex: 1;
+        }
+
         .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            margin: 8px 0;
-            color: var(--text-primary);
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #60a5fa;
         }
-        
+
         .stat-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            font-weight: 500;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 2px;
         }
-        
-        /* User Sections */
-        .user-section {
-            display: none;
-        }
-        
-        .user-section.active {
-            display: block;
-        }
-        
-        .section-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        /* Signal Card */
-        .signal-card {
-            background: var(--card-bg);
-            border-radius: 16px;
-            box-shadow: var(--card-shadow);
+
+        .action-section {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
             margin-bottom: 20px;
-            overflow: hidden;
-            border: 1px solid var(--border);
+            border: 1px solid #334155;
         }
-        
-        .signal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: linear-gradient(135deg, var(--card-bg) 0%, #2d3748 100%);
-            border-bottom: 1px solid var(--border);
+
+        .action-section h3 {
+            margin-bottom: 15px;
+            color: #e2e8f0;
         }
-        
-        .signal-pair {
-            font-weight: 700;
-            font-size: 22px;
-            color: var(--text-primary);
-        }
-        
-        .signal-direction {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 14px;
-            text-transform: uppercase;
-        }
-        
-        .signal-buy {
-            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-            color: white;
-        }
-        
-        .signal-sell {
-            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
-            color: white;
-        }
-        
-        .signal-confidence {
-            background: var(--primary);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 14px;
-        }
-        
-        .signal-content {
-            padding: 20px;
-        }
-        
-        .signal-details {
+
+        .action-buttons {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-            margin-bottom: 20px;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
         }
-        
-        .signal-detail {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .detail-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-            font-weight: 500;
-        }
-        
-        .detail-value {
+
+        .btn-primary, .btn-secondary {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
             font-weight: 600;
-            font-size: 16px;
-            color: var(--text-primary);
-        }
-        
-        .chart-container {
-            height: 250px;
-            position: relative;
-            margin: 20px 0;
-            background: var(--background);
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid var(--border);
-        }
-        
-        .signal-timer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: var(--background);
-            border-top: 1px solid var(--border);
-        }
-        
-        .timer {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary);
-            font-feature-settings: "tnum";
-        }
-        
-        .signal-result {
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 700;
-            text-align: center;
-            font-size: 14px;
-        }
-        
-        .win {
-            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-            color: white;
-        }
-        
-        .loss {
-            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
-            color: white;
-        }
-        
-        .pending {
-            background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
-            color: white;
-        }
-        
-        /* Smart Money Analysis */
-        .analysis-panel {
-            background: var(--background);
-            padding: 16px;
-            border-radius: 12px;
-            margin: 16px 0;
-            border: 1px solid var(--border);
-        }
-        
-        .analysis-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 12px;
+            cursor: pointer;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
+            transition: all 0.3s ease;
         }
-        
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
+
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
         }
-        
-        .analysis-item {
-            display: flex;
-            flex-direction: column;
+
+        .btn-secondary {
+            background: #374151;
+            color: white;
+            border: 1px solid #4b5563;
         }
-        
-        .analysis-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
         }
-        
-        .analysis-value {
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--text-primary);
+
+        .btn-secondary:hover {
+            background: #4b5563;
         }
-        
-        .trend-bearish {
-            color: var(--danger);
-        }
-        
-        .trend-bullish {
-            color: var(--success);
-        }
-        
-        .strength-high {
-            color: var(--success);
-        }
-        
-        .strength-moderate {
-            color: var(--warning);
-        }
-        
-        .strength-low {
-            color: var(--danger);
-        }
-        
-        /* History */
-        .history-card {
-            background: var(--card-bg);
-            padding: 16px;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            border: 1px solid var(--border);
-        }
-        
-        .history-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        
-        .history-pair {
-            font-weight: 600;
-            font-size: 16px;
-        }
-        
-        .history-details {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-        
-        /* Settings */
-        .settings-group {
-            background: var(--card-bg);
+
+        .settings-section {
+            background: #1e293b;
             padding: 20px;
             border-radius: 12px;
-            margin-bottom: 16px;
-            border: 1px solid var(--border);
+            border: 1px solid #334155;
         }
-        
-        .settings-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: var(--text-primary);
+
+        .settings-section h3 {
+            margin-bottom: 15px;
+            color: #e2e8f0;
         }
-        
+
         .setting-item {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border);
+            gap: 12px;
+            padding: 12px;
+            background: #334155;
+            border-radius: 8px;
+            margin-bottom: 10px;
         }
-        
-        .setting-item:last-child {
-            border-bottom: none;
-        }
-        
-        .setting-label {
-            color: var(--text-primary);
-        }
-        
-        .setting-value {
-            color: var(--text-secondary);
-        }
-        
+
         .switch {
             position: relative;
             display: inline-block;
             width: 50px;
             height: 24px;
         }
-        
+
         .switch input {
             opacity: 0;
             width: 0;
             height: 0;
         }
-        
+
         .slider {
             position: absolute;
             cursor: pointer;
@@ -461,11 +215,11 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: var(--border);
+            background-color: #6b7280;
             transition: .4s;
             border-radius: 24px;
         }
-        
+
         .slider:before {
             position: absolute;
             content: "";
@@ -477,737 +231,288 @@
             transition: .4s;
             border-radius: 50%;
         }
-        
+
         input:checked + .slider {
-            background-color: var(--success);
+            background-color: #10b981;
         }
-        
+
         input:checked + .slider:before {
             transform: translateX(26px);
         }
-        
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-secondary);
+
+        .trading-status {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 15px;
+            border-left: 4px solid #10b981;
         }
-        
-        .empty-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
-        
-        .empty-text {
-            font-size: 16px;
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
             margin-bottom: 8px;
+            font-size: 0.9rem;
         }
-        
-        .empty-subtext {
-            font-size: 14px;
+
+        .status-value {
+            color: #60a5fa;
+            font-weight: 500;
+        }
+
+        .loading {
             opacity: 0.7;
+            pointer-events: none;
         }
-        
-        /* Buttons */
-        .btn-primary {
-            background: var(--primary);
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
             color: white;
-            padding: 12px 24px;
-            border: none;
+            padding: 12px 20px;
             border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 14px;
-        }
-        
-        .btn-block {
-            width: 100%;
-        }
-        
-        /* Responsive */
-        @media (min-width: 768px) {
-            .container {
-                max-width: 600px;
-                padding: 20px;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 16px;
-            }
-            
-            .signal-details {
-                grid-template-columns: repeat(4, 1fr);
-            }
-            
-            .analysis-grid {
-                grid-template-columns: repeat(4, 1fr);
-            }
-            
-            .user-nav {
-                justify-content: center;
-            }
-        }
-        
-        /* Animations */
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        
-        .pulse {
-            animation: pulse 2s infinite;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-content">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.enableClosingConfirmation();
+
+    // Функции для связи с ботом
+    function sendToBot(action, data = {}) {
+        const payload = JSON.stringify({ action, ...data });
+        tg.sendData(payload);
+        showNotification(`Команда отправлена: ${action}`);
+    }
+
+    function showNotification(message) {
+        const notification = document.getElementById('notification');
+        if (notification) {
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    // Обработчики кнопок
+    document.addEventListener('DOMContentLoaded', function() {
+        // Кнопка получения сигнала
+        const signalBtn = document.getElementById('getSignalBtn');
+        if (signalBtn) {
+            signalBtn.addEventListener('click', () => {
+                signalBtn.classList.add('loading');
+                sendToBot('get_signal');
+                setTimeout(() => signalBtn.classList.remove('loading'), 3000);
+            });
+        }
+        
+        // Кнопка статистики
+        const statsBtn = document.getElementById('showStatsBtn');
+        if (statsBtn) {
+            statsBtn.addEventListener('click', () => {
+                sendToBot('show_stats');
+            });
+        }
+        
+        // Кнопка истории
+        const historyBtn = document.getElementById('showHistoryBtn');
+        if (historyBtn) {
+            historyBtn.addEventListener('click', () => {
+                sendToBot('history');
+            });
+        }
+        
+        // Переключатель авто-трейдинга
+        const autoTradingToggle = document.getElementById('autoTradingToggle');
+        if (autoTradingToggle) {
+            autoTradingToggle.addEventListener('change', (e) => {
+                sendToBot('toggle_auto_trading', { enabled: e.target.checked });
+            });
+        }
+        
+        // Переключатель ML
+        const mlToggle = document.getElementById('mlToggle');
+        if (mlToggle) {
+            mlToggle.addEventListener('change', (e) => {
+                sendToBot('toggle_ml', { enabled: e.target.checked });
+            });
+        }
+        
+        // Переключатель GPT
+        const gptToggle = document.getElementById('gptToggle');
+        if (gptToggle) {
+            gptToggle.addEventListener('change', (e) => {
+                sendToBot('toggle_gpt', { enabled: e.target.checked });
+            });
+        }
+        
+        // Кнопка выхода
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                tg.close();
+            });
+        }
+
+        // Загрузка данных пользователя
+        loadUserData();
+    });
+
+    function loadUserData() {
+        // Отправляем запрос на получение реальных данных
+        sendToBot('get_user_data');
+        
+        // Демо-данные на время тестирования
+        setTimeout(() => {
+            updateDashboard({
+                trade_count: 24,
+                win_rate: 67.5,
+                open_trades: 1,
+                auto_trading: true,
+                ml_enabled: true,
+                gpt_enabled: false
+            });
+        }, 1000);
+    }
+
+    function updateDashboard(data) {
+        if (data && data.trade_count !== undefined) {
+            document.getElementById('totalTrades').textContent = data.trade_count;
+            document.getElementById('winRate').textContent = data.win_rate.toFixed(1) + '%';
+            document.getElementById('openTrades').textContent = data.open_trades || 0;
+            
+            document.getElementById('autoTradingToggle').checked = data.auto_trading;
+            document.getElementById('mlToggle').checked = data.ml_enabled;
+            document.getElementById('gptToggle').checked = data.gpt_enabled;
+        }
+    }
+    </script>
+
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="header-left">
                 <div class="logo">
                     <i class="fas fa-robot"></i>
-                    Трейдинг Сигналы
+                    Трейдинг Бот
                 </div>
                 <div class="user-info">
-                    <span id="userStatus">Активен</span>
-                    <div class="status-badge" id="connectionStatus">ONLINE</div>
-                    <button class="btn btn-danger" onclick="logout()">
-                        <i class="fas fa-sign-out-alt"></i> Выйти
-                    </button>
+                    <span class="user-name">Пользователь</span>
+                    <span class="user-status">🟢 Online</span>
                 </div>
             </div>
+            <div class="header-right">
+                <button class="btn-logout" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Выйти
+                </button>
+            </div>
         </div>
-        
-        <!-- Navigation -->
-        <div class="user-nav">
-            <button class="nav-btn active" onclick="showSection('signals')">
-                <i class="fas fa-chart-line"></i> Сигналы
-            </button>
-            <button class="nav-btn" onclick="showSection('history')">
-                <i class="fas fa-history"></i> История
-            </button>
-            <button class="nav-btn" onclick="showSection('stats')">
-                <i class="fas fa-chart-bar"></i> Статистика
-            </button>
-            <button class="nav-btn" onclick="showSection('settings')">
-                <i class="fas fa-cog"></i> Настройки
-            </button>
-        </div>
-        
-        <!-- Статистика -->
+
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label">Точность</div>
-                <div class="stat-value">78%</div>
-                <div class="stat-label">за сегодня</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Сигналы</div>
-                <div class="stat-value" id="signalsCount">1</div>
-                <div class="stat-label">активно</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Время</div>
-                <div class="stat-value" id="currentTime">--:--</div>
-                <div class="stat-label">сервера</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Статус</div>
-                <div class="stat-value" id="botStatus">🟢</div>
-                <div class="stat-label">бота</div>
-            </div>
-        </div>
-        
-        <!-- Signals Section -->
-        <div id="signals" class="user-section active">
-            <div class="section-title">
-                <i class="fas fa-bolt"></i> Активные сигналы
-            </div>
-            
-            <div id="signalsContainer">
-                <!-- Активные сигналы будут здесь -->
-            </div>
-            
-            <div id="emptySignals" class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-moon"></i>
+                <div class="stat-icon">
+                    <i class="fas fa-chart-line"></i>
                 </div>
-                <div class="empty-text">Нет активных сигналов</div>
-                <div class="empty-subtext">Ожидайте новые торговые сигналы</div>
-            </div>
-        </div>
-        
-        <!-- History Section -->
-        <div id="history" class="user-section">
-            <div class="section-title">
-                <i class="fas fa-history"></i> История сделок
-            </div>
-            
-            <div id="historyContainer">
-                <!-- История сделок будет здесь -->
-            </div>
-            
-            <div id="emptyHistory" class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-clipboard-list"></i>
-                </div>
-                <div class="empty-text">История сделок пуста</div>
-                <div class="empty-subtext">Здесь появятся завершенные сделки</div>
-            </div>
-        </div>
-        
-        <!-- Statistics Section -->
-        <div id="stats" class="user-section">
-            <div class="section-title">
-                <i class="fas fa-chart-bar"></i> Ваша статистика
-            </div>
-            
-            <div class="stats-grid">
-                <div class="stat-card">
+                <div class="stat-info">
+                    <div class="stat-value" id="totalTrades">0</div>
                     <div class="stat-label">Всего сделок</div>
-                    <div class="stat-value">156</div>
-                    <div class="stat-label">за все время</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Выиграно</div>
-                    <div class="stat-value">121</div>
-                    <div class="stat-label">сделок</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Проиграно</div>
-                    <div class="stat-value">35</div>
-                    <div class="stat-label">сделок</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Эффективность</div>
-                    <div class="stat-value">77.6%</div>
-                    <div class="stat-label">точность</div>
                 </div>
             </div>
             
-            <div class="chart-container">
-                <canvas id="accuracyChart"></canvas>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="winRate">0%</div>
+                    <div class="stat-label">Win Rate</div>
+                </div>
             </div>
             
-            <div class="chart-container">
-                <canvas id="pairsChart"></canvas>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value" id="openTrades">0</div>
+                    <div class="stat-label">Активных сделок</div>
+                </div>
             </div>
         </div>
-        
-        <!-- Settings Section -->
-        <div id="settings" class="user-section">
-            <div class="section-title">
-                <i class="fas fa-cog"></i> Настройки
+
+        <div class="action-section">
+            <h3>Торговые действия</h3>
+            <div class="action-buttons">
+                <button class="btn-primary" id="getSignalBtn">
+                    <i class="fas fa-bolt"></i>
+                    Получить сигнал
+                </button>
+                <button class="btn-secondary" id="showStatsBtn">
+                    <i class="fas fa-chart-bar"></i>
+                    Статистика
+                </button>
+                <button class="btn-secondary" id="showHistoryBtn">
+                    <i class="fas fa-history"></i>
+                    История
+                </button>
+                <button class="btn-secondary" onclick="sendToBot('status')">
+                    <i class="fas fa-info-circle"></i>
+                    Статус
+                </button>
             </div>
-            
-            <div class="settings-group">
-                <div class="settings-title">Уведомления</div>
-                
-                <div class="setting-item">
-                    <div class="setting-label">Новые сигналы</div>
-                    <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                
-                <div class="setting-item">
-                    <div class="setting-label">Завершение сделок</div>
-                    <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                
-                <div class="setting-item">
-                    <div class="setting-label">Важные уведомления</div>
-                    <label class="switch">
-                        <input type="checkbox">
-                        <span class="slider"></span>
-                    </label>
-                </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Настройки анализа</h3>
+            <div class="setting-item">
+                <label class="switch">
+                    <input type="checkbox" id="autoTradingToggle">
+                    <span class="slider"></span>
+                </label>
+                <span>🤖 Авто-трейдинг</span>
             </div>
-            
-            <div class="settings-group">
-                <div class="settings-title">Торговые настройки</div>
-                
-                <div class="setting-item">
-                    <div class="setting-label">Минимальная уверенность</div>
-                    <div class="setting-value">6/10</div>
-                </div>
-                
-                <div class="setting-item">
-                    <div class="setting-label">Авто-догон</div>
-                    <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                
-                <div class="setting-item">
-                    <div class="setting-label">Макс. шагов догона</div>
-                    <div class="setting-value">5</div>
-                </div>
+            <div class="setting-item">
+                <label class="switch">
+                    <input type="checkbox" id="mlToggle">
+                    <span class="slider"></span>
+                </label>
+                <span>🧠 ML анализ</span>
             </div>
-            
-            <button class="btn-primary btn-block">
-                <i class="fas fa-save"></i> Сохранить настройки
-            </button>
+            <div class="setting-item">
+                <label class="switch">
+                    <input type="checkbox" id="gptToggle">
+                    <span class="slider"></span>
+                </label>
+                <span>💬 GPT анализ</span>
+            </div>
+        </div>
+
+        <div class="trading-status">
+            <div class="status-item">
+                <span>Текущая сделка:</span>
+                <span class="status-value" id="openTrades">0</span>
+            </div>
+            <div class="status-item">
+                <span>Последний сигнал:</span>
+                <span class="status-value">EURUSD BUY</span>
+            </div>
+            <div class="status-item">
+                <span>Режим работы:</span>
+                <span class="status-value">🟢 Активен</span>
+            </div>
         </div>
     </div>
 
-    <script>
-        // Данные для демонстрации
-        const userSignals = [
-            {
-                id: 392,
-                pair: "AUDCHF",
-                direction: "SELL",
-                entryPrice: "0.52550",
-                expiry: 2,
-                confidence: 6,
-                status: "active",
-                timer: 120,
-                analysis: {
-                    trend: "BEARISH",
-                    strength: "MODERATE",
-                    rsi: "NEUTRAL",
-                    ob: 0,
-                    zones: 1,
-                    patterns: 0
-                },
-                chartData: {
-                    labels: ['10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30'],
-                    datasets: [{
-                        label: 'AUDCHF',
-                        data: [0.5260, 0.5258, 0.5255, 0.5253, 0.5252, 0.5251, 0.5250],
-                        borderColor: '#ef4444',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        borderWidth: 3
-                    }]
-                }
-            }
-        ];
-
-        const historyData = [
-            {
-                id: 391,
-                pair: "GBPCHF",
-                direction: "BUY",
-                entryPrice: "1.07193",
-                exitPrice: "1.07183",
-                result: "LOSS",
-                time: "14:20"
-            },
-            {
-                id: 390,
-                pair: "USDJPY",
-                direction: "SELL",
-                entryPrice: "149.250",
-                exitPrice: "149.120",
-                result: "WIN",
-                time: "13:45"
-            },
-            {
-                id: 389,
-                pair: "EURGBP",
-                direction: "BUY",
-                entryPrice: "0.86750",
-                exitPrice: "0.86820",
-                result: "WIN",
-                time: "12:30"
-            },
-            {
-                id: 388,
-                pair: "AUDUSD",
-                direction: "SELL",
-                entryPrice: "0.65200",
-                exitPrice: "0.65120",
-                result: "WIN",
-                time: "11:15"
-            }
-        ];
-
-        // Функция выхода
-        function logout() {
-            if (confirm('Вы уверены, что хотите выйти?')) {
-                window.location.href = 'login.html';
-            }
-        }
-
-        // Показать секцию
-        function showSection(sectionName) {
-            // Скрыть все секции
-            document.querySelectorAll('.user-section').forEach(section => {
-                section.classList.remove('active');
-            });
-            
-            // Показать выбранную секцию
-            document.getElementById(sectionName).classList.add('active');
-            
-            // Обновить активную кнопку навигации
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            // Загрузить данные для секции
-            if (sectionName === 'signals') {
-                loadSignals();
-            } else if (sectionName === 'history') {
-                loadHistory();
-            } else if (sectionName === 'stats') {
-                loadStatistics();
-            }
-        }
-
-        // Загрузка сигналов
-        function loadSignals() {
-            const container = document.getElementById('signalsContainer');
-            const emptyState = document.getElementById('emptySignals');
-            
-            if (userSignals.length === 0) {
-                container.style.display = 'none';
-                emptyState.style.display = 'block';
-                return;
-            }
-            
-            container.style.display = 'block';
-            emptyState.style.display = 'none';
-            container.innerHTML = '';
-            
-            // Обновляем количество сигналов
-            document.getElementById('signalsCount').textContent = userSignals.length;
-            
-            userSignals.forEach(signal => {
-                const card = document.createElement('div');
-                card.className = 'signal-card';
-                card.innerHTML = generateSignalHTML(signal);
-                container.appendChild(card);
-                
-                // Инициализация графика
-                setTimeout(() => {
-                    initializeChart(signal.id, signal.chartData);
-                }, 100);
-            });
-        }
-
-        // Загрузка истории
-        function loadHistory() {
-            const container = document.getElementById('historyContainer');
-            const emptyState = document.getElementById('emptyHistory');
-            
-            if (historyData.length === 0) {
-                container.style.display = 'none';
-                emptyState.style.display = 'block';
-                return;
-            }
-            
-            container.style.display = 'block';
-            emptyState.style.display = 'none';
-            container.innerHTML = '';
-            
-            historyData.forEach(trade => {
-                const card = document.createElement('div');
-                card.className = 'history-card';
-                card.innerHTML = `
-                    <div class="history-header">
-                        <div class="history-pair">${trade.pair}</div>
-                        <div class="signal-result ${trade.result === 'WIN' ? 'win' : 'loss'}" style="padding: 6px 12px; font-size: 12px;">
-                            ${trade.result === 'WIN' ? '✅ WIN' : '❌ LOSS'}
-                        </div>
-                    </div>
-                    <div class="history-details">
-                        <div>
-                            <div class="detail-label">Направление</div>
-                            <div class="detail-value">${trade.direction}</div>
-                        </div>
-                        <div>
-                            <div class="detail-label">Вход</div>
-                            <div class="detail-value">${trade.entryPrice}</div>
-                        </div>
-                        <div>
-                            <div class="detail-label">Выход</div>
-                            <div class="detail-value">${trade.exitPrice}</div>
-                        </div>
-                        <div>
-                            <div class="detail-label">Время</div>
-                            <div class="detail-value">${trade.time}</div>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        // Загрузка статистики
-        function loadStatistics() {
-            // График точности
-            const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
-            new Chart(accuracyCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
-                    datasets: [{
-                        label: 'Точность %',
-                        data: [72, 75, 78, 82, 80, 76, 78],
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        borderWidth: 3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    }
-                }
-            });
-
-            // График по парам
-            const pairsCtx = document.getElementById('pairsChart').getContext('2d');
-            new Chart(pairsCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDCHF'],
-                    datasets: [{
-                        label: 'Точность %',
-                        data: [80, 75, 82, 78],
-                        backgroundColor: [
-                            'rgba(37, 99, 235, 0.8)',
-                            'rgba(16, 185, 129, 0.8)',
-                            'rgba(245, 158, 11, 0.8)',
-                            'rgba(239, 68, 68, 0.8)'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    }
-                }
-            });
-        }
-
-        // Генерация HTML для сигнала
-        function generateSignalHTML(signal) {
-            return `
-                <div class="signal-header">
-                    <div class="signal-pair">${signal.pair}</div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <span class="signal-direction ${signal.direction === 'BUY' ? 'signal-buy' : 'signal-sell'}">
-                            ${signal.direction}
-                        </span>
-                        <span class="signal-confidence">
-                            ${signal.confidence}/10
-                        </span>
-                    </div>
-                </div>
-                
-                <div class="signal-content">
-                    <!-- Детали сигнала -->
-                    <div class="signal-details">
-                        <div class="signal-detail">
-                            <div class="detail-label">ID СДЕЛКИ</div>
-                            <div class="detail-value">#${signal.id}</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="detail-label">ЦЕНА ВХОДА</div>
-                            <div class="detail-value">${signal.entryPrice}</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="detail-label">ЭКСПИРАЦИЯ</div>
-                            <div class="detail-value">${signal.expiry} мин</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="detail-label">ТАЙМЕР</div>
-                            <div class="detail-value timer-display">${formatTime(signal.timer)}</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Smart Money Analysis -->
-                    <div class="analysis-panel">
-                        <div class="analysis-title">
-                            <i class="fas fa-brain"></i>
-                            SMART MONEY ANALYSIS
-                        </div>
-                        <div class="analysis-grid">
-                            <div class="analysis-item">
-                                <div class="analysis-label">TREND</div>
-                                <div class="analysis-value trend-${signal.analysis.trend.toLowerCase()}">
-                                    ${signal.analysis.trend}
-                                </div>
-                            </div>
-                            <div class="analysis-item">
-                                <div class="analysis-label">STRENGTH</div>
-                                <div class="analysis-value strength-${signal.analysis.strength.toLowerCase()}">
-                                    ${signal.analysis.strength}
-                                </div>
-                            </div>
-                            <div class="analysis-item">
-                                <div class="analysis-label">RSI</div>
-                                <div class="analysis-value">${signal.analysis.rsi}</div>
-                            </div>
-                            <div class="analysis-item">
-                                <div class="analysis-label">ORDER BLOCKS</div>
-                                <div class="analysis-value">${signal.analysis.ob}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- График -->
-                    <div class="chart-container">
-                        <canvas id="chart-${signal.id}"></canvas>
-                    </div>
-                </div>
-                
-                <div class="signal-timer">
-                    <div class="timer pulse">${formatTime(signal.timer)}</div>
-                    <div class="signal-result pending">
-                        ⏳ ОЖИДАНИЕ РЕЗУЛЬТАТА
-                    </div>
-                </div>
-            `;
-        }
-
-        // Инициализация графика
-        function initializeChart(signalId, chartData) {
-            const canvas = document.getElementById(`chart-${signalId}`);
-            if (!canvas) return;
-            
-            const ctx = canvas.getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: chartData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            displayColors: false,
-                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                            titleFont: {
-                                size: 12
-                            },
-                            bodyFont: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            display: true,
-                            grid: {
-                                color: 'rgba(255,255,255,0.1)'
-                            },
-                            ticks: {
-                                color: 'rgba(255,255,255,0.7)',
-                                maxTicksLimit: 6
-                            }
-                        },
-                        y: {
-                            display: true,
-                            grid: {
-                                color: 'rgba(255,255,255,0.1)'
-                            },
-                            ticks: {
-                                color: 'rgba(255,255,255,0.7)'
-                            }
-                        }
-                    },
-                    elements: {
-                        point: {
-                            radius: 0,
-                            hoverRadius: 4
-                        }
-                    },
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    }
-                }
-            });
-        }
-
-        // Форматирование времени
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        // Обновление времени сервера
-        function updateServerTime() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('ru-RU', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: false 
-            });
-            document.getElementById('currentTime').textContent = timeString;
-        }
-
-        // Имитация обновления таймеров
-        function updateTimers() {
-            document.querySelectorAll('.timer').forEach(timer => {
-                const timeParts = timer.textContent.split(':');
-                let minutes = parseInt(timeParts[0]);
-                let seconds = parseInt(timeParts[1]);
-                
-                if (seconds > 0) {
-                    seconds--;
-                } else {
-                    if (minutes > 0) {
-                        minutes--;
-                        seconds = 59;
-                    }
-                }
-                
-                timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                
-                // Обновляем также в деталях
-                const detailTimer = timer.closest('.signal-card')?.querySelector('.timer-display');
-                if (detailTimer) {
-                    detailTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                }
-            });
-        }
-
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', function() {
-            loadSignals();
-            updateServerTime();
-            
-            // Обновление времени каждую секунду
-            setInterval(updateTimers, 1000);
-            setInterval(updateServerTime, 1000);
-            
-            // Имитация получения нового сигнала
-            setInterval(() => {
-                console.log("Проверка новых сигналов...");
-            }, 30000);
-        });
-    </script>
+    <div class="notification" id="notification"></div>
 </body>
 </html>
