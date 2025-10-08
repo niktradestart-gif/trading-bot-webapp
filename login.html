@@ -351,20 +351,14 @@ function showUserSuccess(user, pocketId) {
     localStorage.setItem('pocket_user_name', userName);
     localStorage.setItem('pocket_user_role', user.role);
     
-    // Обновляем кнопку продолжить в зависимости от роли
-    if (user.role === 'admin') {
-        proceedBtn.onclick = () => window.location.href = 'admin.html';
-        proceedBtn.innerHTML = '<i class="fas fa-cog"></i> Перейти в панель администратора';
-    } else {
-        proceedBtn.onclick = () => window.location.href = 'user.html';
-        proceedBtn.innerHTML = '<i class="fas fa-user"></i> Перейти в личный кабинет';
-    }
+    // ВСЕ пользователи идут в trading.html (и админы и юзеры)
+    proceedBtn.onclick = () => window.location.href = 'trading.html';
+    proceedBtn.innerHTML = '<i class="fas fa-chart-line"></i> Перейти в трейдинг';
     
     // Показываем кнопку перехода
     proceedBtn.style.display = 'block';
     authBtn.style.display = 'none';
 }
-
 function showUserNotFound(pocketId) {
     const errorDiv = document.getElementById('errorMessage');
     const regButtons = document.getElementById('regButtons');
@@ -410,16 +404,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
     function proceedToApp() {
-        if (currentPocketId && currentUserInfo) {
-            if (currentUserInfo.role === 'admin') {
-                window.location.href = 'admin.html';
-            } else {
-                window.location.href = 'user.html';
-            }
-        } else {
-            showMessage('errorMessage', '❌ Сначала проверьте ID');
-        }
+    if (currentPocketId && currentUserInfo) {
+        // Все идут в trading.html
+        window.location.href = 'trading.html';
+    } else {
+        showMessage('errorMessage', '❌ Сначала проверьте ID');
     }
+}
 
     function openRegistration() {
         const url = 'https://pocket-friends.com/r/0qrjewbjlf';
