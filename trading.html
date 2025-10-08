@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASPIRE TRADE - Трейдинг</title>
+    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/trading.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Шапка -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1>ASPIRE TRADE</h1>
+                <span class="app-subtitle">Трейдинг</span>
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <span id="userName">Пользователь</span>
+                    <button onclick="logout()" class="logout-btn">Выйти</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Статистика -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-number" id="totalTrades">24</div>
+                <div class="stat-label">СДЕЛОК</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="winRate">67.5%</div>
+                <div class="stat-label">WIN RATE</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="activeTrades">1</div>
+                <div class="stat-label">АКТИВНЫХ</div>
+            </div>
+        </div>
+
+        <!-- Навигация -->
+        <nav class="app-nav">
+            <button class="nav-btn active" data-tab="signals">Сигналы</button>
+            <button class="nav-btn" data-tab="history">История</button>
+            <button class="nav-btn" data-tab="statistics">Статистика</button>
+            <button class="nav-btn" data-tab="settings">Настройки</button>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="main-content">
+            
+            <!-- ВКЛАДКА СИГНАЛЫ -->
+            <div id="signals-tab" class="tab-content active">
+                <!-- Текущий сигнал -->
+                <div class="current-signal">
+                    <div class="signal-header">
+                        <h3>USDCHF - Smart Money Analysis - SELL</h3>
+                        <div class="signal-confidence">
+                            <span>6/10</span>
+                            <span>УВЕРЕННОСТЬ</span>
+                        </div>
+                    </div>
+                    
+                    <div class="signal-details">
+                        <div class="detail-item">
+                            <span class="label">ID СДЕЛКИ</span>
+                            <span class="value">#392</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">ЦЕНА ВХОДА</span>
+                            <span class="value">0.52550</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">ЭКСПИРАЦИЯ</span>
+                            <span class="value">2 МИН</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">ТАЙМЕР</span>
+                            <span class="value timer" id="tradeTimer">00:00</span>
+                        </div>
+                    </div>
+
+                    <!-- ГРАФИК -->
+                    <div class="trading-interface">
+                        <div class="chart-header">
+                            <div class="pair-info">
+                                <h2>USDCHF - Smart Money Analysis - SELL</h2>
+                                <div class="current-price">0.79996</div>
+                            </div>
+                            <div class="analysis-indicators">
+                                <div class="indicator">
+                                    <span class="label">Trend:</span>
+                                    <span class="value bearish">BEARISH</span>
+                                </div>
+                                <div class="indicator">
+                                    <span class="label">Strength:</span>
+                                    <span class="value moderate">MODERATE</span>
+                                </div>
+                                <div class="indicator">
+                                    <span class="label">RSI:</span>
+                                    <span class="value neutral">NEUTRAL</span>
+                                </div>
+                                <div class="indicator">
+                                    <span class="label">OB:</span>
+                                    <span class="value">2</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chart-container">
+                            <div class="price-levels">
+                                <div class="price-level">0.80125</div>
+                                <div class="price-level">0.80100</div>
+                                <div class="price-level">0.80075</div>
+                                <div class="price-level active">0.80050</div>
+                                <div class="price-level">0.80025</div>
+                                <div class="price-level current">0.80000</div>
+                                <div class="price-level">0.79975</div>
+                                <div class="price-level">0.79950</div>
+                            </div>
+                            
+                            <div class="chart-area">
+                                <canvas id="tradingChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Volume индикатор -->
+                        <div class="volume-container">
+                            <div class="volume-bars">
+                                <div class="volume-bar" style="height: 60%"></div>
+                                <div class="volume-bar" style="height: 80%"></div>
+                                <div class="volume-bar" style="height: 40%"></div>
+                                <div class="volume-bar" style="height: 70%"></div>
+                                <div class="volume-bar" style="height: 90%"></div>
+                                <div class="volume-bar" style="height: 50%"></div>
+                            </div>
+                            <div class="volume-labels">
+                                <span>10:20</span>
+                                <span>14:10</span>
+                                <span>12:10</span>
+                                <span>12:30</span>
+                                <span>13:10</span>
+                                <span>14:30</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Кнопки действия -->
+                    <div class="action-buttons">
+                        <button class="btn btn-success" onclick="executeTrade('BUY')">BUY</button>
+                        <button class="btn btn-danger" onclick="executeTrade('SELL')">SELL</button>
+                        <button class="btn btn-secondary" onclick="skipTrade()">Пропустить</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ВКЛАДКА ИСТОРИЯ -->
+            <div id="history-tab" class="tab-content">
+                <div class="history-container">
+                    <h3>История сделок</h3>
+                    <div class="filters">
+                        <select id="timeFilter">
+                            <option value="today">Сегодня</option>
+                            <option value="week">Неделя</option>
+                            <option value="month">Месяц</option>
+                        </select>
+                        <select id="resultFilter">
+                            <option value="all">Все сделки</option>
+                            <option value="win">Выигрыши</option>
+                            <option value="loss">Проигрыши</option>
+                        </select>
+                    </div>
+                    <div class="trades-list" id="tradesList">
+                        <!-- История будет загружена через JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ВКЛАДКА СТАТИСТИКА -->
+            <div id="statistics-tab" class="tab-content">
+                <div class="stats-grid">
+                    <div class="stat-chart">
+                        <h4>Эффективность по дням</h4>
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                    <div class="stat-chart">
+                        <h4>Валютные пары</h4>
+                        <canvas id="pairsChart"></canvas>
+                    </div>
+                    <div class="stat-numbers">
+                        <h4>Ключевые метрики</h4>
+                        <div class="metrics-list" id="metricsList">
+                            <!-- Метрики через JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ВКЛАДКА НАСТРОЙКИ -->
+            <div id="settings-tab" class="tab-content">
+                <div class="settings-container">
+                    <h3>Настройки уведомлений</h3>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="pushNotifications" checked>
+                            Push-уведомления
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="emailNotifications">
+                            Email-уведомления
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>Минимальная уверенность сигнала:</label>
+                        <input type="range" id="confidenceLevel" min="1" max="10" value="6">
+                        <span id="confidenceValue">6/10</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSettings()">Сохранить настройки</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets/trading.js"></script>
+</body>
+</html>
