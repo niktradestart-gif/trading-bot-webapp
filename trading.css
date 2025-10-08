@@ -1,0 +1,501 @@
+/* trading.css - Стили для трейдинг интерфейса */
+
+/* Основные стили */
+.app-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    color: white;
+}
+
+/* Шапка */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.header-left h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.app-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logout-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Статистика */
+.stats-container {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px;
+    gap: 15px;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    flex: 1;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat-number {
+    font-size: 32px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+}
+
+/* Навигация */
+.app-nav {
+    display: flex;
+    padding: 0 20px;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.nav-btn {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.nav-btn.active {
+    background: #667eea;
+    transform: translateY(-2px);
+}
+
+.nav-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Основной контент */
+.main-content {
+    padding: 0 20px 20px;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Текущий сигнал */
+.current-signal {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.signal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.signal-header h3 {
+    margin: 0;
+    color: white;
+}
+
+.signal-confidence {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 10px 15px;
+    border-radius: 8px;
+}
+
+.signal-confidence span:first-child {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.signal-confidence span:last-child {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.signal-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.detail-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.detail-item .label {
+    display: block;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 5px;
+}
+
+.detail-item .value {
+    display: block;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.timer {
+    color: #ff4444;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* График */
+.trading-interface {
+    background: #1e1e1e;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.pair-info h2 {
+    color: white;
+    margin: 0;
+    font-size: 18px;
+}
+
+.current-price {
+    font-size: 24px;
+    font-weight: bold;
+    color: #ff4444;
+    margin-top: 5px;
+}
+
+.analysis-indicators {
+    display: flex;
+    gap: 15px;
+}
+
+.indicator {
+    background: #2d2d2d;
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.indicator .label {
+    color: #888;
+    font-size: 12px;
+    display: block;
+}
+
+.indicator .value {
+    font-weight: bold;
+    margin-top: 3px;
+}
+
+.bearish { color: #ff4444; }
+.bullish { color: #44ff44; }
+.neutral { color: #ffff44; }
+.moderate { color: #ffaa44; }
+
+.chart-container {
+    display: flex;
+    height: 300px;
+    margin-bottom: 20px;
+}
+
+.price-levels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 80px;
+    color: white;
+    font-size: 12px;
+    padding: 10px 0;
+}
+
+.price-level.current {
+    color: #ff4444;
+    font-weight: bold;
+}
+
+.price-level.active {
+    color: #ffaa44;
+}
+
+.chart-area {
+    flex: 1;
+    position: relative;
+}
+
+.chart-area canvas {
+    border-radius: 8px;
+}
+
+/* Volume индикатор */
+.volume-container {
+    height: 80px;
+    display: flex;
+    flex-direction: column;
+}
+
+.volume-bars {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    flex: 1;
+    padding: 0 10px;
+}
+
+.volume-bar {
+    width: 30px;
+    background: #4444ff;
+    border-radius: 2px 2px 0 0;
+    transition: height 0.3s;
+}
+
+.volume-labels {
+    display: flex;
+    justify-content: space-between;
+    color: #888;
+    font-size: 10px;
+    padding: 5px 10px;
+}
+
+/* Кнопки действия */
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.btn {
+    flex: 1;
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: white;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+}
+
+.btn-secondary {
+    background: #6c757d;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* История сделок */
+.history-container {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.filters {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.filters select {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 6px;
+    flex: 1;
+}
+
+.trades-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.trade-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.trade-win {
+    border-left: 4px solid #28a745;
+}
+
+.trade-loss {
+    border-left: 4px solid #dc3545;
+}
+
+/* Статистика */
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.stat-chart {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.stat-chart h4 {
+    margin: 0 0 15px 0;
+    text-align: center;
+}
+
+.stat-numbers {
+    grid-column: 1 / -1;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.metrics-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.metric-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+/* Настройки */
+.settings-container {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.setting-item {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.setting-item label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.setting-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.setting-item input[type="range"] {
+    flex: 1;
+    margin: 0 10px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .stats-container {
+        flex-direction: column;
+    }
+    
+    .app-nav {
+        flex-direction: column;
+    }
+    
+    .signal-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .analysis-indicators {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+}
