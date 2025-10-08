@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход - Трейдинг Сигналы</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --background: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .logo-subtitle {
+            color: var(--text-secondary);
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .login-card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+        }
+        
+        .login-title {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+        
+        .login-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .input-with-icon {
+            position: relative;
+        }
+        
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+        
+        .input-with-icon .form-control {
+            padding-left: 45px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+        }
+        
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-ghost:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .role-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .role-btn {
+            padding: 12px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .role-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 25px 0;
+            color: var(--text-secondary);
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+        
+        .divider-text {
+            padding: 0 15px;
+            font-size: 14px;
+        }
+        
+        .demo-accounts {
+            background: var(--background);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-top: 25px;
+        }
+        
+        .demo-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        
+        .demo-account {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .demo-account:last-child {
+            border-bottom: none;
+        }
+        
+        .demo-role {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .demo-credentials {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        
+        .demo-click {
+            background: var(--primary);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 25px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        
+        .security-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+            color: var(--success);
+            font-size: 12px;
+        }
+        
+        /* Анимации */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .login-card {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 25px 20px;
+            }
+            
+            .logo {
+                font-size: 28px;
+            }
+            
+            .role-selector {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo">
+                <i class="fas fa-robot"></i>
+                Трейдинг Сигналы
+            </div>
+            <div class="logo-subtitle">Smart Money Analysis</div>
+        </div>
+        
+        <div class="login-card">
+            <div class="login-title">Добро пожаловать</div>
+            <div class="login-subtitle">Войдите в свою учетную запись</div>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">ID пользователя</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-user input-icon"></i>
+                        <input type="text" class="form-control" id="username" placeholder="Введите ваш ID" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Пароль</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" class="form-control" id="password" placeholder="Введите пароль" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Тип учетной записи</label>
+                    <div class="role-selector">
+                        <div class="role-btn active" data-role="user" onclick="selectRole('user')">
+                            <i class="fas fa-user"></i> Пользователь
+                        </div>
+                        <div class="role-btn" data-role="admin" onclick="selectRole('admin')">
+                            <i class="fas fa-shield-alt"></i> Администратор
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> Войти в систему
+                </button>
+            </form>
+            
+            <div class="divider">
+                <span class="divider-text">или</span>
+            </div>
+            
+            <button class="btn btn-ghost" onclick="connectTelegram()">
+                <i class="fab fa-telegram"></i> Войти через Telegram
+            </button>
+            
+            <div class="demo-accounts">
+                <div class="demo-title">Демо доступы для тестирования</div>
+                
+                <div class="demo-account">
+                    <div>
+                        <div class="demo-role">👤 Пользователь</div>
+                        <div class="demo-credentials">ID: user123 | Пароль: password</div>
+                    </div>
+                    <span class="demo-click" onclick="fillDemoUser()">Вставить</span>
+                </div>
+                
+                <div class="demo-account">
+                    <div>
+                        <div class="demo-role">🛡️ Администратор</div>
+                        <div class="demo-credentials">ID: admin | Пароль: admin123</div>
+                    </div>
+                    <span class="demo-click" onclick="fillDemoAdmin()">Вставить</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div>Трейдинг Бот v3.2.1</div>
+            <div class="security-badge">
+                <i class="fas fa-shield-check"></i>
+                Secure SSL Connection • Encrypted Data
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Текущая выбранная роль
+        let currentRole = 'user';
+        
+        // Выбор роли
+        function selectRole(role) {
+            currentRole = role;
+            
+            // Обновить UI
+            document.querySelectorAll('.role-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-role="${role}"]`).classList.add('active');
+            
+            // Обновить placeholder в зависимости от роли
+            const usernameInput = document.getElementById('username');
+            if (role === 'admin') {
+                usernameInput.placeholder = 'Введите admin ID';
+            } else {
+                usernameInput.placeholder = 'Введите ваш ID';
+            }
+        }
+        
+        // Заполнить демо данные пользователя
+        function fillDemoUser() {
+            document.getElementById('username').value = 'user123';
+            document.getElementById('password').value = 'password';
+            selectRole('user');
+        }
+        
+        // Заполнить демо данные админа
+        function fillDemoAdmin() {
+            document.getElementById('username').value = 'admin';
+            document.getElementById('password').value = 'admin123';
+            selectRole('admin');
+        }
+        
+        // Вход через Telegram
+        function connectTelegram() {
+            // В реальном приложении здесь будет интеграция с Telegram Login Widget
+            alert('Интеграция с Telegram будет настроена при подключении к боту');
+        }
+        
+        // Обработка формы входа
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showNotification('Заполните все поля', 'error');
+                return;
+            }
+            
+            // Имитация процесса входа
+            simulateLogin(username, password, currentRole);
+        });
+        
+        // Имитация входа в систему
+        function simulateLogin(username, password, role) {
+            // Показать состояние загрузки
+            const submitBtn = document.querySelector('.btn-primary');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Авторизация...';
+            submitBtn.disabled = true;
+            
+            // Имитация задержки сети
+            setTimeout(() => {
+                // Простая проверка демо данных
+                const validUsers = {
+                    'user': { username: 'user123', password: 'password' },
+                    'admin': { username: 'admin', password: 'admin123' }
+                };
+                
+                const validUser = validUsers[role];
+                
+                if (username === validUser.username && password === validUser.password) {
+                    showNotification('Успешный вход! Перенаправление...', 'success');
+                    
+                    // Перенаправление на соответствующую панель
+                    setTimeout(() => {
+                        if (role === 'admin') {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'user.html';
+                        }
+                    }, 1500);
+                    
+                } else {
+                    showNotification('Неверный ID пользователя или пароль', 'error');
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }
+            }, 2000);
+        }
+        
+        // Показать уведомление
+        function showNotification(message, type) {
+            // Создать элемент уведомления
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 10px;
+                color: white;
+                font-weight: 600;
+                z-index: 1000;
+                animation: slideIn 0.3s ease-out;
+                max-width: 300px;
+            `;
+            
+            if (type === 'success') {
+                notification.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            } else {
+                notification.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+            }
+            
+            notification.innerHTML = `
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i>
+                ${message}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Удалить уведомление через 4 секунды
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 4000);
+        }
+        
+        // Добавить стили для анимаций уведомлений
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Автофокус на поле username при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('username').focus();
+        });
+    </script>
+</body>
+</html>
