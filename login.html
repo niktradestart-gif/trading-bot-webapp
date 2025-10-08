@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трейдинг Бот - Вход</title>
+    <title>Трейдинг Бот - Авторизация</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         * {
@@ -22,12 +22,12 @@
             padding: 20px;
         }
 
-        .login-container {
+        .auth-container {
             width: 100%;
             max-width: 400px;
         }
 
-        .login-header {
+        .auth-header {
             text-align: center;
             margin-bottom: 30px;
         }
@@ -48,15 +48,14 @@
             margin-top: 5px;
         }
 
-        .login-card {
+        .auth-card {
             background: white;
             border-radius: 20px;
             padding: 40px 30px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
         }
 
-        .login-title {
+        .auth-title {
             font-size: 1.8rem;
             font-weight: bold;
             color: #333;
@@ -64,7 +63,7 @@
             margin-bottom: 10px;
         }
 
-        .login-subtitle {
+        .auth-subtitle {
             color: #666;
             text-align: center;
             margin-bottom: 30px;
@@ -110,7 +109,7 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .login-btn {
+        .auth-btn {
             width: 100%;
             padding: 15px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -125,87 +124,78 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
+            margin-bottom: 15px;
         }
 
-        .login-btn:hover {
+        .auth-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
         }
 
-        .demo-accounts {
-            margin-top: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 12px;
-            border: 2px solid #e9ecef;
+        .auth-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
         }
 
-        .demo-title {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 15px;
-            text-align: center;
+        .secondary-btn {
+            background: #6c757d;
         }
 
-        .demo-account {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .secondary-btn:hover {
+            background: #5a6268;
+            box-shadow: 0 10px 20px rgba(108, 117, 125, 0.3);
+        }
+
+        .success-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .success-btn:hover {
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.3);
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
             padding: 12px;
-            background: white;
             border-radius: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #e9ecef;
+            margin: 15px 0;
+            border: 1px solid #f5c6cb;
+            display: none;
         }
 
-        .demo-role {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 4px;
-        }
-
-        .demo-credentials {
-            font-size: 0.9rem;
-            color: #666;
-        }
-
-        .demo-click {
-            color: #667eea;
-            cursor: pointer;
-            font-weight: 600;
-            padding: 6px 12px;
-            border: 2px solid #667eea;
-            border-radius: 6px;
-            transition: all 0.3s ease;
-        }
-
-        .demo-click:hover {
-            background: #667eea;
-            color: white;
-        }
-
-        .role-selection {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .role-btn {
-            flex: 1;
+        .success-message {
+            background: #d4edda;
+            color: #155724;
             padding: 12px;
-            border: 2px solid #e1e5e9;
-            border-radius: 10px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-            font-weight: 500;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 1px solid #c3e6cb;
+            display: none;
         }
 
-        .role-btn.active {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
+        .info-box {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .footer {
@@ -215,172 +205,205 @@
             font-size: 0.9rem;
         }
 
-        .security-badge {
-            margin-top: 10px;
+        .pocket-badge {
+            display: inline-block;
+            background: #ff6b35;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
             font-size: 0.8rem;
-            opacity: 0.7;
+            font-weight: bold;
+            margin-left: 5px;
         }
     </style>
 </head>
 <body>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-    // Инициализация Telegram Web App
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.enableClosingConfirmation();
 
-    // Функция для отправки данных боту
-    function sendToBot(action, data = {}) {
-        const payload = JSON.stringify({ action, ...data });
-        tg.sendData(payload);
+    let currentUserId = null;
+
+    function showMessage(elementId, message) {
+        const element = document.getElementById(elementId);
+        element.textContent = message;
+        element.style.display = 'block';
+        setTimeout(() => {
+            element.style.display = 'none';
+        }, 5000);
     }
 
-    // Автоматический вход для авторизованных пользователей Telegram
-    if (tg.initDataUnsafe.user) {
-        console.log('User is authorized in Telegram:', tg.initDataUnsafe.user);
-        // Автоматически перенаправляем на user.html
+    function checkPocketId() {
+        const pocketId = document.getElementById('pocketId').value.trim();
+        const authBtn = document.getElementById('authBtn');
+        const errorDiv = document.getElementById('errorMessage');
+        const successDiv = document.getElementById('successMessage');
+
+        // Скрываем предыдущие сообщения
+        errorDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+
+        // Проверка формата ID
+        if (!pocketId) {
+            showMessage('errorMessage', '❌ Введите ID аккаунта Pocket Option');
+            return;
+        }
+
+        if (!/^\d+$/.test(pocketId)) {
+            showMessage('errorMessage', '❌ ID должен содержать только цифры');
+            return;
+        }
+
+        // Показываем загрузку
+        authBtn.disabled = true;
+        authBtn.innerHTML = '<div class="loading"></div> Проверка ID...';
+
+        // Получаем Telegram user_id если доступен
+        const telegramId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+
+        // Отправляем запрос боту на проверку
+        const payload = JSON.stringify({ 
+            action: 'check_pocket_id',
+            pocket_id: pocketId,
+            telegram_id: telegramId
+        });
+        
+        tg.sendData(payload);
+
+        // Демо-ответ (в реальности будет ответ от бота)
         setTimeout(() => {
-            window.location.href = 'user.html';
-        }, 1000);
+            // Здесь будет реальная проверка через API Pocket Option
+            // Сейчас используем демо-логику
+            
+            const validIds = ['69662105', '12345678', '87654321']; // Демо-валидные ID
+            
+            if (validIds.includes(pocketId)) {
+                successDiv.innerHTML = `
+                    ✅ <strong>ID подтвержден!</strong><br>
+                    Добро пожаловать в торговую систему!
+                `;
+                successDiv.style.display = 'block';
+                authBtn.disabled = false;
+                authBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Перейти в систему';
+                authBtn.className = 'auth-btn success-btn';
+                currentUserId = pocketId;
+                
+                // Сохраняем ID в localStorage
+                localStorage.setItem('pocket_user_id', pocketId);
+            } else {
+                errorDiv.innerHTML = `
+                    ❌ <strong>ID не найден в реферальной системе</strong><br>
+                    Зарегистрируйтесь по ссылке ниже
+                `;
+                errorDiv.style.display = 'block';
+                authBtn.disabled = false;
+                authBtn.innerHTML = '<i class="fas fa-key"></i> Проверить ID';
+                authBtn.className = 'auth-btn';
+                
+                // Показываем кнопки регистрации и поддержки
+                document.getElementById('regButtons').style.display = 'block';
+            }
+        }, 2000);
     }
+
+    function proceedToApp() {
+        if (currentUserId) {
+            // Определяем роль пользователя (в реальности бот определит)
+            const isAdmin = currentUserId === '69662105'; // Демо-админ
+            
+            if (isAdmin) {
+                window.location.href = 'admin.html';
+            } else {
+                window.location.href = 'user.html';
+            }
+        }
+    }
+
+    function openRegistration() {
+        const url = 'https://pocket-friends.com/r/0qrjewbjlf';
+        window.open(url, '_blank');
+    }
+
+    function openSupport() {
+        const url = 'https://pocket-friends.com/r/0qrjewbjlf';
+        window.open(url, '_blank');
+    }
+
+    // Проверяем сохраненный ID при загрузке
+    document.addEventListener('DOMContentLoaded', function() {
+        const savedId = localStorage.getItem('pocket_user_id');
+        if (savedId) {
+            document.getElementById('pocketId').value = savedId;
+        }
+    });
     </script>
 
-    <div class="login-container">
-        <div class="login-header">
+    <div class="auth-container">
+        <div class="auth-header">
             <div class="logo">
                 <i class="fas fa-robot"></i>
                 Трейдинг Бот
             </div>
-            <div class="logo-subtitle">Smart Money Analysis</div>
+            <div class="logo-subtitle">Pocket Option Auth System</div>
         </div>
         
-        <div class="login-card">
-            <div class="login-title">Добро пожаловать</div>
-            <div class="login-subtitle">Войдите в свою учетную запись</div>
+        <div class="auth-card">
+            <div class="auth-title">Авторизация</div>
+            <div class="auth-subtitle">Введите ваш ID аккаунта Pocket Option</div>
             
-            <div class="role-selection">
-                <div class="role-btn active" data-role="user" onclick="selectRole('user')">
-                    👤 Пользователь
-                </div>
-                <div class="role-btn" data-role="admin" onclick="selectRole('admin')">
-                    🛡️ Администратор
-                </div>
+            <div class="info-box">
+                <strong>Как найти ID:</strong><br>
+                1. Откройте приложение Pocket Option<br>
+                2. Нажмите на аватар профиля<br>
+                3. Ваш ID указан в формате: <strong>69662105</strong>
             </div>
             
-            <form id="loginForm">
+            <form id="authForm" onsubmit="event.preventDefault(); checkPocketId();">
                 <div class="form-group">
-                    <label class="form-label">ID пользователя</label>
+                    <label class="form-label">ID аккаунта Pocket Option</label>
                     <div class="input-with-icon">
-                        <i class="fas fa-user input-icon"></i>
-                        <input type="text" class="form-control" id="username" placeholder="Введите ваш ID" required>
+                        <i class="fas fa-id-card input-icon"></i>
+                        <input type="text" class="form-control" id="pocketId" 
+                               placeholder="69662105" pattern="\d+" required>
                     </div>
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label">Пароль</label>
-                    <div class="input-with-icon">
-                        <i class="fas fa-lock input-icon"></i>
-                        <input type="password" class="form-control" id="password" placeholder="Введите пароль" required>
-                    </div>
-                </div>
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage"></div>
                 
-                <button type="submit" class="login-btn">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Войти в систему
+                <button type="submit" class="auth-btn" id="authBtn">
+                    <i class="fas fa-key"></i>
+                    Проверить ID
+                </button>
+                
+                <button type="button" class="auth-btn success-btn" onclick="proceedToApp()" id="proceedBtn" style="display: none;">
+                    <i class="fas fa-arrow-right"></i>
+                    Перейти в систему
                 </button>
             </form>
             
-            <div class="demo-accounts">
-                <div class="demo-title">Тестовые аккаунты:</div>
+            <div id="regButtons" style="display: none;">
+                <button class="auth-btn secondary-btn" onclick="openRegistration()">
+                    <i class="fas fa-user-plus"></i>
+                    Зарегистрироваться в Pocket Option
+                </button>
                 
-                <div class="demo-account">
-                    <div class="demo-info">
-                        <div class="demo-role">👤 Пользователь</div>
-                        <div class="demo-credentials">ID: user123 | Пароль: password</div>
-                    </div>
-                    <span class="demo-click" onclick="fillDemoUser()">Вставить</span>
-                </div>
-                
-                <div class="demo-account">
-                    <div class="demo-info">
-                        <div class="demo-role">🛡️ Администратор</div>
-                        <div class="demo-credentials">ID: admin | Пароль: admin123</div>
-                    </div>
-                    <span class="demo-click" onclick="fillDemoAdmin()">Вставить</span>
-                </div>
+                <button class="auth-btn" onclick="openSupport()">
+                    <i class="fas fa-headset"></i>
+                    Связаться с поддержкой
+                </button>
             </div>
         </div>
         
         <div class="footer">
-            <div>Трейдинг Бот v3.2.1</div>
-            <div class="security-badge">
-                <i class="fas fa-shield-check"></i>
-                Secure SSL Connection • Encrypted Data
+            <div>Трейдинг Бот • Pocket Option Auth v1.0</div>
+            <div style="margin-top: 10px; font-size: 0.8rem;">
+                Только для зарегистрированных пользователей
+                <span class="pocket-badge">POCKET</span>
             </div>
         </div>
     </div>
-
-    <script>
-        // Текущая выбранная роль
-        let currentRole = 'user';
-        
-        // Заполнить демо данные администратора
-        function fillDemoAdmin() {
-            document.getElementById('username').value = 'admin';
-            document.getElementById('password').value = 'admin123';
-            selectRole('admin');
-        }
-        
-        // Заполнить демо данные пользователя
-        function fillDemoUser() {
-            document.getElementById('username').value = 'user123';
-            document.getElementById('password').value = 'password';
-            selectRole('user');
-        }
-        
-        // Выбор роли
-        function selectRole(role) {
-            currentRole = role;
-            
-            // Обновить UI
-            document.querySelectorAll('.role-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.querySelector(`[data-role="${role}"]`).classList.add('active');
-            
-            // Обновить placeholder в зависимости от роли
-            const usernameInput = document.getElementById('username');
-            if (role === 'admin') {
-                usernameInput.placeholder = 'Введите admin';
-            } else {
-                usernameInput.placeholder = 'Введите user123';
-            }
-        }
-        
-        // Обработчик формы входа
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            // Простая проверка логина
-            if ((username === 'user123' && password === 'password') || 
-                (username === 'admin' && password === 'admin123')) {
-                
-                if (username === 'admin') {
-                    window.location.href = 'admin.html';
-                } else {
-                    window.location.href = 'user.html';
-                }
-            } else {
-                alert('Неверный ID пользователя или пароль');
-            }
-        });
-        
-        // Инициализация - выбор пользователя по умолчанию
-        selectRole('user');
-    </script>
 </body>
 </html>
