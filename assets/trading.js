@@ -1,189 +1,242 @@
-// Логика торговой панели
-class TradingPanel {
-    constructor() {
-        this.currentTimer = 89; // 1:29 в секундах
-        this.timerInterval = null;
-        this.init();
-    }
-
-    init() {
-        this.checkAuth();
-        this.setupWebApp();
-        this.startTimer();
-        this.setupEventListeners();
-    }
-
-    checkAuth() {
-        const token = localStorage.getItem('auth_token');
-        if (!token) {
-            window.location.href = 'login.html';
-            return;
-        }
-    }
-
-    setupWebApp() {
-        if (window.Telegram && window.Telegram.WebApp) {
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
-            
-            // Устанавливаем цветовую схему
-            Telegram.WebApp.setHeaderColor('#1a1a2e');
-            Telegram.WebApp.setBackgroundColor('#1a1a2e');
-        }
-    }
-
-    startTimer() {
-        this.timerInterval = setInterval(() => {
-            this.currentTimer--;
-            
-            if (this.currentTimer <= 0) {
-                this.timerComplete();
-                return;
-            }
-            
-            this.updateTimerDisplay();
-        }, 1000);
-    }
-
-    updateTimerDisplay() {
-        const minutes = Math.floor(this.currentTimer / 60);
-        const seconds = this.currentTimer % 60;
-        const timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        
-        // Обновляем все таймеры на странице
-        const timerElements = document.querySelectorAll('.timer');
-        timerElements.forEach(element => {
-            element.textContent = timerText;
-        });
-    }
-
-    timerComplete() {
-        clearInterval(this.timerInterval);
-        
-        // Показываем результат сделки
-        this.showTradeResult();
-    }
-
-    async showTradeResult() {
-        // Запрашиваем результат у бота
-        try {
-            const result = await this.getTradeResult();
-            this.displayResult(result);
-        } catch (error) {
-            console.error('Ошибка получения результата:', error);
-        }
-    }
-
-    async getTradeResult() {
-        // В реальном приложении бот сам пришлет результат
-        // Здесь имитируем ответ
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    success: Math.random() > 0.5,
-                    profit: 18,
-                    pair: 'AUDCHF',
-                    exitPrice: 0.52480
-                });
-            }, 2000);
-        });
-    }
-
-    displayResult(result) {
-        const statusElement = document.querySelector('.status-message');
-        if (statusElement) {
-            if (result.success) {
-                statusElement.innerHTML = '<span class="icon">🟢</span> СДЕЛКА ВЫИГРАНА +' + result.profit + '$';
-                statusElement.style.color = '#00ff88';
-            } else {
-                statusElement.innerHTML = '<span class="icon">🔴</span> СДЕЛКА ПРОИГРАНА';
-                statusElement.style.color = '#ff4444';
-            }
-        }
-
-        // Через 5 секунд обновляем данные
-        setTimeout(() => {
-            this.refreshData();
-        }, 5000);
-    }
-
-    async refreshData() {
-        // Обновляем данные через бота
-        if (window.Telegram && window.Telegram.WebApp) {
-            Telegram.WebApp.sendData(JSON.stringify({
-                action: 'get_signal'
-            }));
-        }
-        
-        // Сбрасываем таймер для нового сигнала
-        this.resetTimer();
-    }
-
-    resetTimer() {
-        this.currentTimer = 120; // 2 минуты
-        const statusElement = document.querySelector('.status-message');
-        if (statusElement) {
-            statusElement.innerHTML = '<span class="icon">☒</span> ОЖИДАНИЕ РЕЗУЛЬТАТА';
-            statusElement.style.color = '#ffffff';
-        }
-        this.startTimer();
-    }
-
-    setupEventListeners() {
-        // Обработчики для будущих интерактивных элементов
-    }
-
-    // Получение новых данных от бота
-    handleBotMessage(data) {
-        switch (data.type) {
-            case 'new_signal':
-                this.updateSignal(data.signal);
-                break;
-            case 'trade_result':
-                this.displayResult(data.result);
-                break;
-            case 'update_stats':
-                this.updateStats(data.stats);
-                break;
-        }
-    }
-
-    updateSignal(signal) {
-        // Обновляем данные сигнала на странице
-        const pairElement = document.querySelector('.pair');
-        const directionElement = document.querySelector('.direction');
-        const confidenceElement = document.querySelector('.confidence');
-        const priceElement = document.querySelector('.detail-item:nth-child(2) .value');
-
-        if (pairElement) pairElement.textContent = signal.pair;
-        if (directionElement) {
-            directionElement.textContent = signal.direction;
-            directionElement.className = `direction ${signal.direction.toLowerCase()}`;
-        }
-        if (confidenceElement) confidenceElement.textContent = signal.confidence;
-        if (priceElement) priceElement.textContent = signal.entry_price;
-
-        // Сбрасываем таймер
-        this.resetTimer();
-    }
-
-    updateStats(stats) {
-        // Обновляем статистику
-        const statValues = document.querySelectorAll('.stat-value');
-        if (statValues[0]) statValues[0].textContent = stats.accuracy + '%';
-        if (statValues[1]) statValues[1].textContent = stats.active_signals;
-        // и т.д.
-    }
-}
-
-// Инициализация торговой панели
-document.addEventListener('DOMContentLoaded', () => {
-    window.tradingPanel = new TradingPanel();
-});
-
-// Глобальная функция для получения сообщений от бота
-window.handleTelegramUpdate = function(data) {
-    if (window.tradingPanel) {
-        window.tradingPanel.handleBotMessage(data);
-    }
+// Minimal front-end runtime for ASPIRE WebApp
+const Aspire = (() => {
+const state = {
+whitelist: [],
+whitelistMap: {},
+pocketId: null,
+isAdmin: false,
+polling: null,
 };
+const paths = {
+whitelist: 'pocket_users.json',
+10
+lastSignal: 'last_signal.json', // создаётся ботом при новом
+сигнале
+lastResult: 'last_result.json', // создаётся ботом при закрытии
+сделки
+mlInfo: 'ml_info.json', // бот обновляет после /retrain
+system: 'system_status.json', // бот обновляет по /status
+chartPng: 'assets/images/latest_chart.png', // бот экспортирует PNG из
+enhanced_plot_chart()
+};
+// ---------- helpers ----------
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+function toast(msg, type='info'){ const t=$('#toast'); if(!t) return;
+t.textContent=msg; t.className='toast';
+setTimeout(()=>t.classList.add('hidden'), 3000); }
+async function fetchJSON(url){
+try{ const r = await fetch(url + '?_=' + Date.now()); if(!r.ok) return {
+ok:false, data:null }; const d = await r.json(); return { ok:true, data:d } }
+catch{ return { ok:false, data:null } }
+}
+// ---------- whitelist ----------
+async function fetchWhitelist(){
+const res = await fetchJSON(paths.whitelist);
+if(!res.ok){ return { ok:false, list:[], map:{} } }
+// file is in object form { id: {name, role, ...}, ... }
+const map = res.data || {};
+const list = Object.entries(map).map(([id, obj])=>({ id, ...obj }));
+state.whitelist = list; state.whitelistMap = map;
+return { ok:true, list, map };
+}
+function requireAuth(){
+const id = localStorage.getItem('pocketId');
+if(!id){ location.href = 'login.html'; return }
+state.pocketId = id;
+}
+async function requireAdmin(){
+const id = localStorage.getItem('pocketId');
+if(!id) return location.href='login.html';
+state.pocketId = id;
+const wl = await fetchWhitelist();
+const u = wl.map[id];
+state.isAdmin = !!u && (u.role === 'admin');
+if(!state.isAdmin){ toast('Требуются права администратора'); return
+location.href='trading.html' }
+}
+11
+// ---------- trading page ----------
+function renderSignal(sig, target){
+if(!sig){ target.innerHTML = '<div class="muted">Нет активных сигналов</
+div>'; return; }
+const badge = sig.direction === 'SELL' ? 'badge badge-sell' : 'badge
+badge-buy';
+target.innerHTML = `
+ <div class="pair">${sig.pair}</div>
+ <div><span class="${badge}">${sig.direction}</span></div>
+ <div><span class="badge badge-conf">${sig.confidence ?? '-'} / 10</
+span></div>
+ <div><div class="muted">ID</div>#${sig.id ?? '—'}</div>
+ <div><div class="muted">ВХОД</div>${sig.entry_price ?? '—'}</div>
+ <div><div class="muted">Экспирация</div>${sig.expiry ?? '—'}</div>
+ `;
+}
+let countdownInt = null;
+function startTimer(seconds){
+const el = $('#signalTimer'); if(!el) return;
+clearInterval(countdownInt);
+let t = Number(seconds)||0;
+const tick = ()=>{ const m=String(Math.floor(t/60)).padStart(2,'0');
+const s=String(t%60).padStart(2,'0'); el.textContent=`${m}:${s}`; if(t>0)
+t--; else clearInterval(countdownInt); };
+tick(); countdownInt = setInterval(tick,1000);
+}
+async function loadKPIs(){
+const sR = await fetchJSON(paths.system);
+if(sR.ok){
+$('#botStatus')?.classList.add('pill-online');
+$('#kpi-servertime').textContent = sR.data.server_time ?? '—';
+$('#kpi-accuracy').textContent = sR.data.accuracy_today ?? '—';
+$('#kpi-active').textContent = sR.data.active_signals ?? '—';
+$('#kpi-botstate').className = sR.data.bot_online ? 'dot dot-green' :
+'dot';
+}
+}
+async function loadHistory(){
+const r = await fetchJSON('last_history.json'); // опционально, если бот
+пишет историй
+if(!r.ok || !Array.isArray(r.data)) return;
+const box = $('#history');
+box.innerHTML = r.data.slice(-6).reverse().map(item=>{
+const cls = item.result === 'WIN' ? 'win' : 'loss';
+return `<div class="hist-item"><div class="muted">#${item.id} • $
+{item.pair}</div><div class="result ${cls}">${item.result}</div><div
+class="muted">${item.timestamp ?? ''}</div></div>`
+12
+}).join('');
+}
+async function pollSignal(){
+const res = await fetchJSON(paths.lastSignal);
+const wrap = $('#signalWrap');
+if(res.ok){
+const sig = res.data; renderSignal(sig, wrap);
+const ttl = Number(sig.time_left_sec ?? 0); if(ttl>0) startTimer(ttl);
+$('#chartImg')?.setAttribute('src', paths.chartPng + '?_=' +
+Date.now());
+}
+const rr = await fetchJSON(paths.lastResult);
+if(rr.ok && rr.data?.result){ toast(`Сделка #${rr.data.id} завершена: $
+{rr.data.result}`); loadHistory(); }
+}
+function initTrading(){
+$('#btnLogout')?.addEventListener('click', ()=>{
+localStorage.removeItem('pocketId'); location.href='login.html'; });
+loadKPIs(); pollSignal(); loadHistory();
+state.polling = setInterval(()=>{ pollSignal(); loadKPIs(); }, 15000);
+}
+// ---------- admin page ----------
+function wireTabs(){
+$$('.tab').forEach(t=>t.addEventListener('click',()=>{
+$$('.tab').forEach(x=>x.classList.remove('active'));
+t.classList.add('active');
+const id = t.getAttribute('data-tab');
+$$('.tab-page').forEach(p=>p.classList.remove('active'));
+$('#tab-' + id).classList.add('active');
+}));
+$$('.feature.card').forEach(f=>f.addEventListener('click',()=>{
+const act = f.getAttribute('data-action');
+const mapping = { users:'users', ml:'ml', analytics:'analytics',
+system:'system' };
+const tab = mapping[act] || 'overview';
+$$(`.tabs .tab`).forEach(x=> x.classList.toggle('active',
+x.dataset.tab===tab));
+$$('.tab-page').forEach(p=>p.classList.remove('active'));
+$('#tab-'+tab).classList.add('active');
+}));
+}
+function renderUsers(){
+const box = $('#users-list');
+if(!box) return;
+box.innerHTML = state.whitelist.map(u=>`
+ <div class="user-row">
+13
+ <div>
+ <div><strong>${u.name ?? 'User'}</strong> <span class="meta">• $
+{u.role ?? 'user'}</span></div>
+ <div class="meta">ID: ${u.id} • ${u.status ?? 'active'}</div>
+ </div>
+ <div>
+ <button class="btn" data-del="${u.id}">Удалить</button>
+ </div>
+ </div>
+ `).join('');
+box.querySelectorAll('button[data-del]').forEach(b=>
+b.addEventListener('click', ()=>{
+const id = b.getAttribute('data-del');
+delete state.whitelistMap[id];
+state.whitelist =
+Object.entries(state.whitelistMap).map(([id,obj])=>({ id, ...obj }));
+renderUsers();
+toast('Удалено из списка');
+}));
+}
+function exportWhitelist(){
+const data = JSON.stringify(state.whitelistMap, null, 2);
+const blob = new Blob([data], { type:'application/json' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url; a.download = 'pocket_users.json'; a.click();
+setTimeout(()=> URL.revokeObjectURL(url), 2000);
+}
+async function loadAdminBlocks(){
+// KPIs
+const wl = await fetchWhitelist();
+$('#ovr-users').textContent = wl.list.length;
+const sys = await fetchJSON(paths.system);
+if(sys.ok){ $('#ovr-acc').textContent = sys.data.accuracy_all ?? '—'; $
+('#ovr-sig').textContent = sys.data.active_signals ?? '—'; }
+// ML
+const ml = await fetchJSON(paths.mlInfo);
+if(ml.ok){ $('#ml-info').innerHTML = `
+ <div><strong>Обучена:</strong> ${ml.data.trained_at ?? '—'}</div>
+ <div><strong>Сделок:</strong> ${ml.data.trades ?? '—'}</div>
+ <div><strong>Точность (тест):</strong> ${ml.data.test_accuracy ?? '—'}
+</div>
+ <div><strong>Win rate:</strong> ${ml.data.win_rate ?? '—'}</div>`; }
+// Signals
+const sig = await fetchJSON(paths.lastSignal);
+14
+if(sig.ok){ renderSignal(sig.data, $('#adm-signal')); }
+// Users
+renderUsers();
+// Logs (заглушка)
+$('#ovr-log').innerHTML = [
+'<span class="info">[INFO]</span> ML модель переобучена с точностью
+61.5%\n',
+'<span class="succ">[SUCCESS]</span> Сделка #392 завершена в
+прибыль\n',
+'<span class="warn">[WARNING]</span> Высокая волатильность AUDCHF\n',
+'<span class="err">[ERROR]</span> Ошибка подключения к бирже, повторная
+попытка...\n'
+].join('');
+}
+function initAdmin(){
+$('#btnLogout')?.addEventListener('click', ()=>{
+localStorage.removeItem('pocketId'); location.href='login.html'; });
+wireTabs();
+fetchWhitelist().then(loadAdminBlocks);
+$('#btn-add')?.addEventListener('click', ()=>{
+const id = $('#u-id').value.trim();
+const name = $('#u-name').value.trim() || 'User';
+const role = $('#u-role').value || 'user';
+if(!id){ return toast('Укажите Pocket ID','error') }
+if(state.whitelistMap[id]){ return toast('Такой ID уже есть','error') }
+state.whitelistMap[id] = { name, role, telegram_id:null,
+registered_at:new Date().toISOString(), status:'active' };
+state.whitelist =
+Object.entries(state.whitelistMap).map(([id,obj])=>({ id, ...obj }));
+renderUsers();
+toast('Пользователь добавлен');
+});
+$('#btn-export')?.addEventListener('click', exportWhitelist);
+// fake command buttons (визуальные): замените на реальные HTTP вызовы
+вашего бота
+$$('[data-cmd]').forEach(btn=> btn.addEventListener('click', ()=>{
+toast('Команда отправлена: ' + btn.dataset.cmd);
+}));
+}
+return {
+fetchWhitelist, requireAuth, requireAdmin, initTrading, initAdmin, toast
+};
+})();
