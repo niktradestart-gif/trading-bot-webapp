@@ -3,139 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трейдинг Сигналы</title>
+    <title>Вход - Трейдинг Сигналы</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/style.css">
 </head>
-<body class="login-body">
+<body>
     <div class="login-container">
-        <!-- Левый блок - графики/инфо -->
-        <div class="login-left">
-            <div class="app-brand">
-                <h1>Трейдинг Сигналы</h1>
-                <p class="app-subtitle">Smart Money Analysis</p>
+        <div class="login-header">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                Трейдинг Сигналы
+            </div>
+            <div class="logo-subtitle">Smart Money Analysis</div>
+        </div>
+        
+        <div class="login-card">
+            <div class="login-title">Добро пожаловать</div>
+            <div class="login-subtitle">Войдите в свою учетную запись</div>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">ID пользователя</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-user input-icon"></i>
+                        <input type="text" class="form-control" id="userId" placeholder="Введите ваш ID" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Пароль</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" class="form-control" id="password" placeholder="Введите пароль" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Тип учетной записи</label>
+                    <div class="role-selector">
+                        <div class="role-btn active" data-role="user" onclick="selectRole('user')">
+                            <i class="fas fa-user"></i> Пользователь
+                        </div>
+                        <div class="role-btn" data-role="admin" onclick="selectRole('admin')">
+                            <i class="fas fa-shield-alt"></i> Администратор
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> Войти в систему
+                </button>
+            </form>
+            
+            <div class="divider">
+                <span class="divider-text">или</span>
             </div>
             
-            <div class="market-preview">
-                <div class="preview-item">
-                    <span class="pair">EURUSD</span>
-                    <span class="price up">1.09845</span>
+            <button class="btn btn-ghost" onclick="connectTelegram()">
+                <i class="fab fa-telegram"></i> Войти через Telegram
+            </button>
+            
+            <div class="demo-accounts">
+                <div class="demo-title">Демо доступы для тестирования</div>
+                
+                <div class="demo-account">
+                    <div>
+                        <div class="demo-role">👤 Пользователь</div>
+                        <div class="demo-credentials">D:\user\23 | Пароль: password</div>
+                    </div>
+                    <span class="demo-click" onclick="fillDemo('user')">Вставить</span>
                 </div>
-                <div class="preview-item">
-                    <span class="pair">GBPUSD</span>
-                    <span class="price down">1.27890</span>
+                
+                <div class="demo-account">
+                    <div>
+                        <div class="demo-role">🛡️ Администратор</div>
+                        <div class="demo-credentials">D:\admin | Пароль: admin\123</div>
+                    </div>
+                    <span class="demo-click" onclick="fillDemo('admin')">Вставить</span>
                 </div>
-                <div class="preview-item">
-                    <span class="pair">USDJPY</span>
-                    <span class="price up">148.234</span>
+                
+                <div class="demo-account">
+                    <div>
+                        <div class="demo-role">🧪 Тестирование</div>
+                        <div class="demo-credentials">B:\cramm</div>
+                    </div>
+                    <span class="demo-click" onclick="fillDemo('test')">Вставить</span>
                 </div>
             </div>
         </div>
-
-        <!-- Правый блок - форма -->
-        <div class="login-right">
-            <div class="login-form-container">
-                <div class="form-header">
-                    <h2>Добро пожаловать</h2>
-                    <p>Войдите в свою учетную запись</p>
-                </div>
-
-                <form class="login-form">
-                    <!-- ID пользователя -->
-                    <div class="input-group">
-                        <label>ID пользователя</label>
-                        <div class="input-with-icon">
-                            <input type="text" placeholder="Введите ваш ID" class="modern-input">
-                            <span class="input-check">✓</span>
-                        </div>
-                    </div>
-
-                    <!-- Пароль -->
-                    <div class="input-group">
-                        <label>Пароль</label>
-                        <div class="input-with-icon">
-                            <input type="password" placeholder="Введите пароль" class="modern-input">
-                            <span class="input-check checked">✓</span>
-                        </div>
-                    </div>
-
-                    <!-- Тип учетной записи -->
-                    <div class="input-group">
-                        <label>Тип учетной записи</label>
-                        <div class="radio-group">
-                            <label class="radio-option selected">
-                                <input type="radio" name="accountType" checked>
-                                <span class="radio-custom"></span>
-                                Пользователь
-                            </label>
-                            <label class="radio-option">
-                                <input type="radio" name="accountType">
-                                <span class="radio-custom"></span>
-                                Администратор
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Кнопка входа -->
-                    <button type="button" class="login-btn">
-                        <span>Войти в систему</span>
-                    </button>
-
-                    <!-- Разделитель -->
-                    <div class="divider">
-                        <span>или</span>
-                    </div>
-
-                    <!-- Telegram вход -->
-                    <button type="button" class="telegram-btn">
-                        <span class="tg-icon">📱</span>
-                        Войти через Telegram
-                    </button>
-                </form>
-
-                <!-- Демо доступы -->
-                <div class="demo-section">
-                    <h3>Демо доступы для тестирования</h3>
-                    <div class="demo-grid">
-                        <div class="demo-card">
-                            <div class="demo-header">
-                                <span class="demo-badge user">Пользователь</span>
-                                <span class="demo-check">✓</span>
-                            </div>
-                            <div class="demo-credentials">
-                                D:\user\23 | Пароль: password
-                            </div>
-                        </div>
-                        
-                        <div class="demo-card">
-                            <div class="demo-header">
-                                <span class="demo-badge admin">Администратор</span>
-                                <span class="demo-check">✓</span>
-                            </div>
-                            <div class="demo-credentials">
-                                D:\admin | Пароль: admin\123
-                            </div>
-                        </div>
-                        
-                        <div class="demo-card">
-                            <div class="demo-header">
-                                <span class="demo-badge test">Тестирование</span>
-                                <span class="demo-check">✓</span>
-                            </div>
-                            <div class="demo-credentials">
-                                B:\cramm
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Футер -->
-                <div class="login-footer">
-                    <div class="version">Трейдинг Бот v3.2.1</div>
-                    <div class="security">
-                        <span class="secure-badge">🔒</span>
-                        Secure SSL Connection + Encrypted Data
-                    </div>
-                </div>
+        
+        <div class="footer">
+            <div>Трейдинг Бот v3.2.1</div>
+            <div class="security-badge">
+                <i class="fas fa-shield-check"></i>
+                Secure SSL Connection • Encrypted Data
             </div>
         </div>
     </div>
