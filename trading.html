@@ -1,71 +1,49 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ASPIRE TRADE • Трейдинг</title>
-<link rel="stylesheet" href="assets/trading.css" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?
-family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASPIRE TRADE — Dashboard</title>
+  <link rel="stylesheet" href="assets/trading.css">
 </head>
-<body class="app">
-<aside class="topbar">
-<div class="topbar-left">
-<span class="brand"> Трейдинг Сигналы</span>
-<span id="botStatus" class="pill pill-online">ONLINE</span>
-</div>
-<div class="topbar-right">
-<a class="btn btn-secondary" href="admin.html">Админ</a>
-<button id="btnLogout" class="btn btn-danger">Выйти</button>
-</div>
-</aside>
-<main class="container">
-<!-- KPI row -->
-<section class="grid kpi">
-<div class="card kpi-card">
-<div class="kpi-label">Точность</div>
-<div class="kpi-value" id="kpi-accuracy">—</div>
-<div class="kpi-sub">за сегодня</div>
-</div>
-<div class="card kpi-card">
-<div class="kpi-label">Сигналы</div>
-<div class="kpi-value" id="kpi-active">—</div>
-<div class="kpi-sub">активно</div>
-</div>
-<div class="card kpi-card">
-3
-<div class="kpi-label">Время</div>
-<div class="kpi-value" id="kpi-servertime">—</div>
-<div class="kpi-sub">сервера</div>
-</div>
-<div class="card kpi-card">
-<div class="kpi-label">Статус</div>
-<div class="kpi-value"><span id="kpi-botstate" class="dot dotgreen"></span></div>
-<div class="kpi-sub">бота</div>
-</div>
-</section>
-<!-- Active signals -->
-<section class="card">
-<div class="section-title">Активные сигналы</div>
-<div id="signalWrap" class="signal"></div>
-<div class="chart-wrap">
-<img id="chartImg" src="assets/images/latest_chart.png" alt="Chart" /
->
-</div>
-<div id="signalTimer" class="timer">—:—</div>
-</section>
-<section class="card">
-<div class="section-title">История (последние)</div>
-<div id="history" class="history"></div>
-</section>
-</main>
-<div id="toast" class="toast hidden"></div>
-<script src="assets/trading.js"></script>
-<script>
-Aspire.requireAuth();
-Aspire.initTrading();
-</script>
+<body>
+  <header>
+    <h2>ASPIRE TRADE</h2>
+    <button onclick="logout()">Выйти</button>
+  </header>
+
+  <main class="content">
+    <section id="signalSection" class="card wide">
+      <h3>📈 Текущий сигнал</h3>
+      <div id="signalData">Загрузка...</div>
+    </section>
+
+    <section class="card wide">
+      <h3>📊 График</h3>
+      <img id="chartImg" src="" alt="Chart">
+    </section>
+
+    <section class="card">
+      <h3>📉 Результат последней сделки</h3>
+      <div id="lastResult">—</div>
+    </section>
+
+    <section class="card">
+      <h3>📊 Статистика торговли</h3>
+      <div id="statsBox">—</div>
+    </section>
+
+    <section class="card wide">
+      <h3>📜 История последних сделок</h3>
+      <table id="historyTable">
+        <thead>
+          <tr><th>#</th><th>Пара</th><th>Направление</th><th>Результат</th><th>Время</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="assets/trading.js"></script>
 </body>
 </html>
