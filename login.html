@@ -14,54 +14,41 @@
                 <i class="fas fa-chart-line"></i>
                 Трейдинг Сигналы
             </div>
-            <div class="logo-subtitle">Smart Money Analysis</div>
+            <div class="logo-subtitle">Pocket Option Auth System</div>
         </div>
         
         <div class="login-card">
-            <div class="login-title">Добро пожаловать</div>
-            <div class="login-subtitle">Войдите в свою учетную запись</div>
+            <div class="login-title">Авторизация</div>
+            <div class="login-subtitle">Введите ваш ID аккаунта Pocket Option</div>
+            
+            <!-- Инструкция -->
+            <div class="instruction-box">
+                <h3>Как найти ID:</h3>
+                <ol>
+                    <li>Откройте приложение Pocket Option</li>
+                    <li>Нажмите на аватар профиля</li>
+                    <li>Ваш ID указан в формате: <strong>69662105</strong></li>
+                </ol>
+            </div>
             
             <form id="loginForm">
                 <div class="form-group">
-                    <label class="form-label">ID пользователя</label>
+                    <label class="form-label">ID аккаунта Pocket Option</label>
                     <div class="input-with-icon">
-                        <i class="fas fa-user input-icon"></i>
-                        <input type="text" class="form-control" id="userId" placeholder="Введите ваш ID" required>
+                        <i class="fas fa-id-card input-icon"></i>
+                        <input type="text" class="form-control" id="pocketId" placeholder="Введите ваш Pocket ID" required>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Пароль</label>
-                    <div class="input-with-icon">
-                        <i class="fas fa-lock input-icon"></i>
-                        <input type="password" class="form-control" id="password" placeholder="Введите пароль" required>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Тип учетной записи</label>
-                    <div class="role-selector">
-                        <div class="role-btn active" data-role="user" onclick="selectRole('user')">
-                            <i class="fas fa-user"></i> Пользователь
-                        </div>
-                        <div class="role-btn" data-role="admin" onclick="selectRole('admin')">
-                            <i class="fas fa-shield-alt"></i> Администратор
-                        </div>
+                    
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="confirmId">
+                        <label for="confirmId">ID подтвержден!</label>
                     </div>
                 </div>
                 
                 <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-sign-in-alt"></i> Войти в систему
+                    <i class="fas fa-sign-in-alt"></i> Перейти в трейдинг
                 </button>
             </form>
-            
-            <div class="divider">
-                <span class="divider-text">или</span>
-            </div>
-            
-            <button class="btn btn-ghost" onclick="connectTelegram()">
-                <i class="fab fa-telegram"></i> Войти через Telegram
-            </button>
             
             <div class="demo-accounts">
                 <div class="demo-title">Демо доступы для тестирования</div>
@@ -69,7 +56,7 @@
                 <div class="demo-account">
                     <div>
                         <div class="demo-role">👤 Пользователь</div>
-                        <div class="demo-credentials">D:\user\23 | Пароль: password</div>
+                        <div class="demo-credentials">ID: 12345678</div>
                     </div>
                     <span class="demo-click" onclick="fillDemo('user')">Вставить</span>
                 </div>
@@ -77,27 +64,19 @@
                 <div class="demo-account">
                     <div>
                         <div class="demo-role">🛡️ Администратор</div>
-                        <div class="demo-credentials">D:\admin | Пароль: admin\123</div>
+                        <div class="demo-credentials">ID: 69662105</div>
                     </div>
                     <span class="demo-click" onclick="fillDemo('admin')">Вставить</span>
-                </div>
-                
-                <div class="demo-account">
-                    <div>
-                        <div class="demo-role">🧪 Тестирование</div>
-                        <div class="demo-credentials">B:\cramm</div>
-                    </div>
-                    <span class="demo-click" onclick="fillDemo('test')">Вставить</span>
                 </div>
             </div>
         </div>
         
         <div class="footer">
-            <div>Трейдинг Бот v3.2.1</div>
+            <div>Трейдинг Бот • Pocket Option Auth v1.0</div>
             <div class="security-badge">
-                <i class="fas fa-shield-check"></i>
-                Secure SSL Connection • Encrypted Data
+                Только для зарегистрированных пользователей <strong>POCKET</strong>
             </div>
+            <div class="bot-link">@aspiretrad_bot</div>
         </div>
     </div>
 
