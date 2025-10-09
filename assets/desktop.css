@@ -1,0 +1,278 @@
+// Логика админ панели
+class AdminPanel {
+    constructor() {
+        this.currentSection = 'users';
+        this.init();
+    }
+
+    init() {
+        this.checkAdminAuth();
+        this.setupNavigation();
+        this.loadDashboardData();
+        this.setupWebApp();
+        this.startLiveUpdates();
+    }
+
+    checkAdminAuth() {
+        const token = localStorage.getItem('auth_token');
+        const role = localStorage.getItem('user_role');
+        
+        if (!token || role !== 'admin') {
+            window.location.href = 'login.html';
+            return;
+        }
+    }
+
+    setupNavigation() {
+        // Обработка кликов по навигации
+        const navItems = document.querySelectorAll('.nav-item a');
+        navItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = e.target.getAttribute('href').substring(1);
+                this.switchSection(target);
+            });
+        });
+    }
+
+    switchSection(section) {
+        this.currentSection = section;
+        
+        // Обновляем активный пункт меню
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        document.querySelector(`.nav-item a[href="#${section}"]`).parentElement.classList.add('active');
+        
+        // Загружаем данные для секции
+        this.loadSectionData(section);
+    }
+
+    async loadDashboardData() {
+        try {
+            const stats = await this.fetchSystemStats();
+            this.updateStats(stats);
+            
+            const actions = await this.fetchRecentActions();
+            this.updateRecentActions(actions);
+        } catch (error) {
+            console.error('Ошибка загрузки данных:', error);
+        }
+    }
+
+    async fetchSystemStats() {
+        // В реальном приложении запрашиваем у бота
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve({
+                    active_users: 142,
+                    total_users: 203,
+                    accuracy: 76.4,
+                    active_signals: 18,
+                    system_profit: 2.4
+                });
+            }, 500);
+        });
+    }
+
+    async fetchRecentActions() {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve([
+                    {
+                        time: '2024-01-15 14:23:45',
+                        user: '[IMP0]',
+                        text: 'ML модель переобучена с точностью 82.3%',
+                        type: 'success'
+                    },
+                    {
+                        time: '2024-01-15 14:18:30', 
+                        user: '[SINCE58]',
+                        text: 'Сделка #192 закрыта с прибылью',
+                        type: 'success'
+                    },
+                    {
+                        time: '2024-01-15 13:56:12',
+                        user: '[RABNINE]',
+                        text: 'Высокая возможность на паре GBPCHF',
+                        type: 'info'
+                    },
+                    {
+                        time: '2024-01-15 13:48:22',
+                        user: '[IMP0]',
+                        text: 'Новый пользователь авторизован (ID: 548988474)',
+                        type: 'warning'
+                    },
+                    {
+                        time: '2024-01-15 13:20:15',
+                        user: '[ERROR]',
+                        text: 'Ошибка подключения к бирже, повторная попытка...',
+                        type: 'error'
+                    }
+                ]);
+            }, 300);
+        });
+    }
+
+    updateStats(stats) {
+        const statCards = document.querySelectorAll('.stat-card.large');
+        if (statCards[0]) {
+            statCards[0].querySelector('.stat-value').textContent = stats.active_users;
+            statCards[0].querySelector('.stat-label').textContent = `из ${stats.total_users}`;
+        }
+        if (statCards[1]) {
+            statCards[1].querySelector('.stat-value').textContent = stats.accuracy + '%';
+        }
+        if (statCards[2]) {
+            statCards[2].querySelector('.stat-value').textContent = stats.active_signals;
+        }
+        if (statCards[3]) {
+            statCards[3].querySelector('.stat-value').textContent = stats.system_profit + '%';
+        }
+    }
+
+    updateRecentActions(actions) {
+        const actionsList = document.querySelector('.actions-list');
+        if (!actionsList) return;
+
+        actionsList.innerHTML = actions.map(action => `
+            <div class="action-item ${action.type}">
+                <span class="action-time">${action.time}</span>
+                <span class="action-user">${action.user}</span>
+                <span class="action-text">${action.text}</span>
+            </div>
+        `).join('');
+    }
+
+    setupWebApp() {
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+            
+            // Для админки не сужаем окно
+            Telegram.WebApp.setHeaderColor('#1a1a2e');
+            Telegram.WebApp.setBackgroundColor('#1a1a2e');
+        }
+    }
+
+    startLiveUpdates() {
+        // Обновляем данные каждые 30 секунд
+        setInterval(() => {
+            this.loadDashboardData();
+        }, 30000);
+    }
+
+    async loadSectionData(section) {
+        // Загружаем данные для конкретной секции
+        switch (section) {
+            case 'users':
+                await this.loadUsersData();
+                break;
+            case 'signals':
+                await this.loadSignalsData();
+                break;
+            case 'ml':
+                await this.loadMLData();
+                break;
+            case 'analytics':
+                await this.loadAnalyticsData();
+                break;
+        }
+    }
+
+    async loadUsersData() {
+        // Загрузка данных пользователей
+        console.log('Загрузка данных пользователей...');
+    }
+
+    async loadSignalsData() {
+        // Загрузка данных сигналов
+        console.log('Загрузка данных сигналов...');
+    }
+
+    async loadMLData() {
+        // Загрузка данных ML модели
+        console.log('Загрузка данных ML модели...');
+    }
+
+    async loadAnalyticsData() {
+        // Загрузка аналитики
+        console.log('Загрузка аналитики...');
+    }
+
+    // Обработка команд от бота
+    handleBotMessage(data) {
+        switch (data.type) {
+            case 'system_update':
+                this.updateStats(data.stats);
+                break;
+            case 'new_action':
+                this.addRecentAction(data.action);
+                break;
+            case 'user_activity':
+                this.updateUserActivity(data.activity);
+                break;
+        }
+    }
+
+    addRecentAction(action) {
+        const actionsList = document.querySelector('.actions-list');
+        if (actionsList) {
+            const actionHTML = `
+                <div class="action-item ${action.type}">
+                    <span class="action-time">${action.time}</span>
+                    <span class="action-user">${action.user}</span>
+                    <span class="action-text">${action.text}</span>
+                </div>
+            `;
+            
+            actionsList.insertAdjacentHTML('afterbegin', actionHTML);
+            
+            // Удаляем старые записи если их слишком много
+            const items = actionsList.querySelectorAll('.action-item');
+            if (items.length > 10) {
+                items[items.length - 1].remove();
+            }
+        }
+    }
+}
+
+// Инициализация админ панели
+document.addEventListener('DOMContentLoaded', () => {
+    window.adminPanel = new AdminPanel();
+});
+
+// Глобальная функция для получения сообщений от бота
+window.handleTelegramUpdate = function(data) {
+    if (window.adminPanel) {
+        window.adminPanel.handleBotMessage(data);
+    }
+};
+
+// Функции для работы с системой
+class SystemCommands {
+    static async retrainML() {
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.sendData(JSON.stringify({
+                action: 'retrain'
+            }));
+        }
+    }
+
+    static async backupData() {
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.sendData(JSON.stringify({
+                action: 'backup'
+            }));
+        }
+    }
+
+    static async getStats() {
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.sendData(JSON.stringify({
+                action: 'modelstats'
+            }));
+        }
+    }
+}
