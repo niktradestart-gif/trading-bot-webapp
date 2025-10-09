@@ -1,57 +1,65 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ASPIRE TRADE — Admin Panel</title>
-  <link rel="stylesheet" href="assets/trading.css">
+  <link rel="stylesheet" href="assets/trading.css" />
 </head>
 <body>
-  <header>
-    <h2>Админ-панель</h2>
+  <div class="gradient-bg"></div>
+  <header class="glass header">
+    <h2 class="logo">⚡ ASPIRE TRADE — Admin</h2>
     <button onclick="logout()">Выйти</button>
   </header>
 
-  <main class="content">
-    <section class="card">
-      <h3>👤 Добавить пользователя</h3>
-      <input id="newPocket" placeholder="Pocket ID">
-      <input id="newName" placeholder="Имя">
-      <select id="newRole">
-        <option value="user">User</option>
-        <option value="admin">Admin</option>
-      </select>
-      <button onclick="addUser()">Добавить</button>
-      <p id="adminMsg"></p>
+  <nav class="tabs glass">
+    <button class="tab active" data-tab="users">👥 Пользователи</button>
+    <button class="tab" data-tab="ml">🧠 ML-модель</button>
+    <button class="tab" data-tab="system">⚙️ Система</button>
+    <button class="tab" data-tab="signals">💹 Сигналы</button>
+    <button class="tab" data-tab="logs">📜 Логи</button>
+  </nav>
+
+  <main class="grid">
+    <section id="tab-users" class="tab-content active glass card wide">
+      <h3>👥 Whitelist</h3>
+      <div class="add-user">
+        <input id="newPocket" placeholder="Pocket ID" />
+        <input id="newName" placeholder="Имя" />
+        <select id="newRole"><option value="user">User</option><option value="admin">Admin</option></select>
+        <button onclick="addUser()">Добавить</button>
+      </div>
+      <pre id="whitelistBox">Загрузка…</pre>
     </section>
 
-    <section class="card wide">
-      <h3>📋 Белый список</h3>
-      <pre id="whitelistBox">Загрузка...</pre>
-    </section>
-
-    <section class="card">
+    <section id="tab-ml" class="tab-content glass card wide">
       <h3>🧠 ML-модель</h3>
-      <pre id="mlInfo">Загрузка...</pre>
-      <button onclick="sendCommand('retrain')">🔄 Переобучить</button>
-      <button onclick="sendCommand('modelstats')">📊 Статистика ML</button>
+      <pre id="mlInfo">Загрузка…</pre>
+      <div class="actions">
+        <button onclick="sendCommand('retrain')">🔄 Переобучить</button>
+        <button onclick="sendCommand('modelstats')">📊 Статистика ML</button>
+      </div>
     </section>
 
-    <section class="card">
-      <h3>⚙️ Управление системой</h3>
-      <button onclick="sendCommand('status')">📈 Статус</button>
-      <button onclick="sendCommand('clearalltrades')">🧹 Очистить сделки</button>
-      <button onclick="sendCommand('stop')">⛔ Остановить бота</button>
+    <section id="tab-system" class="tab-content glass card wide">
+      <h3>⚙️ Система</h3>
+      <div id="systemBox">Загрузка…</div>
+      <div class="actions">
+        <button onclick="sendCommand('status')">📈 Статус</button>
+        <button onclick="sendCommand('clearalltrades')">🧹 Очистить сделки</button>
+        <button onclick="sendCommand('stop')">⛔ Остановить бота</button>
+      </div>
     </section>
 
-    <section class="card wide">
-      <h3>📡 Сигналы</h3>
-      <div id="adminSignals">Загрузка...</div>
+    <section id="tab-signals" class="tab-content glass card wide">
+      <h3>💹 Сигналы</h3>
+      <div id="adminSignals">Загрузка…</div>
     </section>
 
-    <section class="card wide">
+    <section id="tab-logs" class="tab-content glass card wide">
       <h3>📜 Логи</h3>
-      <pre id="logBox">Загрузка...</pre>
+      <pre id="logBox">Загрузка…</pre>
     </section>
   </main>
 
