@@ -19,148 +19,115 @@ class TradingApp {
         // Демо доступы
         const demoAccounts = document.querySelectorAll('input[name="demoAccount"]');
         demoAccounts.forEach(radio => {
-            radio.addEventListener('change', (e) => this.handleDemoAccount(e.target.value));
+            radio.addEventListener('change', (e) => this.handleDemoAccount(e.target.id));
+        });
+
+        // Переключение типа учетной записи
+        const accountTypes = document.querySelectorAll('input[name="accountType"]');
+        accountTypes.forEach(radio => {
+            radio.addEventListener('change', (e) => this.handleAccountTypeChange(e.target.id));
         });
     }
 
     checkAuthentication() {
-        // Проверяем, авторизован ли пользователь
         const token = localStorage.getItem('auth_token');
         if (token && window.location.pathname.includes('login.html')) {
-            // Если уже авторизован, перенаправляем на торговую панель
-            this.redirectToTrading();
+            const role = localStorage.getItem('user_role');
+            this.redirectToPanel(role);
         }
     }
 
-    async handleLogin() {
-        const pocketId = document.getElementById('pocketId').value.trim();
-        const isConfirmed = document.getElementById('confirmId').checked;
+    handleLogin() {
+        const userId = document.getElementById('userId').value.trim();
+        const password = document.getElementById('password').value;
+        const isUserType = document.getElementById('userType').checked;
+        const accountType = isUserType ? 'user' : 'admin';
 
-        if (!pocketId) {
-            this.showError('Введите ваш Pocket ID');
+        if (!userId) {
+            this.showError('Введите ID пользователя');
             return;
         }
 
-        if (!isConfirmed) {
-            this.showError('Подтвердите ваш ID');
+        if (!password) {
+            this.showError('Введите пароль');
             return;
         }
 
-        // Показываем загрузку
         this.showLoading();
 
-        try {
-            // Проверяем Pocket ID через Telegram Web App
-            if (window.Telegram && window.Telegram.WebApp) {
-                const result = await this.verifyPocketId(pocketId);
-                
-                if (result.success) {
-                    this.loginSuccess(result.user);
-                } else {
-                    this.showError(result.message);
-                }
-            } else {
-                // Режим тестирования (без Telegram)
-                this.testLogin(pocketId);
-            }
-        } catch (error) {
-            this.showError('Ошибка подключения: ' + error.message);
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    async verifyPocketId(pocketId) {
-        // Отправляем данные в бота через Telegram Web App
-        if (window.Telegram && window.Telegram.WebApp) {
-            return new Promise((resolve) => {
-                window.Telegram.WebApp.sendData(JSON.stringify({
-                    action: 'check_pocket_id',
-                    pocket_id: pocketId,
-                    telegram_id: window.Telegram.WebApp.initDataUnsafe.user?.id
-                }));
-                
-                // В реальном приложении бот ответит через callback
-                setTimeout(() => {
-                    resolve({ success: true, user: { role: 'user' } });
-                }, 1000);
-            });
+        // Проверка демо доступов
+        if (this.checkDemoAccess(userId, password, accountType)) {
+            setTimeout(() => {
+                this.loginSuccess({
+                    role: accountType,
+                    name: 'Демо пользователь',
+                    id: userId
+                });
+            }, 1000);
         } else {
-            // Тестовый режим
-            return this.mockVerifyPocketId(pocketId);
+            setTimeout(() => {
+                this.showError('Неверные учетные данные');
+                this.hideLoading();
+            }, 1000);
         }
     }
 
-    mockVerifyPocketId(pocketId) {
-        // Тестовая проверка Pocket ID
-        const testIds = ['69662105', '12345678', '87654321'];
-        
-        if (testIds.includes(pocketId) || pocketId.startsWith('demo')) {
-            return {
-                success: true,
-                user: {
-                    role: pocketId === '69662105' ? 'admin' : 'user',
-                    name: 'Тестовый пользователь'
-                }
-            };
-        } else {
-            return {
-                success: false,
-                message: 'Pocket ID не найден в системе'
-            };
-        }
-    }
-
-    handleDemoAccount(accountType) {
+    checkDemoAccess(userId, password, accountType) {
         const demoCredentials = {
-            user: { id: 'demo_user_23', password: 'password' },
-            admin: { id: 'demo_admin', password: 'admin123' }
+            'D:\\user\\23': { password: 'password', role: 'user' },
+            'D:\\admin': { password: 'admin\\123', role: 'admin' },
+            'B:\\cramm': { password: '', role: 'user' }
         };
 
-        const creds = demoCredentials[accountType];
-        if (creds) {
-            document.getElementById('pocketId').value = creds.id;
-            document.getElementById('confirmId').checked = true;
+        const creds = demoCredentials[userId];
+        return creds && creds.password === password && creds.role === accountType;
+    }
+
+    handleDemoAccount(demoId) {
+        const demoData = {
+            'demoUser': { id: 'D:\\user\\23', password: 'password', type: 'userType' },
+            'demoAdmin': { id: 'D:\\admin', password: 'admin\\123', type: 'adminType' },
+            'demoTest': { id: 'B:\\cramm', password: '', type: 'userType' }
+        };
+
+        const data = demoData[demoId];
+        if (data) {
+            document.getElementById('userId').value = data.id;
+            document.getElementById('password').value = data.password;
+            document.getElementById(data.type).checked = true;
         }
+    }
+
+    handleAccountTypeChange(typeId) {
+        // Можно добавить дополнительную логику при смене типа аккаунта
+        console.log('Тип аккаунта изменен на:', typeId);
     }
 
     loginSuccess(user) {
-        // Сохраняем данные авторизации
         localStorage.setItem('auth_token', 'demo_token');
         localStorage.setItem('user_role', user.role);
         localStorage.setItem('user_name', user.name);
+        localStorage.setItem('user_id', user.id);
 
-        // Перенаправляем в зависимости от роли
-        if (user.role === 'admin') {
+        this.redirectToPanel(user.role);
+    }
+
+    redirectToPanel(role) {
+        if (role === 'admin') {
             window.location.href = 'admin.html';
         } else {
-            this.redirectToTrading();
+            window.location.href = 'trading.html';
         }
     }
 
-    redirectToTrading() {
-        window.location.href = 'trading.html';
-    }
-
-    testLogin(pocketId) {
-        // Тестовый логин для разработки
-        const user = {
-            role: pocketId === '69662105' ? 'admin' : 'user',
-            name: 'Тестовый пользователь'
-        };
-        
-        this.loginSuccess(user);
-    }
-
     showError(message) {
-        // Простое уведомление об ошибке
         alert('Ошибка: ' + message);
     }
 
     showLoading() {
         const btn = document.getElementById('loginBtn');
         if (btn) {
-            btn.innerHTML = 'Проверка ID...';
+            btn.innerHTML = 'Проверка...';
             btn.disabled = true;
         }
     }
@@ -168,7 +135,7 @@ class TradingApp {
     hideLoading() {
         const btn = document.getElementById('loginBtn');
         if (btn) {
-            btn.innerHTML = 'Перейти в трейдинг';
+            btn.innerHTML = 'Войти в систему';
             btn.disabled = false;
         }
     }
@@ -179,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     new TradingApp();
 });
 
-// Функции для работы с Telegram Web App
+// Интеграция с Telegram Web App
 if (window.Telegram && window.Telegram.WebApp) {
     Telegram.WebApp.ready();
     Telegram.WebApp.expand();
