@@ -1,145 +1,60 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ASPIRE TRADE • Админ панель</title>
-<link rel="stylesheet" href="assets/trading.css" />
-4
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?
-family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASPIRE TRADE — Admin Panel</title>
+  <link rel="stylesheet" href="assets/trading.css">
 </head>
-<body class="app">
-<aside class="topbar">
-<div class="topbar-left">
-<span class="brand"> АДМИН ПАНЕЛЬ</span>
-<span class="pill">SUPER ADMIN</span>
-</div>
-<div class="topbar-right">
-<a class="btn btn-secondary" href="trading.html">Вид пользователя</a>
-<button id="btnLogout" class="btn btn-danger">Выйти</button>
-</div>
-</aside>
-<main class="container">
-<nav class="tabs">
-<button data-tab="overview" class="tab active">Обзор</button>
-<button data-tab="users" class="tab">Пользователи</button>
-<button data-tab="signals" class="tab">Сигналы</button>
-<button data-tab="analytics" class="tab">Аналитика</button>
-<button data-tab="ml" class="tab">ML Модель</button>
-<button data-tab="system" class="tab">Система</button>
-<button data-tab="settings" class="tab">Настройки</button>
-</nav>
-<!-- OVERVIEW -->
-<section class="tab-page active" id="tab-overview">
-<div class="grid kpi">
-<div class="card kpi-card"><div class="kpi-label">Активных
-пользователей</div><div id="ovr-users" class="kpi-value">—</div><div
-class="kpi-sub">из whitelist</div></div>
-<div class="card kpi-card"><div class="kpi-label">Точность бота</
-div><div id="ovr-acc" class="kpi-value">—</div><div class="kpi-sub">за всё
-время</div></div>
-<div class="card kpi-card"><div class="kpi-label">Активных сигналов</
-div><div id="ovr-sig" class="kpi-value">—</div><div class="kpi-sub">в
-реальном времени</div></div>
-<div class="card kpi-card"><div class="kpi-label">Доход системы</
-div><div id="ovr-fee" class="kpi-value">2.4%</div><div class="kpisub">комиссии</div></div>
-</div>
-<div class="grid features">
-<a class="feature card" data-action="users"><span> </span><div><h4>Управление
-пользователями</h4><p>Просмотр, активация, блокировка</p></div></a>
-<a class="feature card" data-action="ml"><span> </span><div><h4>Обучение
-ML модели</h4><p>Переобучение на новых данных</p></div></a>
-<a class="feature card" data-action="analytics"><span> </
-5
-span><div><h4>Детальная аналитика</h4><p>Статистика по парам и
-эффективности</p></div></a>
-<a class="feature card" data-action="system"><span> </span><div><h4>Системные
-метрики</h4><p>Мониторинг производительности</p></div></a>
-<a class="feature card" data-action="broadcast"><span> </
-span><div><h4>Рассылка сообщений</h4><p>Уведомления всем пользователям</p></
-div></a>
-<a class="feature card" data-action="backup"><span> </span><div><h4>Резервное
-копирование</h4><p>Бэкапы базы данных</p></div></a>
-</div>
-<div class="card logcard">
-<div class="section-title">Последние действия</div>
-<pre id="ovr-log" class="log">—</pre>
-</div>
-</section>
-<!-- USERS -->
-<section class="tab-page" id="tab-users">
-<div class="card">
-<div class="section-title">Белый список</div>
-<div class="users-toolbar">
-<input id="u-id" class="input" placeholder="Pocket ID" />
-<input id="u-name" class="input" placeholder="Имя" />
-<select id="u-role" class="input"><option value="user">user</
-option><option value="admin">admin</option></select>
-<button class="btn btn-primary" id="btn-add">Добавить</button>
-<button class="btn" id="btn-export">Скачать JSON</button>
-</div>
-<div id="users-list" class="users-list"></div>
-</div>
-</section>
-<!-- SIGNALS -->
-<section class="tab-page" id="tab-signals">
-<div class="card">
-<div class="section-title">Текущие сигналы</div>
-<div id="adm-signal" class="signal"></div>
-</div>
-</section>
-<!-- ANALYTICS -->
-<section class="tab-page" id="tab-analytics">
-<div class="card"><div class="section-title">Аналитика</div><div
-class="muted">(модуль заглушка — подключите свой источник)</div></div>
-</section>
-<!-- ML -->
-<section class="tab-page" id="tab-ml">
-<div class="card">
-<div class="section-title">Статистика ML модели</div>
-6
-<div id="ml-info" class="ml-info"></div>
-<div class="row gap">
-<button class="btn btn-primary" data-cmd="/retrain">Переобучить</
-button>
-<button class="btn" data-cmd="/modelstats">Статистика</button>
-<button class="btn" data-cmd="/forceml">Включить ML</button>
-<button class="btn" data-cmd="/repairml">Восстановить ML фичи</
-button>
-</div>
-</div>
-</section>
-<!-- SYSTEM -->
-<section class="tab-page" id="tab-system">
-<div class="card">
-<div class="section-title">Система</div>
-<div id="sys-info" class="sys-info"></div>
-<div class="row gap">
-<button class="btn" data-cmd="/status">Статус</button>
-<button class="btn" data-cmd="/clearalltrades">Очистить сделки</
-button>
-<button class="btn" data-cmd="/restorebackup">Восстановить из
-бэкапа</button>
-<button class="btn btn-danger" data-cmd="/stop">Остановить бота</
-button>
-</div>
-</div>
-</section>
-<!-- SETTINGS -->
-<section class="tab-page" id="tab-settings">
-<div class="card"><div class="section-title">Настройки</div><div
-class="muted">Подключите реальный API вызов к вашему боту, если требуется.</
-div></div>
-</section>
-</main>
-<div id="toast" class="toast hidden"></div>
-<script src="assets/trading.js"></script>
-<script>
-Aspire.requireAdmin();
-Aspire.initAdmin();
-</script>
+<body>
+  <header>
+    <h2>Админ-панель</h2>
+    <button onclick="logout()">Выйти</button>
+  </header>
+
+  <main class="content">
+    <section class="card">
+      <h3>👤 Добавить пользователя</h3>
+      <input id="newPocket" placeholder="Pocket ID">
+      <input id="newName" placeholder="Имя">
+      <select id="newRole">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button onclick="addUser()">Добавить</button>
+      <p id="adminMsg"></p>
+    </section>
+
+    <section class="card wide">
+      <h3>📋 Белый список</h3>
+      <pre id="whitelistBox">Загрузка...</pre>
+    </section>
+
+    <section class="card">
+      <h3>🧠 ML-модель</h3>
+      <pre id="mlInfo">Загрузка...</pre>
+      <button onclick="sendCommand('retrain')">🔄 Переобучить</button>
+      <button onclick="sendCommand('modelstats')">📊 Статистика ML</button>
+    </section>
+
+    <section class="card">
+      <h3>⚙️ Управление системой</h3>
+      <button onclick="sendCommand('status')">📈 Статус</button>
+      <button onclick="sendCommand('clearalltrades')">🧹 Очистить сделки</button>
+      <button onclick="sendCommand('stop')">⛔ Остановить бота</button>
+    </section>
+
+    <section class="card wide">
+      <h3>📡 Сигналы</h3>
+      <div id="adminSignals">Загрузка...</div>
+    </section>
+
+    <section class="card wide">
+      <h3>📜 Логи</h3>
+      <pre id="logBox">Загрузка...</pre>
+    </section>
+  </main>
+
+  <script src="assets/trading.js"></script>
 </body>
 </html>
