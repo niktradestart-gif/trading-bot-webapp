@@ -1,40 +1,41 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ASPIRE TRADE — Dashboard</title>
-  <link rel="stylesheet" href="assets/trading.css">
+  <link rel="stylesheet" href="assets/trading.css" />
 </head>
 <body>
-  <header>
-    <h2>ASPIRE TRADE</h2>
+  <div class="gradient-bg"></div>
+  <header class="glass header">
+    <h2 class="logo">⚡ ASPIRE TRADE</h2>
     <button onclick="logout()">Выйти</button>
   </header>
 
-  <main class="content">
-    <section id="signalSection" class="card wide">
+  <main class="grid">
+    <section class="glass card wide">
       <h3>📈 Текущий сигнал</h3>
-      <div id="signalData">Загрузка...</div>
+      <div id="signalData" class="signal-box neon">Загрузка…</div>
     </section>
 
-    <section class="card wide">
+    <section class="glass card wide">
       <h3>📊 График</h3>
-      <img id="chartImg" src="" alt="Chart">
+      <img id="chartImg" src="" alt="Chart" class="chart" />
     </section>
 
-    <section class="card">
-      <h3>📉 Результат последней сделки</h3>
-      <div id="lastResult">—</div>
+    <section class="glass card">
+      <h3>📉 Результат</h3>
+      <div id="lastResult" class="neon">—</div>
     </section>
 
-    <section class="card">
-      <h3>📊 Статистика торговли</h3>
-      <div id="statsBox">—</div>
+    <section class="glass card">
+      <h3>📊 Статистика</h3>
+      <div id="statsBox" class="neon">—</div>
     </section>
 
-    <section class="card wide">
-      <h3>📜 История последних сделок</h3>
+    <section class="glass card wide">
+      <h3>📜 История сделок</h3>
       <table id="historyTable">
         <thead>
           <tr><th>#</th><th>Пара</th><th>Направление</th><th>Результат</th><th>Время</th></tr>
