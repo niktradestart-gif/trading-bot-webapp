@@ -1,0 +1,271 @@
+/* Дополнения к mobile.css для trading.html */
+
+/* Стили для торговой панели */
+.trading-page .header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.trading-page .header h1 {
+    font-size: 22px;
+    color: #00ff88;
+    margin-bottom: 15px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+}
+
+.stat-card h3 {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 8px;
+    font-weight: normal;
+}
+
+.stat-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #00ff88;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 10px;
+    color: #888;
+}
+
+/* Активные сигналы */
+.active-signals {
+    margin-bottom: 20px;
+}
+
+.active-signals h2 {
+    font-size: 18px;
+    color: #00ff88;
+    margin-bottom: 15px;
+}
+
+.signal-table {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.table-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    background: rgba(0, 255, 136, 0.1);
+    padding: 12px 15px;
+    font-size: 12px;
+    color: #00ff88;
+    font-weight: bold;
+}
+
+.table-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.table-row:last-child {
+    border-bottom: none;
+}
+
+.pair {
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.direction {
+    font-weight: bold;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.direction.buy {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+}
+
+.direction.sell {
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+}
+
+.confidence {
+    text-align: right;
+    color: #ffaa00;
+    font-weight: bold;
+}
+
+/* Детали сигнала */
+.signal-details {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.detail-item .label {
+    font-size: 10px;
+    color: #888;
+    margin-bottom: 4px;
+}
+
+.detail-item .value {
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.timer {
+    color: #ffaa00;
+    font-family: 'Courier New', monospace;
+}
+
+/* SMART MONEY ANALYSIS */
+.smc-analysis {
+    margin-bottom: 20px;
+}
+
+.smc-analysis h2 {
+    font-size: 18px;
+    color: #00ff88;
+    margin-bottom: 15px;
+}
+
+.smc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.smc-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.smc-item .label {
+    font-size: 12px;
+    color: #888;
+}
+
+.smc-item .value {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.smc-item .value.bearish {
+    color: #ff4444;
+}
+
+.smc-item .value.bullish {
+    color: #00ff88;
+}
+
+.levels-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.level-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+    font-size: 12px;
+    color: #ccc;
+}
+
+.time-markers {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+}
+
+.time-markers span {
+    font-size: 10px;
+    color: #888;
+}
+
+/* Футер с таймером */
+.trading-footer {
+    margin-top: 20px;
+}
+
+.waiting-status {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+}
+
+.timer-display {
+    font-size: 32px;
+    font-weight: bold;
+    color: #ffaa00;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 10px;
+}
+
+.status-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.status-message .icon {
+    font-size: 16px;
+}
+
+/* Анимации */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.signal-active {
+    animation: pulse 2s infinite;
+}
