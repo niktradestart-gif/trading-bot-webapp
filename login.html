@@ -3,25 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход - Трейдинг Сигналы</title>
+    <title>Трейдинг Сигналы</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
     <div class="login-container">
+        <!-- Заголовок как в скрине -->
         <div class="login-header">
-            <div class="logo">
-                <i class="fas fa-chart-line"></i>
-                Трейдинг Сигналы
-            </div>
-            <div class="logo-subtitle">Pocket Option Auth System</div>
+            <h1>Трейдинг Бот</h1>
+            <p class="login-subtitle">Pocket Option Auth System</p>
         </div>
-        
+
+        <!-- Форма авторизации -->
         <div class="login-card">
-            <div class="login-title">Авторизация</div>
-            <div class="login-subtitle">Введите ваш ID аккаунта Pocket Option</div>
-            
-            <!-- Инструкция -->
+            <h2>Авторизация</h2>
+            <p class="instruction">Введите ваш ID аккаунта Pocket Option</p>
+
+            <!-- Инструкция как в скрине -->
             <div class="instruction-box">
                 <h3>Как найти ID:</h3>
                 <ol>
@@ -30,52 +29,60 @@
                     <li>Ваш ID указан в формате: <strong>69662105</strong></li>
                 </ol>
             </div>
-            
+
+            <!-- Поле ввода с чекбоксом справа как в скрине -->
             <form id="loginForm">
                 <div class="form-group">
-                    <label class="form-label">ID аккаунта Pocket Option</label>
-                    <div class="input-with-icon">
-                        <i class="fas fa-id-card input-icon"></i>
-                        <input type="text" class="form-control" id="pocketId" placeholder="Введите ваш Pocket ID" required>
-                    </div>
-                    
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="confirmId">
-                        <label for="confirmId">ID подтвержден!</label>
+                    <label>ID аккаунта Pocket Option</label>
+                    <div class="input-with-checkbox">
+                        <input type="text" id="pocketId" placeholder="Введите ваш Pocket ID">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="confirmId">
+                            <label for="confirmId">ID подтвержден!</label>
+                        </div>
                     </div>
                 </div>
-                
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-sign-in-alt"></i> Перейти в трейдинг
+
+                <!-- Кнопка входа -->
+                <button type="submit" class="btn-primary">
+                    Перейти в трейдинг
                 </button>
             </form>
-            
-            <div class="demo-accounts">
-                <div class="demo-title">Демо доступы для тестирования</div>
+
+            <!-- Демо доступы в точном формате как в скрине -->
+            <div class="demo-section">
+                <h3>Демо доступы для тестирования</h3>
                 
                 <div class="demo-account">
-                    <div>
-                        <div class="demo-role">👤 Пользователь</div>
-                        <div class="demo-credentials">ID: 12345678</div>
-                    </div>
-                    <span class="demo-click" onclick="fillDemo('user')">Вставить</span>
+                    <input type="radio" name="demoAccount" id="demoUser">
+                    <label for="demoUser">
+                        <span class="demo-type">Пользователь</span>
+                        <span class="demo-credentials">D:\user\23 | Пароль: password</span>
+                    </label>
                 </div>
-                
+
                 <div class="demo-account">
-                    <div>
-                        <div class="demo-role">🛡️ Администратор</div>
-                        <div class="demo-credentials">ID: 69662105</div>
-                    </div>
-                    <span class="demo-click" onclick="fillDemo('admin')">Вставить</span>
+                    <input type="radio" name="demoAccount" id="demoAdmin">
+                    <label for="demoAdmin">
+                        <span class="demo-type">Администратор</span>
+                        <span class="demo-credentials">D:\admin | Пароль: admin\123</span>
+                    </label>
+                </div>
+
+                <div class="demo-account">
+                    <input type="radio" name="demoAccount" id="demoTest">
+                    <label for="demoTest">
+                        <span class="demo-type">Тестирование</span>
+                        <span class="demo-credentials">B:\cramm</span>
+                    </label>
                 </div>
             </div>
         </div>
-        
-        <div class="footer">
-            <div>Трейдинг Бот • Pocket Option Auth v1.0</div>
-            <div class="security-badge">
-                Только для зарегистрированных пользователей <strong>POCKET</strong>
-            </div>
+
+        <!-- Футер как в скрине -->
+        <div class="login-footer">
+            <div class="version">Трейдинг Бот • Pocket Option Auth v1.0</div>
+            <div class="notice">Только для зарегистрированных пользователей <strong>POCKET</strong></div>
             <div class="bot-link">@aspiretrad_bot</div>
         </div>
     </div>
