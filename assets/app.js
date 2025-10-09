@@ -1,153 +1,171 @@
-// Базовая логика приложения
-class TradingApp {
+// Новая логика для красивого дизайна
+class ModernTradingApp {
     constructor() {
         this.init();
     }
 
     init() {
-        this.setupEventListeners();
-        this.checkAuthentication();
+        this.setupDemoCards();
+        this.setupFormInteractions();
+        this.setupAnimations();
     }
 
-    setupEventListeners() {
-        // Логин форма
-        const loginBtn = document.getElementById('loginBtn');
+    setupDemoCards() {
+        // Клик по демо карточкам
+        const demoCards = document.querySelectorAll('.demo-card');
+        demoCards.forEach(card => {
+            card.addEventListener('click', () => {
+                const badge = card.querySelector('.demo-badge');
+                this.fillDemoCredentials(badge.textContent.toLowerCase());
+            });
+        });
+    }
+
+    setupFormInteractions() {
+        // Интерактивность чекбоксов
+        const inputs = document.querySelectorAll('.modern-input');
+        inputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                const check = e.target.nextElementSibling;
+                if (e.target.value.length > 0) {
+                    check.classList.add('checked');
+                } else {
+                    check.classList.remove('checked');
+                }
+            });
+        });
+
+        // Радио кнопки
+        const radioOptions = document.querySelectorAll('.radio-option');
+        radioOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                radioOptions.forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+                option.querySelector('input').checked = true;
+            });
+        });
+
+        // Кнопка входа
+        const loginBtn = document.querySelector('.login-btn');
         if (loginBtn) {
             loginBtn.addEventListener('click', () => this.handleLogin());
         }
+    }
 
-        // Демо доступы
-        const demoAccounts = document.querySelectorAll('input[name="demoAccount"]');
-        demoAccounts.forEach(radio => {
-            radio.addEventListener('change', (e) => this.handleDemoAccount(e.target.id));
-        });
-
-        // Переключение типа учетной записи
-        const accountTypes = document.querySelectorAll('input[name="accountType"]');
-        accountTypes.forEach(radio => {
-            radio.addEventListener('change', (e) => this.handleAccountTypeChange(e.target.id));
+    setupAnimations() {
+        // Плавное появление элементов
+        const elements = document.querySelectorAll('.input-group, .login-btn, .demo-card');
+        elements.forEach((el, index) => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                el.style.transition = 'all 0.5s ease';
+                el.style.opacity = '1';
+                el.style.transform = 'translateY(0)';
+            }, index * 100);
         });
     }
 
-    checkAuthentication() {
-        const token = localStorage.getItem('auth_token');
-        if (token && window.location.pathname.includes('login.html')) {
-            const role = localStorage.getItem('user_role');
-            this.redirectToPanel(role);
+    fillDemoCredentials(type) {
+        const credentials = {
+            'пользователь': { id: 'D:\\user\\23', password: 'password', accountType: 'user' },
+            'администратор': { id: 'D:\\admin', password: 'admin\\123', accountType: 'admin' },
+            'тестирование': { id: 'B:\\cramm', password: '', accountType: 'user' }
+        };
+
+        const creds = credentials[type];
+        if (creds) {
+            // Заполняем поля
+            const idInput = document.querySelector('input[placeholder="Введите ваш ID"]');
+            const passwordInput = document.querySelector('input[type="password"]');
+            
+            if (idInput) idInput.value = creds.id;
+            if (passwordInput) passwordInput.value = creds.password;
+
+            // Обновляем чекбоксы
+            const checks = document.querySelectorAll('.input-check');
+            checks[0].classList.add('checked');
+            if (creds.password) {
+                checks[1].classList.add('checked');
+            }
+
+            // Выбираем тип аккаунта
+            const radioOptions = document.querySelectorAll('.radio-option');
+            radioOptions.forEach(option => {
+                option.classList.remove('selected');
+                if (option.textContent.toLowerCase().includes(creds.accountType)) {
+                    option.classList.add('selected');
+                    option.querySelector('input').checked = true;
+                }
+            });
+
+            // Анимация успеха
+            this.showSuccess('Демо данные заполнены!');
         }
     }
 
     handleLogin() {
-        const userId = document.getElementById('userId').value.trim();
-        const password = document.getElementById('password').value;
-        const isUserType = document.getElementById('userType').checked;
-        const accountType = isUserType ? 'user' : 'admin';
-
-        if (!userId) {
-            this.showError('Введите ID пользователя');
-            return;
-        }
-
-        if (!password) {
-            this.showError('Введите пароль');
+        const idInput = document.querySelector('input[placeholder="Введите ваш ID"]');
+        const passwordInput = document.querySelector('input[type="password"]');
+        
+        if (!idInput.value || !passwordInput.value) {
+            this.showError('Заполните все поля');
             return;
         }
 
         this.showLoading();
-
-        // Проверка демо доступов
-        if (this.checkDemoAccess(userId, password, accountType)) {
-            setTimeout(() => {
-                this.loginSuccess({
-                    role: accountType,
-                    name: 'Демо пользователь',
-                    id: userId
-                });
-            }, 1000);
-        } else {
-            setTimeout(() => {
-                this.showError('Неверные учетные данные');
-                this.hideLoading();
-            }, 1000);
-        }
-    }
-
-    checkDemoAccess(userId, password, accountType) {
-        const demoCredentials = {
-            'D:\\user\\23': { password: 'password', role: 'user' },
-            'D:\\admin': { password: 'admin\\123', role: 'admin' },
-            'B:\\cramm': { password: '', role: 'user' }
-        };
-
-        const creds = demoCredentials[userId];
-        return creds && creds.password === password && creds.role === accountType;
-    }
-
-    handleDemoAccount(demoId) {
-        const demoData = {
-            'demoUser': { id: 'D:\\user\\23', password: 'password', type: 'userType' },
-            'demoAdmin': { id: 'D:\\admin', password: 'admin\\123', type: 'adminType' },
-            'demoTest': { id: 'B:\\cramm', password: '', type: 'userType' }
-        };
-
-        const data = demoData[demoId];
-        if (data) {
-            document.getElementById('userId').value = data.id;
-            document.getElementById('password').value = data.password;
-            document.getElementById(data.type).checked = true;
-        }
-    }
-
-    handleAccountTypeChange(typeId) {
-        // Можно добавить дополнительную логику при смене типа аккаунта
-        console.log('Тип аккаунта изменен на:', typeId);
-    }
-
-    loginSuccess(user) {
-        localStorage.setItem('auth_token', 'demo_token');
-        localStorage.setItem('user_role', user.role);
-        localStorage.setItem('user_name', user.name);
-        localStorage.setItem('user_id', user.id);
-
-        this.redirectToPanel(user.role);
-    }
-
-    redirectToPanel(role) {
-        if (role === 'admin') {
-            window.location.href = 'admin.html';
-        } else {
-            window.location.href = 'trading.html';
-        }
-    }
-
-    showError(message) {
-        alert('Ошибка: ' + message);
+        
+        // Имитация входа
+        setTimeout(() => {
+            const isAdmin = document.querySelector('.radio-option.selected').textContent.includes('Администратор');
+            localStorage.setItem('user_role', isAdmin ? 'admin' : 'user');
+            localStorage.setItem('auth_token', 'demo_token');
+            
+            window.location.href = isAdmin ? 'admin.html' : 'trading.html';
+        }, 1500);
     }
 
     showLoading() {
-        const btn = document.getElementById('loginBtn');
+        const btn = document.querySelector('.login-btn');
         if (btn) {
-            btn.innerHTML = 'Проверка...';
+            btn.innerHTML = '<div class="loading-spinner"></div>';
             btn.disabled = true;
         }
     }
 
-    hideLoading() {
-        const btn = document.getElementById('loginBtn');
-        if (btn) {
-            btn.innerHTML = 'Войти в систему';
-            btn.disabled = false;
-        }
+    showSuccess(message) {
+        // Можно добавить красивый toast
+        console.log('Success:', message);
+    }
+
+    showError(message) {
+        // Можно добавить красивый toast
+        alert('Ошибка: ' + message);
     }
 }
 
-// Инициализация приложения
+// Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', () => {
-    new TradingApp();
+    new ModernTradingApp();
 });
 
-// Интеграция с Telegram Web App
-if (window.Telegram && window.Telegram.WebApp) {
-    Telegram.WebApp.ready();
-    Telegram.WebApp.expand();
-}
+// Стили для спиннера загрузки
+const style = document.createElement('style');
+style.textContent = `
+    .loading-spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid transparent;
+        border-top: 2px solid #ffffff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(style);
