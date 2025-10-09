@@ -4,507 +4,68 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Трейдинг Бот - Авторизация</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .auth-container {
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .auth-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .logo {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .logo-subtitle {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 1rem;
-            margin-top: 5px;
-        }
-
-        .auth-card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        }
-
-        .auth-title {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #333;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-
-        .auth-subtitle {
-            color: #666;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-        }
-
-        .input-with-icon {
-            position: relative;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #666;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 15px 15px 15px 45px;
-            border: 2px solid #e1e5e9;
-            border-radius: 12px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: #f8f9fa;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: #667eea;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .auth-btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .auth-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .auth-btn:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .secondary-btn {
-            background: #6c757d;
-        }
-
-        .secondary-btn:hover {
-            background: #5a6268;
-            box-shadow: 0 10px 20px rgba(108, 117, 125, 0.3);
-        }
-
-        .success-btn {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        }
-
-        .success-btn:hover {
-            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.3);
-        }
-
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 12px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border: 1px solid #f5c6cb;
-            display: none;
-        }
-
-        .success-message {
-            background: #d4edda;
-            color: #155724;
-            padding: 12px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border: 1px solid #c3e6cb;
-            display: none;
-        }
-
-        .info-box {
-            background: #d1ecf1;
-            color: #0c5460;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border: 1px solid #bee5eb;
-        }
-
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #ffffff;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .footer {
-            margin-top: 30px;
-            text-align: center;
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 0.9rem;
-        }
-
-        .pocket-badge {
-            display: inline-block;
-            background: #ff6b35;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            margin-left: 5px;
-        }
-
-        .user-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 15px 0;
-            border: 2px solid #e9ecef;
-            display: none;
-        }
-
-        .user-name {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-        }
-
-        .user-role {
-            color: #666;
-            font-size: 0.9rem;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/mobile.css">
 </head>
-<body>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script>
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.enableClosingConfirmation();
+<body class="login-page">
+    <div class="container">
+        <!-- Заголовок -->
+        <header class="header">
+            <h1>Трейдинг Бот</h1>
+            <p class="subtitle">Pocket Option Auth System</p>
+        </header>
 
-    // Список валидных ID из pocket_users.json
-    const VALID_POCKET_IDS = {
-        '69662105': { name: 'Admin', role: 'admin' },
-        '5489888474': { name: 'User1', role: 'user' },
-        '5632717908': { name: 'User2', role: 'user' }
-    };
+        <!-- Форма авторизации -->
+        <main class="login-form">
+            <h2>Авторизация</h2>
+            <p class="instruction">Введите ваш ID аккаунта Pocket Option</p>
 
-    let currentPocketId = null;
-    let currentUserInfo = null;
-
-    function showMessage(elementId, message) {
-        const element = document.getElementById(elementId);
-        element.textContent = message;
-        element.style.display = 'block';
-        setTimeout(() => {
-            element.style.display = 'none';
-        }, 5000);
-    }
-
-function checkPocketId() {
-    const pocketId = document.getElementById('pocketId').value.trim();
-    const authBtn = document.getElementById('authBtn');
-    const errorDiv = document.getElementById('errorMessage');
-    const successDiv = document.getElementById('successMessage');
-    const proceedBtn = document.getElementById('proceedBtn');
-    const regButtons = document.getElementById('regButtons');
-    const userInfoDiv = document.getElementById('userInfo');
-
-    // Скрываем предыдущие сообщения
-    errorDiv.style.display = 'none';
-    successDiv.style.display = 'none';
-    proceedBtn.style.display = 'none';
-    regButtons.style.display = 'none';
-    userInfoDiv.style.display = 'none';
-
-    // Проверка формата ID
-    if (!pocketId) {
-        showMessage('errorMessage', '❌ Введите ID аккаунта Pocket Option');
-        return;
-    }
-
-    if (!/^\d+$/.test(pocketId)) {
-        showMessage('errorMessage', '❌ ID должен содержать только цифры');
-        return;
-    }
-
-    // Показываем загрузку
-    authBtn.disabled = true;
-    authBtn.innerHTML = '<div class="loading"></div> Проверка ID...';
-
-    // Отправляем запрос боту на проверку
-    const payload = JSON.stringify({ 
-        action: 'check_pocket_id',
-        pocket_id: pocketId,
-        telegram_id: tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null
-    });
-    
-    tg.sendData(payload);
-
-    // Загружаем реальные данные из pocket_users.json
-    fetch('pocket_users.json')
-        .then(response => response.json())
-        .then(users => {
-            // Ищем пользователя по ID (как строка)
-            const user = users[pocketId];
-            
-            if (user) {
-                // ✅ Пользователь найден
-                showUserSuccess(user, pocketId);
-            } else {
-                // ❌ Пользователь не найден
-                showUserNotFound(pocketId);
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка загрузки данных:', error);
-            showUserNotFound(pocketId);
-        });
-}
-
-function showUserSuccess(user, pocketId) {
-    const successDiv = document.getElementById('successMessage');
-    const proceedBtn = document.getElementById('proceedBtn');
-    const userInfoDiv = document.getElementById('userInfo');
-    const authBtn = document.getElementById('authBtn');
-
-    // Убираем кавычки из имени если они есть
-    const userName = user.name.replace(/"/g, '');
-
-    // Показываем информацию о пользователе
-    userInfoDiv.innerHTML = `
-        <div class="user-info-card">
-            <div class="user-name">👤 ${userName}</div>
-            <div class="user-role">🛡️ ${user.role === 'admin' ? 'Администратор' : 'Пользователь'}</div>
-            <div class="user-id">🆔 ${pocketId}</div>
-        </div>
-    `;
-    userInfoDiv.style.display = 'block';
-    
-    successDiv.innerHTML = `✅ <strong>ID подтвержден!</strong>`;
-    successDiv.style.display = 'block';
-    
-    // Сохраняем данные
-    localStorage.setItem('pocket_user_id', pocketId);
-    localStorage.setItem('pocket_user_name', userName);
-    localStorage.setItem('pocket_user_role', user.role);
-    
-    // ВСЕ пользователи идут в trading.html (и админы и юзеры)
-    proceedBtn.onclick = () => window.location.href = 'trading.html';
-    proceedBtn.innerHTML = '<i class="fas fa-chart-line"></i> Перейти в трейдинг';
-    
-    // Показываем кнопку перехода
-    proceedBtn.style.display = 'block';
-    authBtn.style.display = 'none';
-}
-function showUserNotFound(pocketId) {
-    const errorDiv = document.getElementById('errorMessage');
-    const regButtons = document.getElementById('regButtons');
-    const authBtn = document.getElementById('authBtn');
-
-    errorDiv.innerHTML = `
-        ❌ <strong>ID не найден в реферальной системе</strong><br>
-        Ваш ID: ${pocketId}
-    `;
-    errorDiv.style.display = 'block';
-    
-    // Сбрасываем кнопку
-    authBtn.disabled = false;
-    authBtn.innerHTML = '<i class="fas fa-key"></i> Проверить ID';
-    authBtn.style.display = 'block';
-    
-    // Показываем кнопки регистрации и поддержки
-    regButtons.style.display = 'block';
-}
-
-function showMessage(elementId, message) {
-    const element = document.getElementById(elementId);
-    element.innerHTML = message;
-    element.style.display = 'block';
-}
-
-// Функция для автоматического входа
-function checkAutoLogin() {
-    const savedUserId = localStorage.getItem('pocket_user_id');
-    const savedUserName = localStorage.getItem('pocket_user_name');
-    const savedUserRole = localStorage.getItem('pocket_user_role');
-    
-    if (savedUserId && savedUserName && savedUserRole) {
-        // Автоматически заполняем поле и проверяем
-        document.getElementById('pocketId').value = savedUserId;
-        checkPocketId();
-    }
-}
-
-// Вызываем при загрузке страницы
-document.addEventListener('DOMContentLoaded', function() {
-    checkAutoLogin();
-});
-
-    function proceedToApp() {
-    if (currentPocketId && currentUserInfo) {
-        // Все идут в trading.html
-        window.location.href = 'trading.html';
-    } else {
-        showMessage('errorMessage', '❌ Сначала проверьте ID');
-    }
-}
-
-    function openRegistration() {
-        const url = 'https://pocket-friends.com/r/0qrjewbjlf';
-        window.open(url, '_blank');
-    }
-
-    function openSupport() {
-        const url = 'https://pocket-friends.com/r/0qrjewbjlf';
-        window.open(url, '_blank');
-    }
-
-    // Проверяем сохраненный ID при загрузке
-    document.addEventListener('DOMContentLoaded', function() {
-        const savedId = localStorage.getItem('pocket_user_id');
-        const savedName = localStorage.getItem('pocket_user_name');
-        const savedRole = localStorage.getItem('pocket_user_role');
-        
-        if (savedId && savedName && savedRole) {
-            document.getElementById('pocketId').value = savedId;
-            currentPocketId = savedId;
-            currentUserInfo = { name: savedName, role: savedRole };
-            
-            // Автоматически проверяем сохраненный ID
-            setTimeout(checkPocketId, 500);
-        }
-    });
-    </script>
-
-    <div class="auth-container">
-        <div class="auth-header">
-            <div class="logo">
-                <i class="fas fa-robot"></i>
-                Трейдинг Бот
+            <!-- Инструкция -->
+            <div class="instruction-box">
+                <h3>Как найти ID:</h3>
+                <ol>
+                    <li>Откройте приложение Pocket Option</li>
+                    <li>Нажмите на аватар профиля</li>
+                    <li>Ваш ID указан в формате: <strong>69662105</strong></li>
+                </ol>
             </div>
-            <div class="logo-subtitle">Pocket Option Auth System</div>
-        </div>
-        
-        <div class="auth-card">
-            <div class="auth-title">Авторизация</div>
-            <div class="auth-subtitle">Введите ваш ID аккаунта Pocket Option</div>
-            
-            <div class="info-box">
-                <strong>Как найти ID:</strong><br>
-                1. Откройте приложение Pocket Option<br>
-                2. Нажмите на аватар профиля<br>
-                3. Ваш ID указан в формате: <strong>69662105</strong>
-            </div>
-            
-            <form id="authForm" onsubmit="event.preventDefault(); checkPocketId();">
-                <div class="form-group">
-                    <label class="form-label">ID аккаунта Pocket Option</label>
-                    <div class="input-with-icon">
-                        <i class="fas fa-id-card input-icon"></i>
-                        <input type="text" class="form-control" id="pocketId" 
-                               placeholder="69662105" pattern="\d+" required>
-                    </div>
+
+            <!-- Поле ввода ID -->
+            <div class="input-group">
+                <label>ID аккаунта Pocket Option</label>
+                <input type="text" id="pocketId" placeholder="Введите ваш Pocket ID" maxlength="20">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="confirmId">
+                    <label for="confirmId">ID подтвержден!</label>
                 </div>
-                
-                <div class="user-info" id="userInfo"></div>
-                
-                <div class="error-message" id="errorMessage"></div>
-                <div class="success-message" id="successMessage"></div>
-                
-                <button type="submit" class="auth-btn" id="authBtn">
-                    <i class="fas fa-key"></i>
-                    Проверить ID
-                </button>
-                
-                <button type="button" class="auth-btn success-btn" onclick="proceedToApp()" id="proceedBtn" style="display: none;">
-                    <i class="fas fa-arrow-right"></i>
-                    Перейти в систему
-                </button>
-            </form>
-            
-            <div id="regButtons" style="display: none;">
-                <button class="auth-btn secondary-btn" onclick="openRegistration()">
-                    <i class="fas fa-user-plus"></i>
-                    Зарегистрироваться в Pocket Option
-                </button>
-                
-                <button class="auth-btn" onclick="openSupport()">
-                    <i class="fas fa-headset"></i>
-                    Связаться с поддержкой
-                </button>
             </div>
-        </div>
-        
-        <div class="footer">
-            <div>Трейдинг Бот • Pocket Option Auth v1.0</div>
-            <div style="margin-top: 10px; font-size: 0.8rem;">
-                Только для зарегистрированных пользователей
-                <span class="pocket-badge">POCKET</span>
+
+            <!-- Кнопка входа -->
+            <button class="btn-primary" id="loginBtn">
+                Перейти в трейдинг
+            </button>
+
+            <!-- Демо доступы -->
+            <div class="demo-access">
+                <h3>Демо доступы для тестирования</h3>
+                <div class="demo-account">
+                    <input type="radio" name="demoAccount" id="demoUser" value="user">
+                    <label for="demoUser">Пользователь: D:\user\23 | Пароль: password</label>
+                </div>
+                <div class="demo-account">
+                    <input type="radio" name="demoAccount" id="demoAdmin" value="admin">
+                    <label for="demoAdmin">Администратор: D:\admin | Пароль: admin\123</label>
+                </div>
             </div>
-        </div>
+        </main>
+
+        <!-- Футер -->
+        <footer class="footer">
+            <p class="version">Трейдинг Бот • Pocket Option Auth v1.0</p>
+            <p class="notice">Только для зарегистрированных пользователей <strong>POCKET</strong></p>
+            <p class="bot-link">@aspiretrad_bot</p>
+        </footer>
     </div>
+
+    <script src="assets/app.js"></script>
 </body>
 </html>
