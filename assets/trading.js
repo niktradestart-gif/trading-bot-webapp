@@ -1,179 +1,189 @@
-// Основная логика трейдинг интерфейса
-class TradingApp {
+// Логика торговой панели
+class TradingPanel {
     constructor() {
-        this.currentUser = null;
-        this.activeTrade = null;
-        this.chart = null;
+        this.currentTimer = 89; // 1:29 в секундах
+        this.timerInterval = null;
         this.init();
     }
 
-    async init() {
-        await this.checkAuth();
-        await this.loadUserData();
-        this.initCharts();
+    init() {
+        this.checkAuth();
+        this.setupWebApp();
+        this.startTimer();
         this.setupEventListeners();
-        this.loadActiveSignals();
-        this.startTimers();
     }
 
-    async checkAuth() {
-        const userId = localStorage.getItem('pocket_user_id');
-        if (!userId) {
-            window.location.href = 'index.html';
+    checkAuth() {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            window.location.href = 'login.html';
             return;
         }
-        this.currentUser = {
-            id: userId,
-            name: localStorage.getItem('pocket_user_name'),
-            role: localStorage.getItem('pocket_user_role')
-        };
-        document.getElementById('userName').textContent = this.currentUser.name;
     }
 
-    async loadUserData() {
-        // Загрузка статистики
-        await this.loadStatistics();
-        // Загрузка истории
-        await this.loadTradeHistory();
-    }
-
-    initCharts() {
-        // Основной торговый график
-        this.initTradingChart();
-        // Графики для статистики
-        this.initPerformanceChart();
-        this.initPairsChart();
-    }
-
-    initTradingChart() {
-        const ctx = document.getElementById('tradingChart').getContext('2d');
-        this.chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['10:20', '14:10', '12:10', '12:30', '13:10', '14:30'],
-                datasets: [{
-                    label: 'USDCHF',
-                    data: [0.80125, 0.80075, 0.80050, 0.80025, 0.80000, 0.79975],
-                    borderColor: '#ff4444',
-                    backgroundColor: 'rgba(255, 68, 68, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.1)' } },
-                    y: { grid: { color: 'rgba(255,255,255,0.1)' } }
-                }
-            }
-        });
-    }
-
-    async loadActiveSignals() {
-        try {
-            // Запрос к боту для получения активных сигналов
-            const payload = JSON.stringify({
-                action: 'get_active_signals',
-                user_id: this.currentUser.id
-            });
-            tg.sendData(payload);
+    setupWebApp() {
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
             
-            // Имитация получения сигнала
-            this.updateActiveSignal({
-                pair: 'USDCHF',
-                direction: 'SELL',
-                confidence: 6,
-                entryPrice: 0.52550,
-                expiration: 2
-            });
-            
-        } catch (error) {
-            console.error('Ошибка загрузки сигналов:', error);
+            // Устанавливаем цветовую схему
+            Telegram.WebApp.setHeaderColor('#1a1a2e');
+            Telegram.WebApp.setBackgroundColor('#1a1a2e');
         }
     }
 
-    updateActiveSignal(signal) {
-        this.activeTrade = signal;
-        document.querySelector('.current-signal h3').textContent = 
-            `${signal.pair} - Smart Money Analysis - ${signal.direction}`;
-        document.querySelector('.signal-confidence span:first-child').textContent = 
-            `${signal.confidence}/10`;
-        document.querySelector('.detail-item .value').textContent = signal.entryPrice;
-        this.startTradeTimer(signal.expiration);
-    }
-
-    startTradeTimer(minutes) {
-        let timeLeft = minutes * 60;
-        const timerElement = document.getElementById('tradeTimer');
-        
-        const timer = setInterval(() => {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            timerElement.textContent = 
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    startTimer() {
+        this.timerInterval = setInterval(() => {
+            this.currentTimer--;
             
-            if (timeLeft <= 0) {
-                clearInterval(timer);
-                this.tradeExpired();
+            if (this.currentTimer <= 0) {
+                this.timerComplete();
+                return;
             }
-            timeLeft--;
+            
+            this.updateTimerDisplay();
         }, 1000);
     }
 
-    async executeTrade(direction) {
-        if (!this.activeTrade) return;
+    updateTimerDisplay() {
+        const minutes = Math.floor(this.currentTimer / 60);
+        const seconds = this.currentTimer % 60;
+        const timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         
-        const tradeData = {
-            action: 'execute_trade',
-            user_id: this.currentUser.id,
-            pair: this.activeTrade.pair,
-            direction: direction,
-            entry_price: this.activeTrade.entryPrice
-        };
+        // Обновляем все таймеры на странице
+        const timerElements = document.querySelectorAll('.timer');
+        timerElements.forEach(element => {
+            element.textContent = timerText;
+        });
+    }
+
+    timerComplete() {
+        clearInterval(this.timerInterval);
         
-        tg.sendData(JSON.stringify(tradeData));
+        // Показываем результат сделки
+        this.showTradeResult();
+    }
+
+    async showTradeResult() {
+        // Запрашиваем результат у бота
+        try {
+            const result = await this.getTradeResult();
+            this.displayResult(result);
+        } catch (error) {
+            console.error('Ошибка получения результата:', error);
+        }
+    }
+
+    async getTradeResult() {
+        // В реальном приложении бот сам пришлет результат
+        // Здесь имитируем ответ
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve({
+                    success: Math.random() > 0.5,
+                    profit: 18,
+                    pair: 'AUDCHF',
+                    exitPrice: 0.52480
+                });
+            }, 2000);
+        });
+    }
+
+    displayResult(result) {
+        const statusElement = document.querySelector('.status-message');
+        if (statusElement) {
+            if (result.success) {
+                statusElement.innerHTML = '<span class="icon">🟢</span> СДЕЛКА ВЫИГРАНА +' + result.profit + '$';
+                statusElement.style.color = '#00ff88';
+            } else {
+                statusElement.innerHTML = '<span class="icon">🔴</span> СДЕЛКА ПРОИГРАНА';
+                statusElement.style.color = '#ff4444';
+            }
+        }
+
+        // Через 5 секунд обновляем данные
+        setTimeout(() => {
+            this.refreshData();
+        }, 5000);
+    }
+
+    async refreshData() {
+        // Обновляем данные через бота
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.sendData(JSON.stringify({
+                action: 'get_signal'
+            }));
+        }
         
-        // Показ результата
-        this.showTradeResult(direction);
+        // Сбрасываем таймер для нового сигнала
+        this.resetTimer();
+    }
+
+    resetTimer() {
+        this.currentTimer = 120; // 2 минуты
+        const statusElement = document.querySelector('.status-message');
+        if (statusElement) {
+            statusElement.innerHTML = '<span class="icon">☒</span> ОЖИДАНИЕ РЕЗУЛЬТАТА';
+            statusElement.style.color = '#ffffff';
+        }
+        this.startTimer();
     }
 
     setupEventListeners() {
-        // Навигация по вкладкам
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tabName = e.target.dataset.tab;
-                this.switchTab(tabName);
-            });
-        });
-
-        // Фильтры истории
-        document.getElementById('timeFilter').addEventListener('change', () => {
-            this.loadTradeHistory();
-        });
+        // Обработчики для будущих интерактивных элементов
     }
 
-    switchTab(tabName) {
-        // Скрыть все вкладки
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        // Убрать активный класс у кнопок
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        // Показать выбранную вкладку
-        document.getElementById(`${tabName}-tab`).classList.add('active');
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    // Получение новых данных от бота
+    handleBotMessage(data) {
+        switch (data.type) {
+            case 'new_signal':
+                this.updateSignal(data.signal);
+                break;
+            case 'trade_result':
+                this.displayResult(data.result);
+                break;
+            case 'update_stats':
+                this.updateStats(data.stats);
+                break;
+        }
     }
 
-    logout() {
-        localStorage.clear();
-        window.location.href = 'index.html';
+    updateSignal(signal) {
+        // Обновляем данные сигнала на странице
+        const pairElement = document.querySelector('.pair');
+        const directionElement = document.querySelector('.direction');
+        const confidenceElement = document.querySelector('.confidence');
+        const priceElement = document.querySelector('.detail-item:nth-child(2) .value');
+
+        if (pairElement) pairElement.textContent = signal.pair;
+        if (directionElement) {
+            directionElement.textContent = signal.direction;
+            directionElement.className = `direction ${signal.direction.toLowerCase()}`;
+        }
+        if (confidenceElement) confidenceElement.textContent = signal.confidence;
+        if (priceElement) priceElement.textContent = signal.entry_price;
+
+        // Сбрасываем таймер
+        this.resetTimer();
+    }
+
+    updateStats(stats) {
+        // Обновляем статистику
+        const statValues = document.querySelectorAll('.stat-value');
+        if (statValues[0]) statValues[0].textContent = stats.accuracy + '%';
+        if (statValues[1]) statValues[1].textContent = stats.active_signals;
+        // и т.д.
     }
 }
 
-// Запуск приложения
-const tradingApp = new TradingApp();
+// Инициализация торговой панели
+document.addEventListener('DOMContentLoaded', () => {
+    window.tradingPanel = new TradingPanel();
+});
+
+// Глобальная функция для получения сообщений от бота
+window.handleTelegramUpdate = function(data) {
+    if (window.tradingPanel) {
+        window.tradingPanel.handleBotMessage(data);
+    }
+};
