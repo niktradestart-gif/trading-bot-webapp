@@ -1,95 +1,91 @@
-// Текущая выбранная роль
-let currentRole = 'user';
-
-// Выбор роли
-function selectRole(role) {
-    currentRole = role;
-    
-    // Обновить UI
-    document.querySelectorAll('.role-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    document.querySelector(`[data-role="${role}"]`).classList.add('active');
-}
-
-// Заполнить демо данные
-function fillDemo(type) {
-    const demoData = {
-        'user': { id: 'D:\\user\\23', password: 'password' },
-        'admin': { id: 'D:\\admin', password: 'admin\\123' },
-        'test': { id: 'B:\\cramm', password: '' }
-    };
-    
-    const data = demoData[type];
-    document.getElementById('userId').value = data.id;
-    document.getElementById('password').value = data.password;
-    
-    // Выбрать соответствующую роль
-    if (type === 'admin') {
-        selectRole('admin');
-    } else {
-        selectRole('user');
+// Основная логика приложения
+class PocketOptionAuth {
+    constructor() {
+        this.whitelist = {};
+        this.init();
     }
-    
-    showNotification('Демо данные заполнены!', 'success');
-}
 
-// Вход через Telegram
-function connectTelegram() {
-    showNotification('Интеграция с Telegram будет настроена при подключении к боту', 'success');
-}
-
-// Обработка формы входа
-document.getElementById('loginForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const userId = document.getElementById('userId').value;
-    const password = document.getElementById('password').value;
-    
-    if (!userId || !password) {
-        showNotification('Заполните все поля', 'error');
-        return;
+    async init() {
+        await this.loadWhitelist();
+        this.setupEventListeners();
     }
-    
-    // Имитация процесса входа
-    simulateLogin(userId, password, currentRole);
-});
 
-// Имитация входа в систему
-function simulateLogin(userId, password, role) {
-    // Показать состояние загрузки
-    const submitBtn = document.querySelector('.btn-primary');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<div class="spinner"></div> Авторизация...';
-    submitBtn.disabled = true;
-    
-    // Имитация задержки сети
-    setTimeout(() => {
-        // Простая проверка демо данных
-        const validUsers = {
-            'user': { id: 'D:\\user\\23', password: 'password' },
-            'admin': { id: 'D:\\admin', password: 'admin\\123' },
-            'test': { id: 'B:\\cramm', password: '' }
-        };
-        
-        let isValid = false;
-        Object.values(validUsers).forEach(user => {
-            if (userId === user.id && password === user.password) {
-                isValid = true;
+    // Загружаем белый список из файла
+    async loadWhitelist() {
+        try {
+            const response = await fetch('pocket_users.json');
+            this.whitelist = await response.json();
+            console.log('Whitelist loaded:', this.whitelist);
+        } catch (error) {
+            console.error('Error loading whitelist:', error);
+            // Fallback на дефолтные данные
+            this.whitelist = {
+                "69662105": {
+                    "name": "Admin",
+                    "role": "admin",
+                    "telegram_id": 5129282647,
+                    "registered_at": "2024-01-15T10:30:00",
+                    "status": "active"
+                },
+                "12345678": {
+                    "name": "Тестовый пользователь", 
+                    "role": "user",
+                    "telegram_id": null,
+                    "registered_at": "2024-01-15T11:00:00",
+                    "status": "active"
+                }
+            };
+        }
+    }
+
+    setupEventListeners() {
+        // Обработка формы
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleLogin();
+        });
+
+        // Автоподтверждение при вводе ID
+        document.getElementById('pocketId').addEventListener('input', (e) => {
+            const checkbox = document.getElementById('confirmId');
+            if (e.target.value.length >= 8) {
+                checkbox.checked = true;
             }
         });
+    }
+
+    // Проверка Pocket ID
+    async handleLogin() {
+        const pocketId = document.getElementById('pocketId').value.trim();
+        const isConfirmed = document.getElementById('confirmId').checked;
+
+        if (!pocketId) {
+            this.showNotification('Введите ваш Pocket ID', 'error');
+            return;
+        }
+
+        if (!isConfirmed) {
+            this.showNotification('Подтвердите ваш ID', 'error');
+            return;
+        }
+
+        this.showLoading();
+
+        // Проверяем ID в белом списке
+        const userInfo = this.whitelist[pocketId];
         
-        if (isValid) {
-            showNotification('Успешный вход! Перенаправление...', 'success');
+        if (userInfo && userInfo.status === 'active') {
+            this.showNotification(`✅ ID подтвержден! Добро пожаловать, ${userInfo.name}`, 'success');
             
-            // Сохраняем данные авторизации
-            localStorage.setItem('auth_token', 'demo_token');
-            localStorage.setItem('user_role', role);
-            localStorage.setItem('user_id', userId);
+            // Сохраняем данные пользователя
+            localStorage.setItem('auth_token', 'pocket_auth');
+            localStorage.setItem('user_role', userInfo.role);
+            localStorage.setItem('user_name', userInfo.name);
+            localStorage.setItem('pocket_id', pocketId);
             
-            // Перенаправление на соответствующую панель
+            // Перенаправляем
             setTimeout(() => {
-                if (role === 'admin') {
+                if (userInfo.role === 'admin') {
                     window.location.href = 'admin.html';
                 } else {
                     window.location.href = 'trading.html';
@@ -97,40 +93,72 @@ function simulateLogin(userId, password, role) {
             }, 1500);
             
         } else {
-            showNotification('Неверный ID пользователя или пароль', 'error');
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
+            this.showNotification(
+                `❌ Pocket ID ${pocketId} не найден в системе. Зарегистрируйтесь по реферальной ссылке.`,
+                'error'
+            );
+            this.hideLoading();
         }
-    }, 2000);
-}
+    }
 
-// Показать уведомление
-function showNotification(message, type) {
-    // Создать элемент уведомления
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    
-    notification.innerHTML = `
-        <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i>
-        ${message}
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Удалить уведомление через 4 секунды
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease-in';
+    // Заполнение демо данных
+    fillDemo(type) {
+        const demoIds = {
+            'user': '12345678',
+            'admin': '69662105'
+        };
+        
+        const pocketId = demoIds[type];
+        document.getElementById('pocketId').value = pocketId;
+        document.getElementById('confirmId').checked = true;
+        
+        this.showNotification(`Демо ID ${pocketId} заполнен`, 'success');
+    }
+
+    // Показать загрузку
+    showLoading() {
+        const btn = document.querySelector('.btn-primary');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<div class="spinner"></div> Проверка ID...';
+        btn.disabled = true;
+    }
+
+    // Скрыть загрузку
+    hideLoading() {
+        const btn = document.querySelector('.btn-primary');
+        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Перейти в трейдинг';
+        btn.disabled = false;
+    }
+
+    // Показать уведомление
+    showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = message;
+        
+        document.body.appendChild(notification);
+        
         setTimeout(() => {
-            if (document.body.contains(notification)) {
-                document.body.removeChild(notification);
-            }
-        }, 300);
-    }, 4000);
+            notification.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    document.body.removeChild(notification);
+                }
+            }, 300);
+        }, 4000);
+    }
 }
 
-// Автофокус на поле userId при загрузке
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('userId').focus();
+// Глобальные функции для кнопок
+function fillDemo(type) {
+    if (window.authApp) {
+        window.authApp.fillDemo(type);
+    }
+}
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', () => {
+    window.authApp = new PocketOptionAuth();
 });
 
 // Функция выхода
