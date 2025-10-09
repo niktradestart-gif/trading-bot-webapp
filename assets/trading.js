@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8080/api";
+const API = "http://178.175.167.67:8080/api";
 
 function logout(){localStorage.clear();window.location.href="login.html";}
 
@@ -40,3 +40,4 @@ if(document.getElementById("whitelistBox")){loadWhitelist();loadML();loadSystem(
 
 window.onload=()=>{if(document.getElementById("signalData")){loadSignal();loadChart();loadResult();loadStats();loadHistory();}
 if(document.getElementById("whitelistBox")){loadWhitelist();loadML();loadSystem();loadSignals();loadLogs();}};
+
