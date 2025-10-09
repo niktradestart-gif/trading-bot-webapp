@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ASPIRE TRADE — Login</title>
-  <link rel="stylesheet" href="assets/trading.css">
+  <link rel="stylesheet" href="assets/trading.css" />
 </head>
 <body class="login-body">
-  <div class="login-card">
-    <h1>ASPIRE TRADE</h1>
+  <div class="glass login-card">
+    <h1 class="logo">⚡ ASPIRE TRADE</h1>
     <p>Введите ваш Pocket ID для входа</p>
     <input id="pocketId" type="text" placeholder="Например 5489888474" />
     <button onclick="checkAccess()">Войти</button>
@@ -20,13 +20,12 @@
       const id = document.getElementById("pocketId").value.trim();
       const res = await fetch("pocket_users.json");
       const users = await res.json();
-
       if (users[id]) {
         localStorage.setItem("pocketId", id);
         localStorage.setItem("role", users[id].role);
         window.location.href = users[id].role === "admin" ? "admin.html" : "trading.html";
       } else {
-        document.getElementById("loginError").innerText = "⛔ Доступ запрещён.";
+        document.getElementById("loginError").innerText = "⛔ Доступ запрещён";
       }
     }
   </script>
