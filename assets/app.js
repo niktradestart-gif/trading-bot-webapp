@@ -50,7 +50,18 @@ class PocketOptionAuth {
             const checkbox = document.getElementById('confirmId');
             if (e.target.value.length >= 8) {
                 checkbox.checked = true;
+            } else {
+                checkbox.checked = false;
             }
+        });
+
+        // Демо доступы
+        document.querySelectorAll('input[name="demoAccount"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    this.fillDemo(e.target.id.replace('demo', '').toLowerCase());
+                }
+            });
         });
     }
 
@@ -105,7 +116,8 @@ class PocketOptionAuth {
     fillDemo(type) {
         const demoIds = {
             'user': '12345678',
-            'admin': '69662105'
+            'admin': '69662105',
+            'test': '87654321'
         };
         
         const pocketId = demoIds[type];
@@ -126,7 +138,7 @@ class PocketOptionAuth {
     // Скрыть загрузку
     hideLoading() {
         const btn = document.querySelector('.btn-primary');
-        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Перейти в трейдинг';
+        btn.innerHTML = 'Перейти в трейдинг';
         btn.disabled = false;
     }
 
