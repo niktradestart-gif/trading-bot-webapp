@@ -1,171 +1,142 @@
-// Новая логика для красивого дизайна
-class ModernTradingApp {
-    constructor() {
-        this.init();
-    }
+// Текущая выбранная роль
+let currentRole = 'user';
 
-    init() {
-        this.setupDemoCards();
-        this.setupFormInteractions();
-        this.setupAnimations();
-    }
-
-    setupDemoCards() {
-        // Клик по демо карточкам
-        const demoCards = document.querySelectorAll('.demo-card');
-        demoCards.forEach(card => {
-            card.addEventListener('click', () => {
-                const badge = card.querySelector('.demo-badge');
-                this.fillDemoCredentials(badge.textContent.toLowerCase());
-            });
-        });
-    }
-
-    setupFormInteractions() {
-        // Интерактивность чекбоксов
-        const inputs = document.querySelectorAll('.modern-input');
-        inputs.forEach(input => {
-            input.addEventListener('input', (e) => {
-                const check = e.target.nextElementSibling;
-                if (e.target.value.length > 0) {
-                    check.classList.add('checked');
-                } else {
-                    check.classList.remove('checked');
-                }
-            });
-        });
-
-        // Радио кнопки
-        const radioOptions = document.querySelectorAll('.radio-option');
-        radioOptions.forEach(option => {
-            option.addEventListener('click', () => {
-                radioOptions.forEach(opt => opt.classList.remove('selected'));
-                option.classList.add('selected');
-                option.querySelector('input').checked = true;
-            });
-        });
-
-        // Кнопка входа
-        const loginBtn = document.querySelector('.login-btn');
-        if (loginBtn) {
-            loginBtn.addEventListener('click', () => this.handleLogin());
-        }
-    }
-
-    setupAnimations() {
-        // Плавное появление элементов
-        const elements = document.querySelectorAll('.input-group, .login-btn, .demo-card');
-        elements.forEach((el, index) => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(20px)';
-            
-            setTimeout(() => {
-                el.style.transition = 'all 0.5s ease';
-                el.style.opacity = '1';
-                el.style.transform = 'translateY(0)';
-            }, index * 100);
-        });
-    }
-
-    fillDemoCredentials(type) {
-        const credentials = {
-            'пользователь': { id: 'D:\\user\\23', password: 'password', accountType: 'user' },
-            'администратор': { id: 'D:\\admin', password: 'admin\\123', accountType: 'admin' },
-            'тестирование': { id: 'B:\\cramm', password: '', accountType: 'user' }
-        };
-
-        const creds = credentials[type];
-        if (creds) {
-            // Заполняем поля
-            const idInput = document.querySelector('input[placeholder="Введите ваш ID"]');
-            const passwordInput = document.querySelector('input[type="password"]');
-            
-            if (idInput) idInput.value = creds.id;
-            if (passwordInput) passwordInput.value = creds.password;
-
-            // Обновляем чекбоксы
-            const checks = document.querySelectorAll('.input-check');
-            checks[0].classList.add('checked');
-            if (creds.password) {
-                checks[1].classList.add('checked');
-            }
-
-            // Выбираем тип аккаунта
-            const radioOptions = document.querySelectorAll('.radio-option');
-            radioOptions.forEach(option => {
-                option.classList.remove('selected');
-                if (option.textContent.toLowerCase().includes(creds.accountType)) {
-                    option.classList.add('selected');
-                    option.querySelector('input').checked = true;
-                }
-            });
-
-            // Анимация успеха
-            this.showSuccess('Демо данные заполнены!');
-        }
-    }
-
-    handleLogin() {
-        const idInput = document.querySelector('input[placeholder="Введите ваш ID"]');
-        const passwordInput = document.querySelector('input[type="password"]');
-        
-        if (!idInput.value || !passwordInput.value) {
-            this.showError('Заполните все поля');
-            return;
-        }
-
-        this.showLoading();
-        
-        // Имитация входа
-        setTimeout(() => {
-            const isAdmin = document.querySelector('.radio-option.selected').textContent.includes('Администратор');
-            localStorage.setItem('user_role', isAdmin ? 'admin' : 'user');
-            localStorage.setItem('auth_token', 'demo_token');
-            
-            window.location.href = isAdmin ? 'admin.html' : 'trading.html';
-        }, 1500);
-    }
-
-    showLoading() {
-        const btn = document.querySelector('.login-btn');
-        if (btn) {
-            btn.innerHTML = '<div class="loading-spinner"></div>';
-            btn.disabled = true;
-        }
-    }
-
-    showSuccess(message) {
-        // Можно добавить красивый toast
-        console.log('Success:', message);
-    }
-
-    showError(message) {
-        // Можно добавить красивый toast
-        alert('Ошибка: ' + message);
-    }
+// Выбор роли
+function selectRole(role) {
+    currentRole = role;
+    
+    // Обновить UI
+    document.querySelectorAll('.role-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-role="${role}"]`).classList.add('active');
 }
 
-// Инициализация при загрузке
-document.addEventListener('DOMContentLoaded', () => {
-    new ModernTradingApp();
-});
-
-// Стили для спиннера загрузки
-const style = document.createElement('style');
-style.textContent = `
-    .loading-spinner {
-        width: 20px;
-        height: 20px;
-        border: 2px solid transparent;
-        border-top: 2px solid #ffffff;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto;
+// Заполнить демо данные
+function fillDemo(type) {
+    const demoData = {
+        'user': { id: 'D:\\user\\23', password: 'password' },
+        'admin': { id: 'D:\\admin', password: 'admin\\123' },
+        'test': { id: 'B:\\cramm', password: '' }
+    };
+    
+    const data = demoData[type];
+    document.getElementById('userId').value = data.id;
+    document.getElementById('password').value = data.password;
+    
+    // Выбрать соответствующую роль
+    if (type === 'admin') {
+        selectRole('admin');
+    } else {
+        selectRole('user');
     }
     
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+    showNotification('Демо данные заполнены!', 'success');
+}
+
+// Вход через Telegram
+function connectTelegram() {
+    showNotification('Интеграция с Telegram будет настроена при подключении к боту', 'success');
+}
+
+// Обработка формы входа
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const userId = document.getElementById('userId').value;
+    const password = document.getElementById('password').value;
+    
+    if (!userId || !password) {
+        showNotification('Заполните все поля', 'error');
+        return;
     }
-`;
-document.head.appendChild(style);
+    
+    // Имитация процесса входа
+    simulateLogin(userId, password, currentRole);
+});
+
+// Имитация входа в систему
+function simulateLogin(userId, password, role) {
+    // Показать состояние загрузки
+    const submitBtn = document.querySelector('.btn-primary');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<div class="spinner"></div> Авторизация...';
+    submitBtn.disabled = true;
+    
+    // Имитация задержки сети
+    setTimeout(() => {
+        // Простая проверка демо данных
+        const validUsers = {
+            'user': { id: 'D:\\user\\23', password: 'password' },
+            'admin': { id: 'D:\\admin', password: 'admin\\123' },
+            'test': { id: 'B:\\cramm', password: '' }
+        };
+        
+        let isValid = false;
+        Object.values(validUsers).forEach(user => {
+            if (userId === user.id && password === user.password) {
+                isValid = true;
+            }
+        });
+        
+        if (isValid) {
+            showNotification('Успешный вход! Перенаправление...', 'success');
+            
+            // Сохраняем данные авторизации
+            localStorage.setItem('auth_token', 'demo_token');
+            localStorage.setItem('user_role', role);
+            localStorage.setItem('user_id', userId);
+            
+            // Перенаправление на соответствующую панель
+            setTimeout(() => {
+                if (role === 'admin') {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'trading.html';
+                }
+            }, 1500);
+            
+        } else {
+            showNotification('Неверный ID пользователя или пароль', 'error');
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    }, 2000);
+}
+
+// Показать уведомление
+function showNotification(message, type) {
+    // Создать элемент уведомления
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    notification.innerHTML = `
+        <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i>
+        ${message}
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Удалить уведомление через 4 секунды
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
+    }, 4000);
+}
+
+// Автофокус на поле userId при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('userId').focus();
+});
+
+// Функция выхода
+function logout() {
+    if (confirm('Вы уверены что хотите выйти?')) {
+        localStorage.clear();
+        window.location.href = 'login.html';
+    }
+}
