@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трейдинг Бот</title>
+    <title>Redirect to Login</title>
+    <meta http-equiv="refresh" content="0; url=login.html">
     <script>
-        // Автоматическое перенаправление на страницу логина
-        window.location.href = 'login.html';
+        // Принудительный редирект
+        window.location.href = "login.html";
+        // Очистка localStorage на всякий случай
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_role');
     </script>
 </head>
 <body>
     <p>Перенаправление на страницу входа...</p>
-    <a href="login.html">Если перенаправление не работает, нажмите сюда</a>
+    <a href="login.html">Нажмите здесь если перенаправление не работает</a>
 </body>
 </html>
