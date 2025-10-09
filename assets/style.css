@@ -1,16 +1,12 @@
 :root {
     --primary: #2563eb;
     --primary-dark: #1d4ed8;
-    --secondary: #64748b;
-    --success: #10b981;
-    --danger: #ef4444;
-    --warning: #f59e0b;
     --background: #0f172a;
     --card-bg: #1e293b;
     --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
     --border: #334155;
-    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    --success: #10b981;
 }
 
 * {
@@ -23,12 +19,12 @@
 body {
     background: var(--background);
     color: var(--text-primary);
-    line-height: 1.6;
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
+    line-height: 1.5;
 }
 
 .login-container {
@@ -41,331 +37,226 @@ body {
     margin-bottom: 30px;
 }
 
-.logo {
-    font-size: 32px;
-    font-weight: 700;
+.login-header h1 {
+    font-size: 24px;
+    font-weight: bold;
     color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
 }
 
-.logo-subtitle {
+.login-subtitle {
     color: var(--text-secondary);
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 14px;
 }
 
 .login-card {
     background: var(--card-bg);
-    padding: 30px;
-    border-radius: 16px;
-    box-shadow: var(--card-shadow);
     border: 1px solid var(--border);
-    animation: fadeIn 0.6s ease-out;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 20px;
 }
 
-.login-title {
-    font-size: 24px;
-    font-weight: 700;
-    text-align: center;
+.login-card h2 {
+    font-size: 18px;
+    font-weight: 600;
     margin-bottom: 10px;
     color: var(--text-primary);
 }
 
-.login-subtitle {
-    text-align: center;
+.instruction {
     color: var(--text-secondary);
-    margin-bottom: 30px;
     font-size: 14px;
-}
-
-.form-group {
     margin-bottom: 20px;
 }
 
-.form-label {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--text-primary);
-    font-weight: 600;
-    font-size: 14px;
+.instruction-box {
+    background: rgba(37, 99, 235, 0.1);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
 }
 
-.form-control {
-    width: 100%;
-    padding: 14px 16px;
-    background: var(--background);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: var(--text-primary);
-    font-size: 16px;
-    transition: all 0.3s;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-control:hover {
-    border-color: var(--primary);
-}
-
-.input-with-icon {
-    position: relative;
-}
-
-.input-icon {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-secondary);
-}
-
-.input-with-icon .form-control {
-    padding-left: 45px;
-}
-
-.btn {
-    width: 100%;
-    padding: 14px 20px;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
-    font-size: 16px;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: white;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
-}
-
-.btn-ghost {
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-}
-
-.btn-ghost:hover {
-    border-color: var(--primary);
+.instruction-box h3 {
     color: var(--primary);
+    font-size: 14px;
+    margin-bottom: 10px;
+    font-weight: 600;
 }
 
-.role-selector {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+.instruction-box ol {
+    padding-left: 20px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.instruction-box li {
+    margin-bottom: 5px;
+}
+
+.instruction-box strong {
+    color: var(--text-primary);
+}
+
+.form-group {
     margin-bottom: 25px;
 }
 
-.role-btn {
-    padding: 12px;
-    background: var(--background);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.3s;
-    text-align: center;
+.form-group label {
+    display: block;
+    color: var(--text-primary);
+    font-size: 14px;
+    margin-bottom: 8px;
     font-weight: 500;
+}
+
+.input-with-checkbox {
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 15px;
+}
+
+.input-with-checkbox input[type="text"] {
+    flex: 1;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 15px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.input-with-checkbox input[type="text"]::placeholder {
+    color: var(--text-secondary);
+}
+
+.checkbox-wrapper {
+    display: flex;
+    align-items: center;
     gap: 8px;
+    white-space: nowrap;
 }
 
-.role-btn:hover {
-    border-color: var(--primary);
+.checkbox-wrapper input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
 }
 
-.role-btn.active {
+.checkbox-wrapper label {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin: 0;
+    font-weight: normal;
+}
+
+.btn-primary {
+    width: 100%;
     background: var(--primary);
     color: white;
-    border-color: var(--primary);
-}
-
-.divider {
-    display: flex;
-    align-items: center;
-    margin: 25px 0;
-    color: var(--text-secondary);
-}
-
-.divider::before,
-.divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-}
-
-.divider-text {
-    padding: 0 15px;
-    font-size: 14px;
-}
-
-.demo-accounts {
-    background: var(--background);
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    margin-top: 25px;
-}
-
-.demo-title {
-    font-size: 14px;
+    border: none;
+    border-radius: 4px;
+    padding: 14px;
+    font-size: 16px;
     font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 12px;
-    text-align: center;
+    cursor: pointer;
+    margin-bottom: 25px;
+    transition: background 0.3s;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.demo-section {
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+}
+
+.demo-section h3 {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 15px;
+    font-weight: 600;
 }
 
 .demo-account {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 8px;
+    border-radius: 4px;
+    transition: background 0.3s;
 }
 
-.demo-account:last-child {
-    border-bottom: none;
+.demo-account:hover {
+    background: rgba(255, 255, 255, 0.05);
 }
 
-.demo-role {
-    font-weight: 600;
-    color: var(--text-primary);
+.demo-account input[type="radio"] {
+    margin-top: 2px;
+    accent-color: var(--primary);
+}
+
+.demo-account label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+    margin: 0;
+}
+
+.demo-type {
     font-size: 14px;
+    color: var(--text-primary);
+    font-weight: 500;
 }
 
 .demo-credentials {
-    color: var(--text-secondary);
     font-size: 12px;
+    color: var(--text-secondary);
     font-family: 'Courier New', monospace;
-    margin-top: 2px;
 }
 
-.demo-click {
-    background: var(--primary);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.demo-click:hover {
-    background: var(--primary-dark);
-    transform: translateY(-1px);
-}
-
-.footer {
+.login-footer {
     text-align: center;
-    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.version {
+    color: var(--primary);
+    font-size: 14px;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.notice {
     color: var(--text-secondary);
     font-size: 12px;
+    margin-bottom: 5px;
 }
 
-.security-badge {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 10px;
-    color: var(--success);
+.bot-link {
+    color: var(--primary);
     font-size: 12px;
-}
-
-/* Анимации */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-
-@keyframes slideOut {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(100%); opacity: 0; }
 }
 
 /* Адаптивность */
 @media (max-width: 480px) {
     .login-card {
-        padding: 25px 20px;
+        padding: 20px;
     }
     
-    .logo {
-        font-size: 28px;
+    .input-with-checkbox {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
     }
     
-    .role-selector {
-        grid-template-columns: 1fr;
+    .checkbox-wrapper {
+        justify-content: flex-start;
     }
-    
-    body {
-        padding: 15px;
-    }
-}
-
-/* Уведомления */
-.notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 15px 20px;
-    border-radius: 10px;
-    color: white;
-    font-weight: 600;
-    z-index: 1000;
-    animation: slideIn 0.3s ease-out;
-    max-width: 300px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.notification.success {
-    background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-}
-
-.notification.error {
-    background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
-}
-
-/* Спиннер загрузки */
-.spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid transparent;
-    border-top: 2px solid #ffffff;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
 }
