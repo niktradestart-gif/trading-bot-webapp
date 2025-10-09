@@ -1,140 +1,71 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трейдинг Сигналы</title>
-    <link rel="stylesheet" href="assets/mobile.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ASPIRE TRADE • Трейдинг</title>
+<link rel="stylesheet" href="assets/trading.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?
+family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="trading-page">
-    <div class="container">
-        <!-- Заголовок -->
-        <header class="header">
-            <h1>Трейдинг Сигналы</h1>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Сигналы</h3>
-                    <p class="stat-value">78%</p>
-                    <p class="stat-label">за сегодня</p>
-                </div>
-                <div class="stat-card">
-                    <h3>История</h3>
-                    <p class="stat-value">1</p>
-                    <p class="stat-label">активно</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Статистика</h3>
-                    <p class="stat-value">09:37</p>
-                    <p class="stat-label">сервера</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Настройки</h3>
-                    <p class="stat-value">бота</p>
-                    <p class="stat-label">Статус</p>
-                </div>
-            </div>
-        </header>
-
-        <!-- Разделитель -->
-        <div class="divider"></div>
-
-        <!-- Активные сигналы -->
-        <section class="active-signals">
-            <h2>Активные сигналы</h2>
-            
-            <div class="signal-table">
-                <div class="table-header">
-                    <span>ПАРА</span>
-                    <span>НАПРАВЛЕНИЕ</span>
-                    <span>УВЕРЕННОСТЬ</span>
-                </div>
-                <div class="table-row signal-active">
-                    <span class="pair">AUDCHF</span>
-                    <span class="direction sell">SELL</span>
-                    <span class="confidence">6/10</span>
-                </div>
-            </div>
-
-            <!-- Детали сигнала -->
-            <div class="signal-details">
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <span class="label">ID СДЕЛКИ</span>
-                        <span class="value">#392</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">ЦЕНА ВХОДА</span>
-                        <span class="value">0.52550</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">ЭКСПИРАЦИЯ</span>
-                        <span class="value">2 мин</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">ТАЙМЕР</span>
-                        <span class="value timer">01:29</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Разделитель -->
-        <div class="divider"></div>
-
-        <!-- SMART MONEY ANALYSIS -->
-        <section class="smc-analysis">
-            <h2>SMART MONEY ANALYSIS</h2>
-            
-            <div class="smc-grid">
-                <div class="smc-item">
-                    <span class="label">TREND</span>
-                    <span class="value bearish">BEARISH</span>
-                </div>
-                <div class="smc-item">
-                    <span class="label">STRENGTH</span>
-                    <span class="value">MODERATE</span>
-                </div>
-                <div class="smc-item">
-                    <span class="label">RSI</span>
-                    <span class="value">NEUTRAL</span>
-                </div>
-                <div class="smc-item">
-                    <span class="label">ORDER BLOCKS</span>
-                    <span class="value">ACTIVE</span>
-                </div>
-            </div>
-
-            <!-- Уровни -->
-            <div class="levels-list">
-                <div class="level-item">0.6260</div>
-                <div class="level-item">0.6288</div>
-                <div class="level-item">0.6286</div>
-                <div class="level-item">0.6284</div>
-                <div class="level-item">0.6282</div>
-                <div class="level-item">0.6260</div>
-            </div>
-
-            <!-- Временные метки -->
-            <div class="time-markers">
-                <span>10:00</span>
-                <span>10:30</span>
-                <span>11:00</span>
-                <span>11:30</span>
-            </div>
-        </section>
-
-        <!-- Статус ожидания -->
-        <footer class="trading-footer">
-            <div class="waiting-status">
-                <div class="timer-display">01:29</div>
-                <div class="status-message">
-                    <span class="icon">☒</span>
-                    ОЖИДАНИЕ РЕЗУЛЬТАТА
-                </div>
-            </div>
-        </footer>
-    </div>
-
-    <script src="assets/trading.js"></script>
+<body class="app">
+<aside class="topbar">
+<div class="topbar-left">
+<span class="brand"> Трейдинг Сигналы</span>
+<span id="botStatus" class="pill pill-online">ONLINE</span>
+</div>
+<div class="topbar-right">
+<a class="btn btn-secondary" href="admin.html">Админ</a>
+<button id="btnLogout" class="btn btn-danger">Выйти</button>
+</div>
+</aside>
+<main class="container">
+<!-- KPI row -->
+<section class="grid kpi">
+<div class="card kpi-card">
+<div class="kpi-label">Точность</div>
+<div class="kpi-value" id="kpi-accuracy">—</div>
+<div class="kpi-sub">за сегодня</div>
+</div>
+<div class="card kpi-card">
+<div class="kpi-label">Сигналы</div>
+<div class="kpi-value" id="kpi-active">—</div>
+<div class="kpi-sub">активно</div>
+</div>
+<div class="card kpi-card">
+3
+<div class="kpi-label">Время</div>
+<div class="kpi-value" id="kpi-servertime">—</div>
+<div class="kpi-sub">сервера</div>
+</div>
+<div class="card kpi-card">
+<div class="kpi-label">Статус</div>
+<div class="kpi-value"><span id="kpi-botstate" class="dot dotgreen"></span></div>
+<div class="kpi-sub">бота</div>
+</div>
+</section>
+<!-- Active signals -->
+<section class="card">
+<div class="section-title">Активные сигналы</div>
+<div id="signalWrap" class="signal"></div>
+<div class="chart-wrap">
+<img id="chartImg" src="assets/images/latest_chart.png" alt="Chart" /
+>
+</div>
+<div id="signalTimer" class="timer">—:—</div>
+</section>
+<section class="card">
+<div class="section-title">История (последние)</div>
+<div id="history" class="history"></div>
+</section>
+</main>
+<div id="toast" class="toast hidden"></div>
+<script src="assets/trading.js"></script>
+<script>
+Aspire.requireAuth();
+Aspire.initTrading();
+</script>
 </body>
 </html>
