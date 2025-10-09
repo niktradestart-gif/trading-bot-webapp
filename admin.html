@@ -3,478 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель администратора - Трейдинг Бот</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #0f172a;
-            color: white;
-            min-height: 100vh;
-        }
-
-        .admin-container {
-            max-width: 100%;
-            margin: 0 auto;
-            padding: 15px;
-        }
-
-        .admin-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #334155;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #f59e0b;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .admin-badge {
-            background: #f59e0b;
-            color: #0f172a;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary {
-            background: #3b82f6;
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #374151;
-            color: white;
-            border: 1px solid #4b5563;
-        }
-
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        .admin-stats {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 25px;
-        }
-
-        .admin-stat-card {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #334155;
-        }
-
-        .admin-stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #60a5fa;
-            margin-bottom: 5px;
-        }
-
-        .admin-stat-label {
-            font-size: 0.9rem;
-            color: #94a3b8;
-        }
-
-        .admin-actions {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 25px;
-        }
-
-        .action-card {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #334155;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .action-card:hover {
-            transform: translateY(-2px);
-            border-color: #3b82f6;
-        }
-
-        .action-icon {
-            font-size: 2rem;
-            margin-bottom: 10px;
-            color: #60a5fa;
-        }
-
-        .action-title {
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-
-        .action-desc {
-            font-size: 0.8rem;
-            color: #94a3b8;
-        }
-
-        .system-info {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #334155;
-            margin-bottom: 20px;
-        }
-
-        .system-info h3 {
-            margin-bottom: 15px;
-            color: #e2e8f0;
-        }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-
-        .info-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #334155;
-        }
-
-        .info-label {
-            color: #94a3b8;
-        }
-
-        .info-value {
-            color: #60a5fa;
-            font-weight: 500;
-        }
-
-        .status-online {
-            color: #10b981;
-        }
-
-        .status-offline {
-            color: #ef4444;
-        }
-
-        .users-list {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #334155;
-        }
-
-        .users-list h3 {
-            margin-bottom: 15px;
-            color: #e2e8f0;
-        }
-
-        .user-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            background: #334155;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-
-        .user-name {
-            font-weight: 500;
-        }
-
-        .user-stats {
-            font-size: 0.8rem;
-            color: #94a3b8;
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #10b981;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            z-index: 1000;
-            display: none;
-        }
-
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-    </style>
+    <title>Админ Панель - Трейдинг Бот</title>
+    <link rel="stylesheet" href="assets/desktop.css">
 </head>
-<body>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script>
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.enableClosingConfirmation();
-
-    function sendToBot(action, data = {}) {
-        const payload = JSON.stringify({ action, ...data });
-        tg.sendData(payload);
-        showNotification(`Команда отправлена: ${action}`);
-    }
-
-    function showNotification(message) {
-        const notification = document.getElementById('notification');
-        if (notification) {
-            notification.textContent = message;
-            notification.style.display = 'block';
-            setTimeout(() => {
-                notification.style.display = 'none';
-            }, 3000);
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        // Кнопка выхода
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => {
-                tg.close();
-            });
-        }
-
-        // Кнопка пользовательского вида
-        const userViewBtn = document.getElementById('userViewBtn');
-        if (userViewBtn) {
-            userViewBtn.addEventListener('click', () => {
-                window.location.href = 'user.html';
-            });
-        }
-
-        // Кнопка управления сигналами
-        const signalsBtn = document.getElementById('signalsBtn');
-        if (signalsBtn) {
-            signalsBtn.addEventListener('click', () => {
-                window.location.href = 'admin-signals.html';
-            });
-        }
-
-        // Загрузка системной информации
-        loadSystemInfo();
-    });
-
-    function loadSystemInfo() {
-        // Демо-данные системы
-        updateSystemInfo({
-            total_users: 47,
-            active_trades: 8,
-            system_status: 'online',
-            bot_status: 'running',
-            ml_model: 'trained',
-            gpt_status: 'enabled',
-            last_signal: '2 мин назад',
-            win_rate: '68.2%'
-        });
-    }
-
-    function updateSystemInfo(data) {
-        document.getElementById('totalUsers').textContent = data.total_users;
-        document.getElementById('activeTrades').textContent = data.active_trades;
-        document.getElementById('systemStatus').textContent = data.system_status;
-        document.getElementById('systemStatus').className = data.system_status === 'online' ? 'info-value status-online' : 'info-value status-offline';
-        document.getElementById('botStatus').textContent = data.bot_status;
-        document.getElementById('mlStatus').textContent = data.ml_model;
-        document.getElementById('gptStatus').textContent = data.gpt_status;
-        document.getElementById('lastSignal').textContent = data.last_signal;
-        document.getElementById('systemWinRate').textContent = data.win_rate;
-    }
-    </script>
-
+<body class="admin-page">
     <div class="admin-container">
-        <div class="admin-header">
-            <div class="header-left">
-                <div class="logo">
-                    <i class="fas fa-robot"></i>
-                    Трейдинг Бот
-                </div>
-                <div class="admin-badge">АДМИНИСТРАТОР</div>
-            </div>
-            <div class="btn-group">
-                <button class="btn btn-primary" id="userViewBtn">
-                    <i class="fas fa-eye"></i>
-                    Вид пользователя
-                </button>
-                <button class="btn btn-danger" id="logoutBtn">
-                    <i class="fas fa-sign-out-alt"></i>
-                    Выйти
-                </button>
-            </div>
-        </div>
-
-        <div class="admin-stats">
-            <div class="admin-stat-card">
-                <div class="admin-stat-value" id="totalUsers">0</div>
-                <div class="admin-stat-label">Всего пользователей</div>
-            </div>
-            <div class="admin-stat-card">
-                <div class="admin-stat-value" id="activeTrades">0</div>
-                <div class="admin-stat-label">Активных сделок</div>
-            </div>
-        </div>
-
-        <div class="admin-actions">
-            <div class="action-card" id="signalsBtn">
-                <div class="action-icon">
-                    <i class="fas fa-bolt"></i>
-                </div>
-                <div class="action-title">Управление сигналами</div>
-                <div class="action-desc">Просмотр и управление торговыми сигналами</div>
-            </div>
-            
-            <div class="action-card" onclick="sendToBot('modelstats')">
-                <div class="action-icon">
-                    <i class="fas fa-brain"></i>
-                </div>
-                <div class="action-title">ML Статистика</div>
-                <div class="action-desc">Анализ работы ML модели</div>
-            </div>
-            
-            <div class="action-card" onclick="sendToBot('retrain')">
-                <div class="action-icon">
-                    <i class="fas fa-retweet"></i>
-                </div>
-                <div class="action-title">Переобучить ML</div>
-                <div class="action-desc">Запуск переобучения модели</div>
-            </div>
-            
-            <div class="action-card" onclick="sendToBot('checkdata')">
-                <div class="action-icon">
-                    <i class="fas fa-database"></i>
-                </div>
-                <div class="action-title">Проверка данных</div>
-                <div class="action-desc">Диагностика целостности данных</div>
+        <!-- Боковое меню -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>АДМИН ПАНЕЛЬ</h1>
+                <div class="admin-badge">SUPER ADMIN</div>
             </div>
 
-            <div class="action-card" onclick="sendToBot('restorecounter')">
-                <div class="action-icon">
-                    <i class="fas fa-sync"></i>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <h3>Обзор</h3>
+                    <ul>
+                        <li class="nav-item active"><a href="#users">👥 Пользователи</a></li>
+                        <li class="nav-item"><a href="#signals">📊 Сигналы</a></li>
+                        <li class="nav-item"><a href="#analytics">📈 Аналитика</a></li>
+                        <li class="nav-item"><a href="#ml">🤖 ML модель</a></li>
+                        <li class="nav-item"><a href="#system">⚙️ Система</a></li>
+                        <li class="nav-item"><a href="#settings">🔧 Настройки</a></li>
+                    </ul>
                 </div>
-                <div class="action-title">Восстановить счетчики</div>
-                <div class="action-desc">Исправление счетчиков сделок</div>
-            </div>
+            </nav>
+        </aside>
 
-            <div class="action-card" onclick="sendToBot('clearalltrades')">
-                <div class="action-icon">
-                    <i class="fas fa-trash"></i>
+        <!-- Основной контент -->
+        <main class="main-content">
+            <!-- Статистика сверху -->
+            <section class="stats-overview">
+                <div class="stat-card large">
+                    <h3>Активных пользователей</h3>
+                    <div class="stat-value">142</div>
+                    <div class="stat-label">из 203</div>
                 </div>
-                <div class="action-title">Очистить сделки</div>
-                <div class="action-desc">Очистка всех открытых сделок</div>
-            </div>
-        </div>
+                <div class="stat-card large">
+                    <h3>Точность бэта</h3>
+                    <div class="stat-value">76.4%</div>
+                    <div class="stat-label">за все время</div>
+                </div>
+                <div class="stat-card large">
+                    <h3>Активных сигналов</h3>
+                    <div class="stat-value">18</div>
+                    <div class="stat-label">в реальном времени</div>
+                </div>
+                <div class="stat-card large">
+                    <h3>Доход системы</h3>
+                    <div class="stat-value">2.4%</div>
+                    <div class="stat-label">комиссия</div>
+                </div>
+            </section>
 
-        <div class="system-info">
-            <h3>Системная информация</h3>
-            <div class="info-grid">
-                <div class="info-item">
-                    <span class="info-label">Статус системы:</span>
-                    <span class="info-value status-online" id="systemStatus">online</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Статус бота:</span>
-                    <span class="info-value" id="botStatus">running</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">ML модель:</span>
-                    <span class="info-value" id="mlStatus">trained</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">GPT анализ:</span>
-                    <span class="info-value" id="gptStatus">enabled</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Последний сигнал:</span>
-                    <span class="info-value" id="lastSignal">2 мин назад</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Общий Win Rate:</span>
-                    <span class="info-value" id="systemWinRate">68.2%</span>
-                </div>
-            </div>
-        </div>
+            <!-- Разделитель -->
+            <div class="divider"></div>
 
-        <div class="users-list">
-            <h3>Активные пользователи</h3>
-            <div class="user-item">
-                <div>
-                    <div class="user-name">Иван Петров</div>
-                    <div class="user-stats">12 сделок • 75% win rate</div>
+            <!-- Обзор системы -->
+            <section class="system-overview">
+                <h2>Обзор системы</h2>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h4>👥 Управление пользователями</h4>
+                        <p>Просмотр, активация, блокировка пользователей</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🤖 Обучение ML модели</h4>
+                        <p>Переобучение нейросети на новых данных</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📊 Детальная аналитика</h4>
+                        <p>Статистика по парам и эффективности</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⚡ Системные метрики</h4>
+                        <p>Мониторинг производительности системы</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📢 Рассылка сообщений</h4>
+                        <p>Отправка уведомлений всем пользователям</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>💾 Резервное копирование</h4>
+                        <p>Создание бэкапа базы данных</p>
+                    </div>
                 </div>
-                <div class="status-online">🟢 Online</div>
-            </div>
-            <div class="user-item">
-                <div>
-                    <div class="user-name">Мария Сидорова</div>
-                    <div class="user-stats">8 сделок • 62% win rate</div>
+            </section>
+
+            <!-- Последние действия -->
+            <section class="recent-actions">
+                <h2>Последние действия</h2>
+                
+                <div class="actions-list">
+                    <div class="action-item success">
+                        <span class="action-time">2024-01-15 14:23:45</span>
+                        <span class="action-user">[IMP0]</span>
+                        <span class="action-text">ML модель переобучена с точностью 82.3%</span>
+                    </div>
+                    <div class="action-item success">
+                        <span class="action-time">2024-01-15 14:18:30</span>
+                        <span class="action-user">[SINCE58]</span>
+                        <span class="action-text">Сделка #192 закрыта с прибылью</span>
+                    </div>
+                    <div class="action-item info">
+                        <span class="action-time">2024-01-15 13:56:12</span>
+                        <span class="action-user">[RABNINE]</span>
+                        <span class="action-text">Высокая возможность на паре GBPCHF</span>
+                    </div>
+                    <div class="action-item warning">
+                        <span class="action-time">2024-01-15 13:48:22</span>
+                        <span class="action-user">[IMP0]</span>
+                        <span class="action-text">Новый пользователь авторизован (ID: 548988474)</span>
+                    </div>
+                    <div class="action-item error">
+                        <span class="action-time">2024-01-15 13:20:15</span>
+                        <span class="action-user">[ERROR]</span>
+                        <span class="action-text">Ошибка подключения к бирже, повторная попытка...</span>
+                    </div>
                 </div>
-                <div class="status-online">🟢 Online</div>
-            </div>
-            <div class="user-item">
-                <div>
-                    <div class="user-name">Алексей Козлов</div>
-                    <div class="user-stats">15 сделок • 80% win rate</div>
-                </div>
-                <div class="status-offline">🔴 Offline</div>
-            </div>
-        </div>
+            </section>
+        </main>
     </div>
 
-    <div class="notification" id="notification"></div>
+    <script src="assets/admin.js"></script>
 </body>
 </html>
