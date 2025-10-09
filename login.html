@@ -3,66 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трейдинг Бот - Авторизация</title>
-    <link rel="stylesheet" href="assets/mobile.css">
+    <title>Трейдинг Сигналы - Авторизация</title>
+    <link rel="stylesheet" href="assets/style.css">
 </head>
 <body class="login-page">
     <div class="container">
-        <!-- Заголовок -->
-        <header class="header">
-            <h1>Трейдинг Бот</h1>
-            <p class="subtitle">Pocket Option Auth System</p>
+        <!-- Заголовок как в скрине -->
+        <header class="login-header">
+            <h1>Трейдинг Сигналы</h1>
+            <div class="login-subtitle">Smart Money Analysis</div>
         </header>
 
-        <!-- Форма авторизации -->
-        <main class="login-form">
-            <h2>Авторизация</h2>
-            <p class="instruction">Введите ваш ID аккаунта Pocket Option</p>
-
-            <!-- Инструкция -->
-            <div class="instruction-box">
-                <h3>Как найти ID:</h3>
-                <ol>
-                    <li>Откройте приложение Pocket Option</li>
-                    <li>Нажмите на аватар профиля</li>
-                    <li>Ваш ID указан в формате: <strong>69662105</strong></li>
-                </ol>
+        <!-- Основной контент -->
+        <main class="login-content">
+            <div class="welcome-section">
+                <h2>Добро пожаловать</h2>
+                <p>Войдите в свою учетную запись</p>
             </div>
 
-            <!-- Поле ввода ID -->
-            <div class="input-group">
-                <label>ID аккаунта Pocket Option</label>
-                <input type="text" id="pocketId" placeholder="Введите ваш Pocket ID" maxlength="20">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="confirmId">
-                    <label for="confirmId">ID подтвержден!</label>
+            <!-- Форма входа -->
+            <div class="login-form">
+                <!-- ID пользователя -->
+                <div class="input-field">
+                    <label>ID пользователя</label>
+                    <div class="input-with-checkbox">
+                        <input type="text" placeholder="Введите ваш ID" id="userId">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="checkUserId">
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Кнопка входа -->
-            <button class="btn-primary" id="loginBtn">
-                Перейти в трейдинг
-            </button>
-
-            <!-- Демо доступы -->
-            <div class="demo-access">
-                <h3>Демо доступы для тестирования</h3>
-                <div class="demo-account">
-                    <input type="radio" name="demoAccount" id="demoUser" value="user">
-                    <label for="demoUser">Пользователь: D:\user\23 | Пароль: password</label>
+                <!-- Пароль -->
+                <div class="input-field">
+                    <label>Пароль</label>
+                    <div class="input-with-checkbox">
+                        <input type="password" placeholder="Введите пароль" id="password">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="checkPassword" checked>
+                        </div>
+                    </div>
                 </div>
-                <div class="demo-account">
-                    <input type="radio" name="demoAccount" id="demoAdmin" value="admin">
-                    <label for="demoAdmin">Администратор: D:\admin | Пароль: admin\123</label>
+
+                <!-- Тип учетной записи -->
+                <div class="input-field">
+                    <label>Тип учетной записи</label>
+                    <div class="account-type">
+                        <div class="radio-option">
+                            <input type="radio" id="userType" name="accountType" checked>
+                            <label for="userType">Пользователь</label>
+                        </div>
+                        <div class="radio-option">
+                            <input type="radio" id="adminType" name="accountType">
+                            <label for="adminType">Администратор</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Кнопка входа -->
+                <button class="login-btn" id="loginBtn">
+                    Войти в систему
+                </button>
+
+                <!-- Разделитель -->
+                <div class="divider">или</div>
+
+                <!-- Вход через Telegram -->
+                <button class="telegram-btn">
+                    Войти через Telegram
+                </button>
+
+                <!-- Демо доступы -->
+                <div class="demo-access">
+                    <h3>Демо доступы для тестирования</h3>
+                    
+                    <div class="demo-account">
+                        <div class="demo-radio">
+                            <input type="radio" id="demoUser" name="demoAccount">
+                        </div>
+                        <label for="demoUser">
+                            <span class="demo-type">Пользователь</span>
+                            <span class="demo-credentials">D:\user\23 | Пароль: password</span>
+                        </label>
+                    </div>
+
+                    <div class="demo-account">
+                        <div class="demo-radio">
+                            <input type="radio" id="demoAdmin" name="demoAccount">
+                        </div>
+                        <label for="demoAdmin">
+                            <span class="demo-type">Администратор</span>
+                            <span class="demo-credentials">D:\admin | Пароль: admin\123</span>
+                        </label>
+                    </div>
+
+                    <div class="demo-account">
+                        <div class="demo-radio">
+                            <input type="radio" id="demoTest" name="demoAccount">
+                        </div>
+                        <label for="demoTest">
+                            <span class="demo-type">Тестирование</span>
+                            <span class="demo-credentials">B:\cramm</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         </main>
 
-        <!-- Футер -->
-        <footer class="footer">
-            <p class="version">Трейдинг Бот • Pocket Option Auth v1.0</p>
-            <p class="notice">Только для зарегистрированных пользователей <strong>POCKET</strong></p>
-            <p class="bot-link">@aspiretrad_bot</p>
+        <!-- Футер как в скрине -->
+        <footer class="login-footer">
+            <div class="version-info">Трейдинг Бот v3.2.1</div>
+            <div class="security-info">Secure SSL Connection + Encrypted Data</div>
         </footer>
     </div>
 
