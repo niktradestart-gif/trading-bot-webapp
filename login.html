@@ -3,118 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трейдинг Сигналы - Авторизация</title>
+    <title>Трейдинг Сигналы</title>
     <link rel="stylesheet" href="assets/style.css">
 </head>
-<body class="login-page">
-    <div class="container">
-        <!-- Заголовок как в скрине -->
-        <header class="login-header">
-            <h1>Трейдинг Сигналы</h1>
-            <div class="login-subtitle">Smart Money Analysis</div>
-        </header>
-
-        <!-- Основной контент -->
-        <main class="login-content">
-            <div class="welcome-section">
-                <h2>Добро пожаловать</h2>
-                <p>Войдите в свою учетную запись</p>
+<body class="login-body">
+    <div class="login-container">
+        <!-- Левый блок - графики/инфо -->
+        <div class="login-left">
+            <div class="app-brand">
+                <h1>Трейдинг Сигналы</h1>
+                <p class="app-subtitle">Smart Money Analysis</p>
             </div>
+            
+            <div class="market-preview">
+                <div class="preview-item">
+                    <span class="pair">EURUSD</span>
+                    <span class="price up">1.09845</span>
+                </div>
+                <div class="preview-item">
+                    <span class="pair">GBPUSD</span>
+                    <span class="price down">1.27890</span>
+                </div>
+                <div class="preview-item">
+                    <span class="pair">USDJPY</span>
+                    <span class="price up">148.234</span>
+                </div>
+            </div>
+        </div>
 
-            <!-- Форма входа -->
-            <div class="login-form">
-                <!-- ID пользователя -->
-                <div class="input-field">
-                    <label>ID пользователя</label>
-                    <div class="input-with-checkbox">
-                        <input type="text" placeholder="Введите ваш ID" id="userId">
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="checkUserId">
-                        </div>
-                    </div>
+        <!-- Правый блок - форма -->
+        <div class="login-right">
+            <div class="login-form-container">
+                <div class="form-header">
+                    <h2>Добро пожаловать</h2>
+                    <p>Войдите в свою учетную запись</p>
                 </div>
 
-                <!-- Пароль -->
-                <div class="input-field">
-                    <label>Пароль</label>
-                    <div class="input-with-checkbox">
-                        <input type="password" placeholder="Введите пароль" id="password">
-                        <div class="checkbox-container">
-                            <input type="checkbox" id="checkPassword" checked>
+                <form class="login-form">
+                    <!-- ID пользователя -->
+                    <div class="input-group">
+                        <label>ID пользователя</label>
+                        <div class="input-with-icon">
+                            <input type="text" placeholder="Введите ваш ID" class="modern-input">
+                            <span class="input-check">✓</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Тип учетной записи -->
-                <div class="input-field">
-                    <label>Тип учетной записи</label>
-                    <div class="account-type">
-                        <div class="radio-option">
-                            <input type="radio" id="userType" name="accountType" checked>
-                            <label for="userType">Пользователь</label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" id="adminType" name="accountType">
-                            <label for="adminType">Администратор</label>
+                    <!-- Пароль -->
+                    <div class="input-group">
+                        <label>Пароль</label>
+                        <div class="input-with-icon">
+                            <input type="password" placeholder="Введите пароль" class="modern-input">
+                            <span class="input-check checked">✓</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Кнопка входа -->
-                <button class="login-btn" id="loginBtn">
-                    Войти в систему
-                </button>
+                    <!-- Тип учетной записи -->
+                    <div class="input-group">
+                        <label>Тип учетной записи</label>
+                        <div class="radio-group">
+                            <label class="radio-option selected">
+                                <input type="radio" name="accountType" checked>
+                                <span class="radio-custom"></span>
+                                Пользователь
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="accountType">
+                                <span class="radio-custom"></span>
+                                Администратор
+                            </label>
+                        </div>
+                    </div>
 
-                <!-- Разделитель -->
-                <div class="divider">или</div>
+                    <!-- Кнопка входа -->
+                    <button type="button" class="login-btn">
+                        <span>Войти в систему</span>
+                    </button>
 
-                <!-- Вход через Telegram -->
-                <button class="telegram-btn">
-                    Войти через Telegram
-                </button>
+                    <!-- Разделитель -->
+                    <div class="divider">
+                        <span>или</span>
+                    </div>
+
+                    <!-- Telegram вход -->
+                    <button type="button" class="telegram-btn">
+                        <span class="tg-icon">📱</span>
+                        Войти через Telegram
+                    </button>
+                </form>
 
                 <!-- Демо доступы -->
-                <div class="demo-access">
+                <div class="demo-section">
                     <h3>Демо доступы для тестирования</h3>
-                    
-                    <div class="demo-account">
-                        <div class="demo-radio">
-                            <input type="radio" id="demoUser" name="demoAccount">
+                    <div class="demo-grid">
+                        <div class="demo-card">
+                            <div class="demo-header">
+                                <span class="demo-badge user">Пользователь</span>
+                                <span class="demo-check">✓</span>
+                            </div>
+                            <div class="demo-credentials">
+                                D:\user\23 | Пароль: password
+                            </div>
                         </div>
-                        <label for="demoUser">
-                            <span class="demo-type">Пользователь</span>
-                            <span class="demo-credentials">D:\user\23 | Пароль: password</span>
-                        </label>
+                        
+                        <div class="demo-card">
+                            <div class="demo-header">
+                                <span class="demo-badge admin">Администратор</span>
+                                <span class="demo-check">✓</span>
+                            </div>
+                            <div class="demo-credentials">
+                                D:\admin | Пароль: admin\123
+                            </div>
+                        </div>
+                        
+                        <div class="demo-card">
+                            <div class="demo-header">
+                                <span class="demo-badge test">Тестирование</span>
+                                <span class="demo-check">✓</span>
+                            </div>
+                            <div class="demo-credentials">
+                                B:\cramm
+                            </div>
+                        </div>
                     </div>
+                </div>
 
-                    <div class="demo-account">
-                        <div class="demo-radio">
-                            <input type="radio" id="demoAdmin" name="demoAccount">
-                        </div>
-                        <label for="demoAdmin">
-                            <span class="demo-type">Администратор</span>
-                            <span class="demo-credentials">D:\admin | Пароль: admin\123</span>
-                        </label>
-                    </div>
-
-                    <div class="demo-account">
-                        <div class="demo-radio">
-                            <input type="radio" id="demoTest" name="demoAccount">
-                        </div>
-                        <label for="demoTest">
-                            <span class="demo-type">Тестирование</span>
-                            <span class="demo-credentials">B:\cramm</span>
-                        </label>
+                <!-- Футер -->
+                <div class="login-footer">
+                    <div class="version">Трейдинг Бот v3.2.1</div>
+                    <div class="security">
+                        <span class="secure-badge">🔒</span>
+                        Secure SSL Connection + Encrypted Data
                     </div>
                 </div>
             </div>
-        </main>
-
-        <!-- Футер как в скрине -->
-        <footer class="login-footer">
-            <div class="version-info">Трейдинг Бот v3.2.1</div>
-            <div class="security-info">Secure SSL Connection + Encrypted Data</div>
-        </footer>
+        </div>
     </div>
 
     <script src="assets/app.js"></script>
