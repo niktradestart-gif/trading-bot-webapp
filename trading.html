@@ -593,56 +593,70 @@
                 return;
             }
             
-            document.getElementById('user-id').textContent = userId;
+            // Безопасная установка текста
+            const safeSetText = (element, text) => {
+                if (element) element.textContent = text;
+            };
+            
+            // Безопасное получение элементов
+            const getElement = (id) => {
+                const el = document.getElementById(id);
+                if (!el) console.warn(`⚠️ Элемент не найден: ${id}`);
+                return el;
+            };
             
             // Элементы DOM
             const elements = {
                 // Статистика
-                accuracy: document.getElementById('accuracy'),
-                activeSignals: document.getElementById('active-signals'),
-                serverTime: document.getElementById('server-time'),
-                status: document.getElementById('status'),
-                statusBadge: document.getElementById('status-badge'),
+                accuracy: getElement('accuracy'),
+                activeSignals: getElement('active-signals'),
+                serverTime: getElement('server-time'),
+                status: getElement('status'),
+                statusBadge: getElement('status-badge'),
                 
                 // Контейнеры
-                signalContainer: document.getElementById('signal-container'),
-                resultContainer: document.getElementById('result-container'),
-                noSignal: document.getElementById('no-signal'),
+                signalContainer: getElement('signal-container'),
+                resultContainer: getElement('result-container'),
+                noSignal: getElement('no-signal'),
                 
                 // Активный сигнал
-                signalTradeId: document.getElementById('signal-trade-id'),
-                signalType: document.getElementById('signal-type'),
-                signalPair: document.getElementById('signal-pair'),
-                signalDirection: document.getElementById('signal-direction'),
-                signalEntry: document.getElementById('signal-entry'),
-                signalExpiry: document.getElementById('signal-expiry'),
-                signalConfidence: document.getElementById('signal-confidence'),
-                signalSource: document.getElementById('signal-source'),
-                signalCountdown: document.getElementById('signal-countdown'),
+                signalTradeId: getElement('signal-trade-id'),
+                signalType: getElement('signal-type'),
+                signalPair: getElement('signal-pair'),
+                signalDirection: getElement('signal-direction'),
+                signalEntry: getElement('signal-entry'),
+                signalExpiry: getElement('signal-expiry'),
+                signalConfidence: getElement('signal-confidence'),
+                signalSource: getElement('signal-source'),
+                signalCountdown: getElement('signal-countdown'),
                 
                 // Результат сделки
-                resultPair: document.getElementById('result-pair'),
-                resultDirection: document.getElementById('result-direction'),
-                resultEntry: document.getElementById('result-entry'),
-                resultExit: document.getElementById('result-exit'),
-                resultOutcome: document.getElementById('result-outcome'),
-                statTotal: document.getElementById('stat-total'),
-                statWins: document.getElementById('stat-wins'),
-                statLosses: document.getElementById('stat-losses'),
-                winRate: document.getElementById('win-rate'),
+                resultPair: getElement('result-pair'),
+                resultDirection: getElement('result-direction'),
+                resultEntry: getElement('result-entry'),
+                resultExit: getElement('result-exit'),
+                resultOutcome: getElement('result-outcome'),
+                statTotal: getElement('stat-total'),
+                statWins: getElement('stat-wins'),
+                statLosses: getElement('stat-losses'),
+                winRate: getElement('win-rate'),
                 
                 // График
-                chartPlaceholder: document.getElementById('chart-placeholder'),
-                chartImage: document.getElementById('chart-image'),
-                chartUpdate: document.getElementById('chart-update'),
+                chartPlaceholder: getElement('chart-placeholder'),
+                chartImage: getElement('chart-image'),
+                chartUpdate: getElement('chart-update'),
                 
                 // История
-                historyList: document.getElementById('history-list'),
+                historyList: getElement('history-list'),
                 
                 // Время обновления
-                signalUpdate: document.getElementById('signal-update'),
-                historyUpdate: document.getElementById('history-update')
+                signalUpdate: getElement('signal-update'),
+                historyUpdate: getElement('history-update'),
+                userId: getElement('user-id')
             };
+            
+            // Показываем ID пользователя
+            safeSetText(elements.userId, userId);
             
             // Текущее состояние
             let currentState = 'no_signal';
@@ -652,11 +666,13 @@
             function updateServerTime() {
                 const now = new Date();
                 const timeString = now.toLocaleTimeString('ru-RU');
-                elements.serverTime.textContent = timeString;
+                safeSetText(elements.serverTime, timeString);
             }
             
             // Переключение состояний
             function showState(state) {
+                if (!elements.signalContainer || !elements.resultContainer || !elements.noSignal) return;
+                
                 elements.signalContainer.style.display = 'none';
                 elements.resultContainer.style.display = 'none';
                 elements.noSignal.style.display = 'none';
@@ -683,34 +699,28 @@
             
             // Загрузка графика - УПРОЩЕННАЯ ВЕРСИЯ
             function loadChart(pair) {
-                if (!pair) {
-                    elements.chartImage.style.display = 'none';
-                    elements.chartPlaceholder.style.display = 'flex';
-                    elements.chartPlaceholder.innerHTML = `
-                        <div>📊 Ожидание торгового сигнала</div>
-                        <div style="font-size: 0.9rem;">График появится здесь</div>
-                    `;
-                    return;
-                }
+                if (!pair || !elements.chartImage || !elements.chartPlaceholder) return;
                 
                 const chartUrl = `${BOT_API}/charts/smc_chart_${pair}_latest.png?ts=${Date.now()}`;
                 console.log(`📈 Загрузка графика: ${chartUrl}`);
                 
                 elements.chartImage.onload = function() {
                     console.log('✅ График загружен');
-                    elements.chartPlaceholder.style.display = 'none';
-                    elements.chartImage.style.display = 'block';
-                    elements.chartUpdate.textContent = `активно: ${pair}`;
+                    if (elements.chartPlaceholder) elements.chartPlaceholder.style.display = 'none';
+                    if (elements.chartImage) elements.chartImage.style.display = 'block';
+                    safeSetText(elements.chartUpdate, `активно: ${pair}`);
                 };
                 
                 elements.chartImage.onerror = function() {
                     console.log('❌ График не загружен');
-                    elements.chartImage.style.display = 'none';
-                    elements.chartPlaceholder.style.display = 'flex';
-                    elements.chartPlaceholder.innerHTML = `
-                        <div>📊 График готовится...</div>
-                        <div style="font-size: 0.9rem;">Пара: ${pair}</div>
-                    `;
+                    if (elements.chartImage) elements.chartImage.style.display = 'none';
+                    if (elements.chartPlaceholder) {
+                        elements.chartPlaceholder.style.display = 'flex';
+                        elements.chartPlaceholder.innerHTML = `
+                            <div>📊 График готовится...</div>
+                            <div style="font-size: 0.9rem;">Пара: ${pair}</div>
+                        `;
+                    }
                 };
                 
                 elements.chartImage.src = chartUrl;
@@ -742,13 +752,17 @@
                     };
                     
                     updateUI(data);
-                    elements.statusBadge.textContent = 'LIVE';
-                    elements.statusBadge.style.background = 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))';
+                    if (elements.statusBadge) {
+                        elements.statusBadge.textContent = 'LIVE';
+                        elements.statusBadge.style.background = 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))';
+                    }
                     
                 } catch (error) {
                     console.error('❌ Ошибка загрузки данных:', error);
-                    elements.statusBadge.textContent = 'OFFLINE';
-                    elements.statusBadge.style.background = 'linear-gradient(135deg, #ff5c7a, #ff8e53)';
+                    if (elements.statusBadge) {
+                        elements.statusBadge.textContent = 'OFFLINE';
+                        elements.statusBadge.style.background = 'linear-gradient(135deg, #ff5c7a, #ff8e53)';
+                    }
                 }
             }
             
@@ -758,9 +772,9 @@
                 
                 // Обновление статистики
                 if (data.system) {
-                    elements.accuracy.textContent = `${Math.round(data.system.win_rate || 0)}%`;
-                    elements.activeSignals.textContent = data.system.active_signals || '0';
-                    elements.status.textContent = data.system.status || 'бета';
+                    safeSetText(elements.accuracy, `${Math.round(data.system.win_rate || 0)}%`);
+                    safeSetText(elements.activeSignals, data.system.active_signals || '0');
+                    safeSetText(elements.status, data.system.status || 'бета');
                 }
                 
                 // Определяем что показывать
@@ -769,32 +783,32 @@
                 
                 if (hasSignal) {
                     showActiveSignal(data.signal, data.system);
-                    elements.signalUpdate.textContent = `обновлено: ${now}`;
+                    safeSetText(elements.signalUpdate, `обновлено: ${now}`);
                 } else if (hasResult) {
                     showTradeResult(data.result, data.system);
-                    elements.signalUpdate.textContent = `обновлено: ${now}`;
+                    safeSetText(elements.signalUpdate, `обновлено: ${now}`);
                 } else {
                     showState('no_signal');
-                    elements.signalUpdate.textContent = 'нет активных сигналов';
+                    safeSetText(elements.signalUpdate, 'нет активных сигналов');
                 }
                 
                 // Обновление истории
                 updateHistory(data.history || []);
-                elements.historyUpdate.textContent = `обновлено: ${now}`;
+                safeSetText(elements.historyUpdate, `обновлено: ${now}`);
             }
             
             // Показать активный сигнал
             function showActiveSignal(signal, system) {
                 showState('active_signal');
                 
-                elements.signalTradeId.textContent = `🎯 СДЕЛКА #${signal.trade_id || system.total_trades || '—'}`;
-                elements.signalPair.textContent = signal.pair || '—';
-                elements.signalEntry.textContent = formatPrice(signal.entry_price);
-                elements.signalExpiry.textContent = signal.expiry ? `${signal.expiry} мин` : '—';
-                elements.signalConfidence.textContent = signal.confidence ? `${signal.confidence}/10` : '—/10';
-                elements.signalSource.textContent = signal.source || 'ENHANCED_SMART_MONEY';
+                safeSetText(elements.signalTradeId, `🎯 СДЕЛКА #${signal.trade_id || system.total_trades || '—'}`);
+                safeSetText(elements.signalPair, signal.pair || '—');
+                safeSetText(elements.signalEntry, formatPrice(signal.entry_price));
+                safeSetText(elements.signalExpiry, signal.expiry ? `${signal.expiry} мин` : '—');
+                safeSetText(elements.signalConfidence, signal.confidence ? `${signal.confidence}/10` : '—/10');
+                safeSetText(elements.signalSource, signal.source || 'ENHANCED_SMART_MONEY');
                 
-                if (signal.direction) {
+                if (signal.direction && elements.signalDirection) {
                     const direction = signal.direction.toUpperCase();
                     elements.signalDirection.textContent = `${direction} (${signal.confidence || '?'}/10)`;
                     elements.signalDirection.className = `signal-direction direction-${signal.direction.toLowerCase()}`;
@@ -802,7 +816,7 @@
                 
                 // Таймер обратного отсчета
                 if (signal.expiry) {
-                    elements.signalCountdown.textContent = `Сделка открыта! Результат через ${signal.expiry} минут...`;
+                    safeSetText(elements.signalCountdown, `Сделка открыта! Результат через ${signal.expiry} минут...`);
                 }
                 
                 // Загрузка графика
@@ -816,22 +830,22 @@
             function showTradeResult(result, system) {
                 showState('trade_result');
                 
-                elements.resultPair.textContent = result.pair || '—';
-                elements.resultEntry.textContent = formatPrice(result.entry_price);
-                elements.resultExit.textContent = formatPrice(result.exit_price);
-                elements.resultOutcome.textContent = result.result || '—';
+                safeSetText(elements.resultPair, result.pair || '—');
+                safeSetText(elements.resultEntry, formatPrice(result.entry_price));
+                safeSetText(elements.resultExit, formatPrice(result.exit_price));
+                safeSetText(elements.resultOutcome, result.result || '—');
                 
-                if (result.direction) {
+                if (result.direction && elements.resultDirection) {
                     const direction = result.direction.toUpperCase();
                     elements.resultDirection.textContent = direction;
                     elements.resultDirection.className = `signal-direction direction-${result.direction.toLowerCase()}`;
                 }
                 
                 // Статистика
-                elements.statTotal.textContent = system.total_trades || '—';
-                elements.statWins.textContent = system.total_wins || '—';
-                elements.statLosses.textContent = system.total_losses || '—';
-                elements.winRate.textContent = system.win_rate ? `${system.win_rate}%` : '—%';
+                safeSetText(elements.statTotal, system.total_trades || '—');
+                safeSetText(elements.statWins, system.total_wins || '—');
+                safeSetText(elements.statLosses, system.total_losses || '—');
+                safeSetText(elements.winRate, system.win_rate ? `${system.win_rate}%` : '—%');
                 
                 // Загрузка графика для последней пары
                 if (result.pair && result.pair !== currentPair) {
@@ -842,6 +856,8 @@
             
             // Обновление истории
             function updateHistory(history) {
+                if (!elements.historyList) return;
+                
                 if (!history || history.length === 0) {
                     elements.historyList.innerHTML = '<div class="no-data">Нет данных о сделках</div>';
                     return;
@@ -881,8 +897,11 @@
             setInterval(fetchTradingData, 5000);
             
             // Обработчики кнопок
-            document.getElementById('refresh-btn').addEventListener('click', fetchTradingData);
-            document.getElementById('logout-btn').addEventListener('click', function() {
+            const refreshBtn = getElement('refresh-btn');
+            const logoutBtn = getElement('logout-btn');
+            
+            if (refreshBtn) refreshBtn.addEventListener('click', fetchTradingData);
+            if (logoutBtn) logoutBtn.addEventListener('click', function() {
                 localStorage.removeItem('pocket_id');
                 window.location.href = 'login.html';
             });
