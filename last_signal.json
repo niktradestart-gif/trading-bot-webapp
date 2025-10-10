@@ -1,11 +1,11 @@
 {
-  "confidence": 6,
-  "direction": "SELL",
-  "entry_price": 0.80534,
+  "confidence": 9,
+  "direction": "BUY",
+  "entry_price": 1.39894,
   "error": null,
-  "expiry": 2,
-  "pair": "USDCHF",
+  "expiry": 1,
+  "pair": "USDCAD",
   "source": "live_bot",
-  "timestamp": "2025-10-10T17:12:38.799249",
-  "last_updated": "2025-10-10T14:14:22.026244"
+  "timestamp": "2025-10-10T17:24:38.331687",
+  "last_updated": "2025-10-10T14:24:46.626483"
 }
