@@ -1,11 +1,11 @@
 {
   "confidence": 10,
-  "direction": "SELL",
-  "entry_price": 2.05823,
+  "direction": "BUY",
+  "entry_price": 1.33452,
   "error": null,
-  "expiry": 1,
-  "pair": "GBPAUD",
+  "expiry": 2,
+  "pair": "GBPUSD",
   "source": "live_bot",
-  "timestamp": "2025-10-10T21:52:24.258137",
-  "last_updated": "2025-10-10T18:53:21.431122"
+  "timestamp": "2025-10-10T22:09:25.200705",
+  "last_updated": "2025-10-10T19:10:45.379408"
 }
