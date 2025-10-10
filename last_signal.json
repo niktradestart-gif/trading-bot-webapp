@@ -1,11 +1,10 @@
 {
-  "confidence": 10,
-  "direction": "SELL",
-  "entry_price": 0.86968,
-  "error": null,
-  "expiry": 1,
-  "pair": "EURGBP",
-  "source": "live_bot",
-  "timestamp": "2025-10-10T23:57:26.450619",
-  "last_updated": "2025-10-10T21:29:08.379128"
+  "pair": "EURUSD",
+  "direction": "BUY",
+  "confidence": 8,
+  "entry_price": 1.07521,
+  "expiry": 2,
+  "source": "ENHANCED_SMART_MONEY",
+  "last_updated": "2025-10-10T21:40:00.312382",
+  "note": "Demo signal - bot unavailable"
 }
