@@ -1,183 +1,342 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ASPIRE TRADE — Панель</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ASPIRE TRADE — Trading</title>
   <style>
-    body {
-      margin: 0;
-      font-family: "Poppins", sans-serif;
-      background-color: #0d1117;
-      color: #ffffff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
+    :root{
+      --bg:#0b0c14; --panel:#111225; --panel-2:#14162c; --text:#f4f6ff;
+      --muted:#aab0c5; --accent1:#6b5cff; --accent2:#19c3ff; --win:#18d27c; --loss:#ff5c7a;
+      --glass: rgba(255,255,255,.07);
     }
-    header {
-      background: linear-gradient(90deg, #0a84ff, #0066ff);
-      width: 100%;
-      text-align: center;
-      padding: 15px 0;
-      font-size: 1.4em;
-      font-weight: 600;
-      letter-spacing: 1px;
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 15% -10%, #2c186e44 0%, transparent 60%),
+        radial-gradient(900px 500px at 85% 110%, #0d476a44 0%, transparent 60%),
+        linear-gradient(180deg,#0b0c14 0%, #0b0c14 100%);
+      background-color:var(--bg);
     }
-    .container {
-      width: 95%;
-      max-width: 1000px;
-      margin-top: 20px;
-      background: #161b22;
-      border-radius: 16px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-      padding: 20px;
+    .wrap{max-width:1200px;margin:0 auto;padding:20px 16px 40px}
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;
     }
-    .section {
-      margin-bottom: 25px;
+    .brand{
+      display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.4px;
     }
-    h2 {
-      font-size: 1.2em;
-      border-left: 4px solid #0a84ff;
-      padding-left: 10px;
-      margin-bottom: 10px;
-      color: #58a6ff;
+    .badge{
+      font-size:.75rem;color:#d5d8ff;background:linear-gradient(90deg,var(--accent1),var(--accent2));
+      padding:4px 10px;border-radius:999px;box-shadow:0 0 16px #6b5cff55;
     }
-    .signal, .system, .history {
-      background: #1c2128;
-      border-radius: 10px;
-      padding: 15px;
+    .actions{display:flex;gap:10px}
+    button{
+      background:linear-gradient(90deg,var(--accent1),var(--accent2));
+      border:none;color:#fff;font-weight:700;padding:10px 16px;border-radius:10px;cursor:pointer;
+      box-shadow:0 6px 18px #1a36ff44; transition:transform .15s ease, box-shadow .2s ease, opacity .15s ease;
     }
-    .signal span {
-      display: inline-block;
-      margin: 5px 0;
-      font-size: 1.05em;
+    button:hover{transform:translateY(-1px); box-shadow:0 10px 24px #1a36ff55}
+    button.secondary{
+      background:transparent;border:1px solid #3d4270;color:#e3e7ff;box-shadow:none;
     }
-    img {
-      width: 100%;
-      border-radius: 10px;
-      margin-top: 10px;
+    button.danger{
+      background:linear-gradient(90deg,#ff5c7a,#f98a52);
+      box-shadow:0 6px 18px #ff5c7a55;
     }
-    .error {
-      color: #ff6666;
-      font-style: italic;
+
+    .grid{display:grid;gap:16px;grid-template-columns:1.1fr .9fr}
+    @media (max-width:1000px){.grid{grid-template-columns:1fr}}
+    .card{
+      background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
+      border:1px solid #2a2e55;border-radius:16px;padding:16px;
+      box-shadow:0 10px 40px #00000060, 0 0 0 1px #1c2040 inset;
+      backdrop-filter: blur(8px);
     }
-    footer {
-      text-align: center;
-      padding: 10px;
-      color: #555;
-      font-size: 0.9em;
-      margin-top: auto;
+    .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .hd h3{margin:0;font-size:1.05rem;color:#e5e7ff}
+    .muted{color:var(--muted);font-size:.9rem}
+    .signal{
+      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:6px;
     }
-    .refresh {
-      display: inline-block;
-      padding: 8px 14px;
-      border: none;
-      background-color: #0a84ff;
-      color: white;
-      border-radius: 8px;
-      font-size: 0.95em;
-      cursor: pointer;
-      margin-bottom: 15px;
+    .kv{background:var(--glass);border:1px solid #2a2e55;border-radius:12px;padding:12px}
+    .kv .k{font-size:.8rem;color:var(--muted)}
+    .kv .v{font-size:1.05rem;margin-top:2px}
+    .dir-buy{color:var(--win)} .dir-sell{color:var(--loss)}
+    .chart{
+      width:100%;aspect-ratio:16/9;border-radius:12px;object-fit:contain;background:#0c0e1d;border:1px solid #2a2e55;
+      box-shadow:inset 0 0 0 1px #1a1d38;
     }
-    .refresh:hover {
-      background-color: #0066ff;
-    }
+
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .stat{background:var(--glass);border:1px solid #2a2e55;border-radius:12px;padding:12px}
+    .stat .label{font-size:.78rem;color:var(--muted)}
+    .stat .val{font-size:1.2rem;margin-top:4px}
+
+    .history{width:100%;border-collapse:collapse;font-size:.95rem}
+    .history th,.history td{padding:10px;border-bottom:1px dashed #2a2e55;text-align:left}
+    .history th{color:#bfc6ff;font-weight:600}
+    .chip{font-size:.78rem;padding:3px 8px;border-radius:999px;border:1px solid #2a2e55;background:#141636;color:#dfe3ff}
+    .chip.win{border-color:#1f945d;color:#aff3d1;background:#10251d}
+    .chip.loss{border-color:#9b3653;color:#ffd5df;background:#2a111a}
+
+    .footnote{margin-top:14px;color:var(--muted);font-size:.85rem}
+    .blink{animation:blink 1.2s linear infinite}
+    @keyframes blink{50%{opacity:.45}}
+    .error{color:#ff8da3}
   </style>
 </head>
-
 <body>
-  <header>🚀 ASPIRE TRADE — LIVE DASHBOARD</header>
-  <div class="container">
-    <button class="refresh" onclick="loadData()">🔄 Обновить данные</button>
-
-    <div class="section signal">
-      <h2>📈 Активный сигнал</h2>
-      <div id="signalContent">Загрузка...</div>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <span style="width:12px;height:12px;border-radius:50%;background:linear-gradient(180deg,var(--accent1),var(--accent2));box-shadow:0 0 16px #6b5cff88;"></span>
+        <div>ASPIRE TRADE — <span class="muted">dashboard</span></div>
+        <span id="liveBadge" class="badge">LIVE</span>
+      </div>
+      <div class="actions">
+        <button class="secondary" id="btnRefresh">Обновить</button>
+        <button class="danger" id="btnLogout">Выход</button>
+      </div>
     </div>
 
-    <div class="section">
-      <h2>📊 График</h2>
-      <div id="chartContent">Загрузка...</div>
+    <div class="grid">
+      <!-- ЛЕВАЯ КОЛОНКА -->
+      <div class="card">
+        <div class="hd">
+          <h3>📈 Активный сигнал</h3>
+          <div class="muted" id="updatedAt">—</div>
+        </div>
+
+        <div id="signalArea">
+          <div class="signal">
+            <div class="kv">
+              <div class="k">Пара</div>
+              <div class="v" id="pair">—</div>
+            </div>
+            <div class="kv">
+              <div class="k">Направление</div>
+              <div class="v" id="direction">—</div>
+            </div>
+            <div class="kv">
+              <div class="k">Уверенность</div>
+              <div class="v" id="confidence">—</div>
+            </div>
+            <div class="kv">
+              <div class="k">Экспирация</div>
+              <div class="v" id="expiry">—</div>
+            </div>
+            <div class="kv">
+              <div class="k">Источник</div>
+              <div class="v" id="source">—</div>
+            </div>
+            <div class="kv">
+              <div class="k">Цена входа</div>
+              <div class="v" id="entry">—</div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px">
+            <img id="chart" class="chart" alt="chart"/>
+          </div>
+
+          <div class="footnote" id="signalNote">Ожидаем новый сигнал…</div>
+          <div class="error" id="signalError" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- ПРАВАЯ КОЛОНКА -->
+      <div class="card">
+        <div class="hd">
+          <h3>📊 Система</h3>
+          <div class="muted" id="sysUpdated">—</div>
+        </div>
+
+        <div class="stats" style="margin-bottom:14px">
+          <div class="stat">
+            <div class="label">Win Rate</div>
+            <div class="val" id="winRate">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">ML Accuracy</div>
+            <div class="val" id="mlAcc">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Всего сделок</div>
+            <div class="val" id="totalTrades">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Активных пользователей</div>
+            <div class="val" id="activeUsers">—</div>
+          </div>
+        </div>
+
+        <div class="hd" style="margin-top:18px">
+          <h3>🕒 Последний результат</h3>
+          <div></div>
+        </div>
+        <table class="history">
+          <thead>
+            <tr>
+              <th>Пара</th>
+              <th>Напр.</th>
+              <th>Результат</th>
+              <th>Время</th>
+            </tr>
+          </thead>
+          <tbody id="lastResultTbody">
+            <tr><td colspan="4" class="muted">Нет данных</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="section system">
-      <h2>⚙️ Система</h2>
-      <div id="systemContent">Загрузка...</div>
-    </div>
-
-    <div class="section history">
-      <h2>🕒 Последний результат</h2>
-      <div id="resultContent">Загрузка...</div>
-    </div>
+    <div class="footnote">Данные обновляются каждые 5 секунд <span class="blink">●</span></div>
   </div>
 
-  <footer>© 2025 ASPIRE TRADE | Real-time AI Trading Panel</footer>
-
   <script>
-    const API_URL = "http://89.23.98.206:8080/api/latest_full.json";
+    // === CONFIG ===
+    const API = "http://89.23.98.206:8080/api";
+    const POLL_MS = 5000;
 
-    async function loadData() {
-      document.getElementById("signalContent").textContent = "Загрузка...";
-      document.getElementById("chartContent").textContent = "Загрузка...";
-      document.getElementById("systemContent").textContent = "Загрузка...";
-      document.getElementById("resultContent").textContent = "Загрузка...";
+    // === AUTH GUARD (если логин есть) ===
+    (function authGuard(){
+      const uid = localStorage.getItem("pocket_id");
+      if(!uid){
+        // если нужно — редиректим на логин
+        // window.location.href = "login.html";
+      }
+    })();
 
-      try {
-        const res = await fetch(API_URL);
-        const data = await res.json();
+    // === UI ELEMENTS ===
+    const el = {
+      pair: qs('#pair'),
+      direction: qs('#direction'),
+      confidence: qs('#confidence'),
+      expiry: qs('#expiry'),
+      source: qs('#source'),
+      entry: qs('#entry'),
+      chart: qs('#chart'),
+      note: qs('#signalNote'),
+      err: qs('#signalError'),
+      updatedAt: qs('#updatedAt'),
+      sysUpdated: qs('#sysUpdated'),
+      winRate: qs('#winRate'),
+      mlAcc: qs('#mlAcc'),
+      totalTrades: qs('#totalTrades'),
+      activeUsers: qs('#activeUsers'),
+      lastResultTbody: qs('#lastResultTbody'),
+      liveBadge: qs('#liveBadge'),
+      btnRefresh: qs('#btnRefresh'),
+      btnLogout: qs('#btnLogout'),
+    };
 
-        // === SIGNAL ===
-        const sig = data.signal;
-        if (!sig || sig.error) {
-          document.getElementById("signalContent").innerHTML = `<p class="error">${sig?.error || "Нет данных"}</p>`;
-        } else {
-          document.getElementById("signalContent").innerHTML = `
-            <span>💼 Пара: <b>${sig.pair}</b></span><br>
-            <span>📊 Направление: <b>${sig.direction}</b></span><br>
-            <span>🎯 Уверенность: <b>${sig.confidence || 0}/10</b></span><br>
-            <span>⏰ Экспирация: ${sig.expiry || 1} мин</span><br>
-            <span>🔍 Источник: ${sig.source || "N/A"}</span>
+    function qs(s, r=document){return r.querySelector(s)}
+
+    // === HELPERS ===
+    const fmtPct = v => (v==null || isNaN(v)) ? '—' : (v.toFixed ? v.toFixed(2) : v) + '%';
+    const nowText = () => new Date().toLocaleTimeString();
+
+    function setSignalEmpty(reason){
+      el.pair.textContent = '—';
+      el.direction.textContent = '—';
+      el.direction.classList.remove('dir-buy','dir-sell');
+      el.confidence.textContent = '—';
+      el.expiry.textContent = '—';
+      el.source.textContent = '—';
+      el.entry.textContent = '—';
+      el.chart.removeAttribute('src');
+      el.note.textContent = reason || 'Ожидаем новый сигнал…';
+      el.err.style.display = 'none';
+    }
+
+    function setResultEmpty(){
+      el.lastResultTbody.innerHTML = `<tr><td colspan="4" class="muted">Нет данных</td></tr>`;
+    }
+
+    async function fetchJSON(url){
+      const r = await fetch(url,{cache:'no-store'});
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+
+    async function loadAll(){
+      try{
+        const data = await fetchJSON(`${API}/latest_full.json?ts=${Date.now()}`);
+
+        // --- System ---
+        const sys = data.system || {};
+        el.winRate.textContent = fmtPct(sys.win_rate);
+        el.mlAcc.textContent = fmtPct(sys.ml_accuracy);
+        el.totalTrades.textContent = sys.total_trades ?? '—';
+        el.activeUsers.textContent = sys.active_users ?? '—';
+        el.sysUpdated.textContent = nowText();
+
+        // --- Signal ---
+        if(data.signal && !data.signal.error){
+          const s = data.signal;
+          el.pair.textContent = s.pair || '—';
+          el.direction.textContent = s.direction || '—';
+          el.direction.classList.remove('dir-buy','dir-sell');
+          if(s.direction){
+            el.direction.classList.add(s.direction.toUpperCase()==='BUY' ? 'dir-buy' : 'dir-sell');
+          }
+          el.confidence.textContent = (s.confidence!=null ? s.confidence : '—') + (s.confidence!=null ? '/10':'');
+          el.expiry.textContent = s.expiry + ' мин';
+          el.source.textContent = s.source || '—';
+          el.entry.textContent = (s.entry_price!=null) ? Number(s.entry_price).toFixed(5) : '—';
+          el.note.textContent = 'Сигнал активен';
+          el.err.style.display = 'none';
+
+          // график: сначала base64, если нет — /chart.png
+          if(data.chart_base64){
+            el.chart.src = data.chart_base64;
+          }else{
+            el.chart.src = `${API}/chart.png?ts=${Date.now()}`;
+          }
+        }else{
+          setSignalEmpty('Нет активных сигналов');
+        }
+        el.updatedAt.textContent = nowText();
+
+        // --- Last Result ---
+        if(data.result && !data.result.error){
+          const r = data.result;
+          el.lastResultTbody.innerHTML = `
+            <tr>
+              <td>${r.pair ?? '—'}</td>
+              <td>${r.direction ?? '—'}</td>
+              <td>
+                <span class="chip ${r.result==='WIN'?'win':'loss'}">${r.result ?? '—'}</span>
+              </td>
+              <td>${r.time ?? r.completed_at ?? '—'}</td>
+            </tr>
           `;
+        }else{
+          setResultEmpty();
         }
 
-        // === CHART ===
-        if (data.chart_base64) {
-          document.getElementById("chartContent").innerHTML = `<img src="${data.chart_base64}" alt="chart">`;
-        } else {
-          document.getElementById("chartContent").innerHTML = `<p class="error">Нет доступного графика</p>`;
-        }
-
-        // === SYSTEM ===
-        const sys = data.system;
-        document.getElementById("systemContent").innerHTML = `
-          👥 Активных пользователей: <b>${sys.active_users}</b><br>
-          📈 Всего сделок: <b>${sys.total_trades}</b><br>
-          🎯 Win Rate: <b>${sys.win_rate}%</b><br>
-          🧠 ML точность: <b>${sys.ml_accuracy}%</b>
-        `;
-
-        // === RESULT ===
-        const resu = data.result;
-        if (!resu || resu.error) {
-          document.getElementById("resultContent").innerHTML = `<p class="error">${resu?.error || "Нет данных"}</p>`;
-        } else {
-          document.getElementById("resultContent").innerHTML = `
-            #${resu.id} ${resu.pair} — ${resu.direction}<br>
-            Результат: <b>${resu.result}</b><br>
-            💰 Вход: ${resu.entry_price}<br>
-            💰 Выход: ${resu.exit_price}
-          `;
-        }
-
-      } catch (err) {
-        console.error(err);
-        document.getElementById("signalContent").innerHTML = `<p class="error">Ошибка загрузки API</p>`;
+        // live badge
+        el.liveBadge.textContent = 'LIVE';
+      }catch(err){
+        // общая ошибка
+        el.err.textContent = 'Ошибка загрузки данных: ' + (err.message || err);
+        el.err.style.display = 'block';
+        el.liveBadge.textContent = 'OFFLINE';
       }
     }
 
-    loadData();
-    setInterval(loadData, 5000); // автообновление каждые 5 сек
+    // === EVENTS ===
+    el.btnRefresh.addEventListener('click', loadAll);
+    el.btnLogout.addEventListener('click', ()=>{
+      localStorage.clear();
+      window.location.href = 'login.html';
+    });
+
+    // === INIT ===
+    loadAll();
+    setInterval(loadAll, POLL_MS);
   </script>
 </body>
 </html>
