@@ -693,7 +693,7 @@
                     return;
                 }
                 
-                const chartUrl = `${BOT_API}/smc_chart_${pair}_latest.png?ts=${Date.now()}`;
+                const chartUrl = `http://89.23.98.206:8080/charts/smc_chart_${pair}_latest.png?ts=${Date.now()}`;
                 console.log(`📈 Загрузка графика: ${chartUrl}`);
                 
                 elements.chartImage.onload = function() {
