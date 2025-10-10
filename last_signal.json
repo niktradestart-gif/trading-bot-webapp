@@ -1,11 +1,11 @@
 {
-  "confidence": 10,
+  "confidence": 6,
   "direction": "SELL",
-  "entry_price": 0.9089,
+  "entry_price": 98.543,
   "error": null,
-  "expiry": 1,
-  "pair": "AUDCAD",
+  "expiry": 2,
+  "pair": "AUDJPY",
   "source": "live_bot",
-  "timestamp": "2025-10-10T20:40:23.419653",
-  "last_updated": "2025-10-10T17:41:34.728628"
+  "timestamp": "2025-10-10T20:49:24.294859",
+  "last_updated": "2025-10-10T17:51:28.192211"
 }
