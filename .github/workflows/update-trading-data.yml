@@ -8,6 +8,8 @@ on:
 jobs:
   update-data:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: 📥 Checkout repository
@@ -16,32 +18,16 @@ jobs:
     - name: 🐍 Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.x'
         
     - name: 📦 Install requests
       run: pip install requests
 
     - name: 🔄 Run update script
-      run: |
-        echo "Current directory: $(pwd)"
-        echo "Files in directory:"
-        ls -la
-        echo "Running update script..."
-        python update_data.py
-
-    - name: 📊 Check updated files
-      run: |
-        echo "Updated files:"
-        cat system_status.json
-        echo "---"
-        cat last_signal.json
-        echo "---" 
-        cat last_result.json
+      run: python update_data.py
 
     - name: 💾 Commit and push
-      run: |
-        git config --local user.name "GitHub Actions Bot"
-        git config --local user.email "actions@users.noreply.github.com"
-        git add system_status.json last_signal.json last_result.json
-        git commit -m "🤖 Auto-update trading data" || echo "No changes to commit"
-        git push
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "🤖 Auto-update trading data"
+        file_pattern: 'system_status.json last_signal.json last_result.json'
