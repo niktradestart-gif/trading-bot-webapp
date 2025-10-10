@@ -1,11 +1,11 @@
 {
-  "confidence": 6,
-  "direction": "SELL",
-  "entry_price": 151.617,
+  "confidence": 8,
+  "direction": "BUY",
+  "entry_price": 0.64835,
   "error": null,
   "expiry": 2,
-  "pair": "USDJPY",
+  "pair": "AUDUSD",
   "source": "live_bot",
-  "timestamp": "2025-10-10T22:45:24.497353",
-  "last_updated": "2025-10-10T19:46:46.042916"
+  "timestamp": "2025-10-10T22:54:59.919564",
+  "last_updated": "2025-10-10T19:56:25.828546"
 }
