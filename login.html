@@ -14,8 +14,10 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             color: #fff;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         .container {
@@ -23,7 +25,8 @@
             color: #333;
             border-radius: 14px;
             padding: 30px 40px;
-            width: 360px;
+            width: 100%;
+            max-width: 360px;
             text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.25);
         }
@@ -53,6 +56,24 @@
             color: #1976d2;
         }
 
+        .user-info {
+            background: #e8f5e9;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+            text-align: left;
+            display: none;
+        }
+
+        .browser-info {
+            background: #fff3cd;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+            text-align: left;
+            display: none;
+        }
+
         input {
             width: 100%;
             padding: 10px;
@@ -60,6 +81,8 @@
             border-radius: 8px;
             font-size: 15px;
             outline: none;
+            margin-bottom: 15px;
+            box-sizing: border-box;
         }
 
         .btn {
@@ -73,10 +96,19 @@
             border-radius: 8px;
             cursor: pointer;
             transition: 0.3s;
+            margin-bottom: 10px;
         }
 
         .btn:hover {
             background: #43a047;
+        }
+
+        .btn-telegram {
+            background: #0088cc;
+        }
+
+        .btn-telegram:hover {
+            background: #0077b3;
         }
 
         .verified-box {
@@ -93,6 +125,7 @@
             font-size: 13px;
             color: rgba(255,255,255,0.9);
             margin-top: 20px;
+            max-width: 360px;
         }
 
         .pocket-btn {
@@ -105,10 +138,21 @@
             font-size: 14px;
             cursor: pointer;
             text-decoration: none;
+            display: inline-block;
         }
 
         .pocket-btn:hover {
             background: #f4511e;
+        }
+
+        .debug-info {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 15px;
+            font-size: 12px;
+            text-align: left;
+            display: none;
         }
     </style>
 </head>
@@ -120,6 +164,20 @@
 
         <h2>Авторизация</h2>
         <p style="font-size: 14px;">Введите ваш ID аккаунта Pocket Option</p>
+
+        <!-- Telegram User Info -->
+        <div id="userInfo" class="user-info">
+            <h4>👤 Данные Telegram</h4>
+            <p><strong>Имя:</strong> <span id="telegramName">—</span></p>
+            <p><strong>Username:</strong> @<span id="telegramUsername">—</span></p>
+            <p><strong>ID:</strong> <span id="telegramId">—</span></p>
+        </div>
+
+        <!-- Browser Info -->
+        <div id="browserInfo" class="browser-info">
+            <h4>🌐 Браузерная версия</h4>
+            <p>Для работы в браузере введите ваш Pocket ID</p>
+        </div>
 
         <div class="info-box">
             <b>Как найти ID:</b><br>
@@ -140,35 +198,177 @@
             ↗ Перейти в трейдинг
         </button>
 
+        <!-- Кнопка для Telegram Mini App -->
+        <button id="tgWebAppBtn" class="btn btn-telegram" style="display:none; margin-top: 10px;" onclick="openTelegramWebApp()">
+            📱 Открыть в Telegram
+        </button>
+
         <a href="https://pocket-friends.com/r/0qrjewbjlf" target="_blank" class="pocket-btn">
             Зарегистрироваться в Pocket Option
         </a>
+
+        <!-- Debug Info -->
+        <div id="debugInfo" class="debug-info">
+            <h4>🔧 Отладочная информация</h4>
+            <p><strong>Среда:</strong> <span id="debugEnv">—</span></p>
+            <p><strong>Pocket ID:</strong> <span id="debugPocketId">—</span></p>
+            <p><strong>Telegram Data:</strong> <span id="debugTgData">—</span></p>
+        </div>
     </div>
 
     <div class="footer">
-        Трейдинг Бот • Pocket Option Auth v1.0<br>
+        Трейдинг Бот • Pocket Option Auth v2.0<br>
         Только для зарегистрированных пользователей<br>
         <span style="opacity:0.8;">@aspiretrad_bot</span>
     </div>
 
     <script>
+        // Автоматическое определение источника (Telegram Mini App или браузер)
+        function detectEnvironment() {
+            // Проверяем Telegram Web App
+            if (window.Telegram && window.Telegram.WebApp) {
+                return 'telegram';
+            }
+            // Проверяем параметры URL (для тестирования)
+            if (window.location.search.includes('tgWebApp')) {
+                return 'telegram';
+            }
+            return 'browser';
+        }
+
+        // Инициализация в зависимости от среды
+        function initializeApp() {
+            const env = detectEnvironment();
+            console.log('Environment detected:', env);
+            
+            // Показываем отладочную информацию
+            document.getElementById('debugEnv').textContent = env;
+            document.getElementById('debugPocketId').textContent = localStorage.getItem("pocket_id") || 'не установлен';
+            document.getElementById('debugInfo').style.display = 'block';
+
+            if (env === 'telegram') {
+                initializeTelegramApp();
+            } else {
+                initializeBrowserApp();
+            }
+        }
+
+        // Инициализация для Telegram Mini App
+        function initializeTelegramApp() {
+            console.log('🚀 Initializing Telegram Mini App');
+            
+            const tg = window.Telegram.WebApp;
+            
+            // Показываем кнопку закрытия
+            tg.BackButton.show();
+            tg.BackButton.onClick(() => {
+                tg.close();
+            });
+
+            // Получаем данные пользователя
+            const user = tg.initDataUnsafe?.user;
+            console.log('Telegram User:', user);
+
+            if (user) {
+                // Показываем информацию о пользователе Telegram
+                document.getElementById('userInfo').style.display = 'block';
+                document.getElementById('telegramId').textContent = user.id;
+                document.getElementById('telegramName').textContent = 
+                    user.first_name + (user.last_name ? ' ' + user.last_name : '');
+                document.getElementById('telegramUsername').textContent = user.username || 'Нет username';
+                
+                // Сохраняем Telegram ID для использования в trading.html
+                localStorage.setItem("telegram_user_id", user.id);
+                localStorage.setItem("telegram_username", user.username || '');
+                localStorage.setItem("telegram_first_name", user.first_name || '');
+                
+                // Обновляем отладочную информацию
+                document.getElementById('debugTgData').textContent = JSON.stringify({
+                    id: user.id,
+                    first_name: user.first_name,
+                    username: user.username
+                });
+            }
+
+            // Проверяем, есть ли уже сохраненный Pocket ID
+            const savedPocketId = localStorage.getItem("pocket_id");
+            if (savedPocketId) {
+                document.getElementById('pocketId').value = savedPocketId;
+                document.getElementById('verifyBox').style.display = 'block';
+                document.getElementById('goBtn').style.display = 'inline-block';
+            }
+
+            // Расширяем на весь экран
+            tg.expand();
+            
+            console.log('✅ Telegram Mini App initialized');
+        }
+
+        // Инициализация для обычного браузера
+        function initializeBrowserApp() {
+            console.log('🌐 Initializing Browser App');
+            document.getElementById('browserInfo').style.display = 'block';
+            
+            // Показываем кнопку для открытия в Telegram
+            document.getElementById('tgWebAppBtn').style.display = 'inline-block';
+
+            // Проверяем, есть ли уже сохраненный Pocket ID
+            const savedPocketId = localStorage.getItem("pocket_id");
+            if (savedPocketId) {
+                document.getElementById('pocketId').value = savedPocketId;
+                document.getElementById('verifyBox').style.display = 'block';
+                document.getElementById('goBtn').style.display = 'inline-block';
+            }
+        }
+
         function checkID() {
             const input = document.getElementById('pocketId').value.trim();
+            const env = detectEnvironment();
+            
             if (input === '' || isNaN(input)) {
                 alert('Введите корректный ID!');
                 return;
             }
+
+            // Сохраняем Pocket ID
+            localStorage.setItem("pocket_id", input);
+            
+            // Показываем подтверждение
             document.getElementById('verifyBox').style.display = 'block';
             document.getElementById('goBtn').style.display = 'inline-block';
+            
+            // Обновляем отладочную информацию
+            document.getElementById('debugPocketId').textContent = input;
+            
+            console.log('✅ Pocket ID saved:', input);
+            console.log('📱 Environment:', env);
         }
 
         function goToTrading() {
-            const id = document.getElementById('pocketId').value.trim();
-            if (id) {
-                localStorage.setItem("pocket_id", id);
-                window.location.href = "trading.html";
+            const pocketId = document.getElementById('pocketId').value.trim();
+            const env = detectEnvironment();
+            
+            if (pocketId) {
+                localStorage.setItem("pocket_id", pocketId);
+                
+                if (env === 'telegram') {
+                    // В Telegram Mini App используем относительный путь
+                    window.location.href = "trading.html";
+                } else {
+                    // В браузере используем полный путь
+                    window.location.href = "http://89.23.98.206:8080/trading.html";
+                }
             }
         }
+
+        function openTelegramWebApp() {
+            // Ссылка для открытия в Telegram Web App
+            const webAppUrl = "https://t.me/aspiretrad_bot/start?startapp=login";
+            window.open(webAppUrl, '_blank');
+        }
+
+        // Запускаем инициализацию при загрузке
+        document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>
