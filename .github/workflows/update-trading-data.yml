@@ -1,0 +1,47 @@
+name: Update Trading Data
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Каждые 5 минут
+  workflow_dispatch:       # Ручной запуск
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: 📦 Install requests
+      run: pip install requests
+
+    - name: 🔄 Run update script
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Files in directory:"
+        ls -la
+        echo "Running update script..."
+        python update_data.py
+
+    - name: 📊 Check updated files
+      run: |
+        echo "Updated files:"
+        cat system_status.json
+        echo "---"
+        cat last_signal.json
+        echo "---" 
+        cat last_result.json
+
+    - name: 💾 Commit and push
+      run: |
+        git config --local user.name "GitHub Actions Bot"
+        git config --local user.email "actions@users.noreply.github.com"
+        git add system_status.json last_signal.json last_result.json
+        git commit -m "🤖 Auto-update trading data" || echo "No changes to commit"
+        git push
