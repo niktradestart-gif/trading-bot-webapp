@@ -200,12 +200,11 @@
     const API = "http://89.23.98.206:8080";
     const POLL_MS = 5000;
 
-    // === AUTH GUARD (если логин есть) ===
+    // === AUTH GUARD ===
     (function authGuard(){
       const uid = localStorage.getItem("pocket_id");
       if(!uid){
-        // если нужно — редиректим на логин
-        // window.location.href = "login.html";
+        window.location.href = "login.html";
       }
     })();
 
