@@ -1,11 +1,11 @@
 {
-  "confidence": 6,
+  "confidence": 9,
   "direction": "SELL",
-  "entry_price": 108.53,
+  "entry_price": 108.517,
   "error": null,
   "expiry": 2,
   "pair": "CADJPY",
   "source": "live_bot",
-  "timestamp": "2025-10-10T18:51:24.065613",
-  "last_updated": "2025-10-10T15:52:57.436918"
+  "timestamp": "2025-10-10T19:15:10.809973",
+  "last_updated": "2025-10-10T16:15:29.071480"
 }
