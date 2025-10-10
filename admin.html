@@ -2,51 +2,53 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>ASPIRE TRADE — Админ</title>
+  <title>ASPIRE TRADE — Admin Panel</title>
   <link rel="stylesheet" href="assets/trading.css">
   <script src="assets/trading.js" defer></script>
 </head>
 <body>
-  <div class="gradient-bg"></div>
+<div class="gradient-bg"></div>
+<header class="header glass">
+  <div class="logo">ADMIN PANEL</div>
+  <button onclick="logout()">Выйти</button>
+</header>
 
-  <div class="header glass">
-    <div class="logo">ASPIRE TRADE — Admin</div>
-    <button onclick="logout()">🚪 Выйти</button>
+<div class="tabs glass">
+  <button class="tab active" data-tab="signals">📈 Сигналы</button>
+  <button class="tab" data-tab="system">⚙️ Система</button>
+  <button class="tab" data-tab="users">👥 Пользователи</button>
+  <button class="tab" data-tab="logs">🧾 Логи</button>
+</div>
+
+<div id="tab-signals" class="tab-content active glass card">
+  <h3>📈 Последний сигнал</h3>
+  <pre id="adminSignals">Загрузка...</pre>
+</div>
+
+<div id="tab-system" class="tab-content glass card">
+  <h3>⚙️ Статус системы</h3>
+  <pre id="systemBox">Загрузка...</pre>
+  <h3>🧠 ML Инфо</h3>
+  <pre id="mlInfo">Загрузка...</pre>
+</div>
+
+<div id="tab-users" class="tab-content glass card">
+  <h3>👥 Белый список</h3>
+  <pre id="whitelistBox">Загрузка...</pre>
+  <div style="margin-top:10px;">
+    <input id="newPocket" placeholder="Pocket ID">
+    <input id="newName" placeholder="Имя">
+    <select id="newRole">
+      <option value="user">user</option>
+      <option value="admin">admin</option>
+    </select>
+    <button onclick="addUser()">Добавить</button>
   </div>
+</div>
 
-  <div class="tabs">
-    <button class="tab active" data-tab="signals">📊 Сигналы</button>
-    <button class="tab" data-tab="ml">🧠 ML</button>
-    <button class="tab" data-tab="users">👥 Пользователи</button>
-    <button class="tab" data-tab="logs">🪵 Логи</button>
-  </div>
-
-  <div class="grid">
-    <div id="tab-signals" class="tab-content active card glass wide">
-      <h2 class="neon">Последний сигнал</h2>
-      <pre id="adminSignals">Загрузка...</pre>
-    </div>
-
-    <div id="tab-ml" class="tab-content card glass">
-      <h2 class="neon">ML Модель</h2>
-      <pre id="mlInfo">Загрузка...</pre>
-    </div>
-
-    <div id="tab-users" class="tab-content card glass wide">
-      <h2 class="neon">Белый список</h2>
-      <pre id="whitelistBox">Загрузка...</pre>
-      <div style="margin-top:10px;">
-        <input id="newPocket" placeholder="ID">
-        <input id="newName" placeholder="Имя">
-        <select id="newRole"><option>user</option><option>admin</option></select>
-        <button onclick="addUser()">➕ Добавить</button>
-      </div>
-    </div>
-
-    <div id="tab-logs" class="tab-content card glass wide">
-      <h2 class="neon">Системные логи</h2>
-      <pre id="logBox">Загрузка...</pre>
-    </div>
-  </div>
+<div id="tab-logs" class="tab-content glass card">
+  <h3>🧾 Системные логи</h3>
+  <pre id="logBox">Загрузка...</pre>
+</div>
 </body>
 </html>
