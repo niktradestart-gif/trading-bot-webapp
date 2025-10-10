@@ -5,9 +5,7 @@ on:
     - cron: '*/2 * * * *'  # Каждые 2 минуты
   workflow_dispatch:       # Ручной запуск
   push:
-    paths:
-      - '**.js'           # Запуск при изменении JS файлов
-      - '**.html'         # Запуск при изменении HTML файлов
+    branches: [ main ]
 
 jobs:
   update-data:
@@ -30,15 +28,15 @@ jobs:
         pip install requests
         
     - name: Update trading data
-      env:
-        BOT_API_URL: "http://89.23.98.206:8080"
       run: |
-        python .github/scripts/update_data.py
+        cd .github/scripts
+        python update_data.py
+        cd ../..
         
     - name: Commit and push changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add system_status.json last_signal.json last_result.json
-        git diff --staged --quiet || git commit -m "🤖 Auto-update trading data [skip ci]"
+        git diff --staged --quiet || git commit -m "🤖 Auto-update trading data"
         git push
