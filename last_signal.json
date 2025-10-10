@@ -1,11 +1,11 @@
 {
-  "confidence": 10,
+  "confidence": 8,
   "direction": "SELL",
-  "entry_price": 0.86963,
+  "entry_price": 1.39955,
   "error": null,
-  "expiry": 1,
-  "pair": "EURGBP",
+  "expiry": 2,
+  "pair": "USDCAD",
   "source": "live_bot",
-  "timestamp": "2025-10-10T22:24:24.247637",
-  "last_updated": "2025-10-10T19:25:03.658281"
+  "timestamp": "2025-10-10T22:34:53.903940",
+  "last_updated": "2025-10-10T19:36:31.380829"
 }
