@@ -657,6 +657,7 @@
             // Текущее состояние
             let currentState = 'no_signal';
             let currentPair = null;
+            let lastChartPath = null;
 
             // Обновление времени сервера
             function updateServerTime() {
@@ -855,7 +856,7 @@
                 }
             }
             
-            // Загрузка графика
+            // Загрузка графика - ИСПРАВЛЕННАЯ ВЕРСИЯ
             function loadChart(pair) {
                 if (!pair) {
                     elements.chartImage.style.display = 'none';
@@ -867,40 +868,74 @@
                     return;
                 }
                 
-                // Правильный URL для графика от бота
-                const chartUrl = `${BOT_API}/api/chart.png?pair=${pair}&ts=${Date.now()}`;
+                // Пробуем разные варианты загрузки графика
+                const chartUrls = [
+                    // Вариант 1: Прямой доступ к файлу графика
+                    `${BOT_API}/smc_chart_${pair}_latest.png`,
+                    // Вариант 2: API эндпоинт
+                    `${BOT_API}/api/chart.png?pair=${pair}`,
+                    // Вариант 3: Статический файл
+                    `${API_BASE}/charts/smc_chart_${pair}_latest.png`
+                ];
                 
-                console.log(`📈 Загрузка графика для ${pair}: ${chartUrl}`);
+                console.log(`📈 Поиск графика для ${pair}`);
                 
                 // Показываем загрузку
                 elements.chartImage.style.display = 'none';
                 elements.chartPlaceholder.style.display = 'flex';
                 elements.chartPlaceholder.innerHTML = `
-                    <div class="chart-loading">🔄 Загрузка графика ${pair}...</div>
-                    <div style="font-size: 0.9rem;">Подключение к торговому боту</div>
+                    <div class="chart-loading">🔄 Поиск графика ${pair}...</div>
+                    <div style="font-size: 0.9rem;">Проверка доступных источников</div>
                 `;
                 
-                elements.chartImage.onload = function() {
-                    elements.chartPlaceholder.style.display = 'none';
-                    elements.chartImage.style.display = 'block';
-                    elements.chartUpdate.textContent = `активно: ${pair}`;
-                    console.log('✅ График успешно загружен');
-                };
-                
-                elements.chartImage.onerror = function() {
+                // Пробуем загрузить график по очереди из всех источников
+                tryLoadChart(chartUrls, 0);
+            }
+            
+            // Рекурсивная попытка загрузки графика из разных источников
+            function tryLoadChart(urls, index) {
+                if (index >= urls.length) {
+                    // Все источники исчерпаны
                     elements.chartImage.style.display = 'none';
                     elements.chartPlaceholder.style.display = 'flex';
                     elements.chartPlaceholder.innerHTML = `
                         <div>❌ График временно недоступен</div>
-                        <div style="font-size: 0.9rem;">Пара: ${pair}</div>
+                        <div style="font-size: 0.9rem;">Пара: ${currentPair}</div>
                         <div style="font-size: 0.8rem; color: var(--warning);">Бот обновляет данные...</div>
                     `;
-                    elements.chartUpdate.textContent = 'ошибка загрузки';
-                    console.log('❌ Ошибка загрузки графика');
+                    elements.chartUpdate.textContent = 'ожидание данных';
+                    console.log('❌ Все источники графиков недоступны');
+                    return;
+                }
+                
+                const currentUrl = urls[index] + `?ts=${Date.now()}`;
+                console.log(`🔍 Попытка ${index + 1}: ${currentUrl}`);
+                
+                elements.chartPlaceholder.innerHTML = `
+                    <div class="chart-loading">🔄 Загрузка графика...</div>
+                    <div style="font-size: 0.9rem;">Источник ${index + 1}/${urls.length}</div>
+                    <div style="font-size: 0.8rem;">${currentUrl}</div>
+                `;
+                
+                // Создаем временный image для проверки
+                const testImage = new Image();
+                
+                testImage.onload = function() {
+                    console.log(`✅ График найден: ${currentUrl}`);
+                    elements.chartImage.src = currentUrl;
+                    elements.chartImage.style.display = 'block';
+                    elements.chartPlaceholder.style.display = 'none';
+                    elements.chartUpdate.textContent = `активно: ${currentPair}`;
                 };
                 
-                // Загружаем график
-                elements.chartImage.src = chartUrl;
+                testImage.onerror = function() {
+                    console.log(`❌ Не удалось загрузить: ${currentUrl}`);
+                    // Пробуем следующий источник
+                    setTimeout(() => tryLoadChart(urls, index + 1), 1000);
+                };
+                
+                // Запускаем проверку
+                testImage.src = currentUrl;
             }
             
             // Обновление истории
