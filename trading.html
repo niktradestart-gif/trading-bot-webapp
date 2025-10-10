@@ -2,271 +2,182 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ASPIRE TRADE — Панель</title>
-
-  <!-- Градиент + стекло, как на твоих скринах -->
   <style>
-    :root{
-      --bg1:#0b1027;--bg2:#11183a;--accent1:#6417ff;--accent2:#17d8ff;
-      --glass:rgba(255,255,255,0.08);--b1:rgba(255,255,255,0.12);--txt:#e9ecff;
-      --ok:#00e676;--warn:#ffb300;--err:#ff5252;
+    body {
+      margin: 0;
+      font-family: "Poppins", sans-serif;
+      background-color: #0d1117;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
     }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--txt);
-      background: radial-gradient(1200px 700px at 10% 15%, #1d2b6b 0%, transparent 60%),
-                  radial-gradient(1000px 800px at 90% 20%, #4d1a9b 0%, transparent 60%),
-                  radial-gradient(1400px 1000px at 40% 80%, #04203f 0%, transparent 60%),
-                  linear-gradient(180deg, var(--bg1), var(--bg2));
-      overflow-x:hidden;
+    header {
+      background: linear-gradient(90deg, #0a84ff, #0066ff);
+      width: 100%;
+      text-align: center;
+      padding: 15px 0;
+      font-size: 1.4em;
+      font-weight: 600;
+      letter-spacing: 1px;
     }
-    .grid{
-      max-width:1200px;margin:26px auto;padding:0 16px;
-      display:grid;grid-template-columns:repeat(12,1fr);gap:18px;
+    .container {
+      width: 95%;
+      max-width: 1000px;
+      margin-top: 20px;
+      background: #161b22;
+      border-radius: 16px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+      padding: 20px;
     }
-    .header{
-      grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
-      padding:14px 18px;border-radius:14px;background:var(--glass);backdrop-filter: blur(12px);
-      border:1px solid var(--b1);box-shadow:0 8px 30px rgba(100,23,255,.15);
+    .section {
+      margin-bottom: 25px;
     }
-    .logo{font-weight:800;letter-spacing:.6px}
-    .logo span{color:#b78cff;text-shadow:0 0 10px rgba(183,140,255,.6)}
-    .btn{
-      background:linear-gradient(90deg,var(--accent1),var(--accent2));
-      color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer;
-      box-shadow:0 0 12px rgba(23,216,255,.35);transition:.25s;
+    h2 {
+      font-size: 1.2em;
+      border-left: 4px solid #0a84ff;
+      padding-left: 10px;
+      margin-bottom: 10px;
+      color: #58a6ff;
     }
-    .btn:hover{transform:translateY(-1px);box-shadow:0 0 16px rgba(23,216,255,.55)}
-    .card{
-      background:var(--glass);backdrop-filter: blur(10px);
-      border:1px solid var(--b1);border-radius:14px;padding:16px;
-      box-shadow:0 10px 30px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.02);
-      animation:fade .5s ease both;
+    .signal, .system, .history {
+      background: #1c2128;
+      border-radius: 10px;
+      padding: 15px;
     }
-    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-    h3{margin:0 0 10px 0;font-weight:800;letter-spacing:.3px}
-    .neon{color:#b78cff;text-shadow:0 0 10px rgba(183,140,255,.55)}
-    .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;font-weight:700;font-size:.9rem}
-    .ok{background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.35);color:var(--ok)}
-    .warn{background:rgba(255,179,0,.12);border:1px solid rgba(255,179,0,.35);color:var(--warn)}
-    .err{background:rgba(255,82,82,.12);border:1px solid rgba(255,82,82,.35);color:var(--err)}
-    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-    .kpi .label{opacity:.75;font-size:.9rem}
-    .kpi .val{font-size:1.8rem;font-weight:900;margin-top:6px}
-    .muted{opacity:.7}
-    .signal-box{font-size:1.06rem;line-height:1.6}
-    .signal-row{display:flex;gap:12px;flex-wrap:wrap}
-    .chip{background:rgba(255,255,255,.08);border:1px solid var(--b1);border-radius:999px;padding:6px 10px}
-    .dir-buy{color:#5dffa7}.dir-sell{color:#ff7a7a}
-    .chart{width:100%;border-radius:12px;margin-top:12px;border:1px solid var(--b1)}
-    .table{width:100%;border-collapse:collapse;margin-top:6px;font-size:.95rem}
-    .table th,.table td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
-    .table th{opacity:.8;font-weight:700}
-    .mono{font-variant-numeric:tabular-nums}
-    /* layout columns */
-    .col-12{grid-column:span 12}
-    .col-8{grid-column:span 8}
-    .col-4{grid-column:span 4}
-    .col-6{grid-column:span 6}
-    @media (max-width:980px){.kpis{grid-template-columns:repeat(2,1fr)}.col-8,.col-6{grid-column:span 12}.col-4{grid-column:span 12}}
+    .signal span {
+      display: inline-block;
+      margin: 5px 0;
+      font-size: 1.05em;
+    }
+    img {
+      width: 100%;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+    .error {
+      color: #ff6666;
+      font-style: italic;
+    }
+    footer {
+      text-align: center;
+      padding: 10px;
+      color: #555;
+      font-size: 0.9em;
+      margin-top: auto;
+    }
+    .refresh {
+      display: inline-block;
+      padding: 8px 14px;
+      border: none;
+      background-color: #0a84ff;
+      color: white;
+      border-radius: 8px;
+      font-size: 0.95em;
+      cursor: pointer;
+      margin-bottom: 15px;
+    }
+    .refresh:hover {
+      background-color: #0066ff;
+    }
   </style>
 </head>
+
 <body>
-  <div class="grid">
-    <!-- Header -->
-    <div class="header">
-      <div class="logo">ASPIRE <span>TRADE</span></div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div id="status-pill" class="pill warn">Статус: —</div>
-        <button class="btn" onclick="logout()">Выйти</button>
-      </div>
+  <header>🚀 ASPIRE TRADE — LIVE DASHBOARD</header>
+  <div class="container">
+    <button class="refresh" onclick="loadData()">🔄 Обновить данные</button>
+
+    <div class="section signal">
+      <h2>📈 Активный сигнал</h2>
+      <div id="signalContent">Загрузка...</div>
     </div>
 
-    <!-- KPIs -->
-    <div class="card col-12">
-      <div class="kpis">
-        <div class="kpi">
-          <div class="label">Активные пользователи</div>
-          <div id="kpi-users" class="val mono">—</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Всего сделок</div>
-          <div id="kpi-trades" class="val mono">—</div>
-        </div>
-        <div class="kpi">
-          <div class="label">Win Rate</div>
-          <div id="kpi-win" class="val mono">—</div>
-        </div>
-        <div class="kpi">
-          <div class="label">ML Точность</div>
-          <div id="kpi-ml" class="val mono">—</div>
-        </div>
-      </div>
+    <div class="section">
+      <h2>📊 График</h2>
+      <div id="chartContent">Загрузка...</div>
     </div>
 
-    <!-- Signal + Chart -->
-    <div class="card col-8">
-      <h3 class="neon">⚡ Активный сигнал</h3>
-      <div id="signal-box" class="signal-box">Загрузка…</div>
-      <img id="chart" class="chart" alt="Chart" />
+    <div class="section system">
+      <h2>⚙️ Система</h2>
+      <div id="systemContent">Загрузка...</div>
     </div>
 
-    <!-- Last result -->
-    <div class="card col-4">
-      <h3 class="neon">📈 Последний результат</h3>
-      <div id="result-box" class="signal-box">Загрузка…</div>
-    </div>
-
-    <!-- History -->
-    <div class="card col-12">
-      <h3 class="neon">🕒 История (последние 10)</h3>
-      <table class="table">
-        <thead>
-          <tr><th>#</th><th>Пара</th><th>Напр.</th><th>Результат</th><th>Вход</th><th>Выход</th><th>Время</th></tr>
-        </thead>
-        <tbody id="hist-body"><tr><td colspan="7" class="muted">Загрузка…</td></tr></tbody>
-      </table>
+    <div class="section history">
+      <h2>🕒 Последний результат</h2>
+      <div id="resultContent">Загрузка...</div>
     </div>
   </div>
 
+  <footer>© 2025 ASPIRE TRADE | Real-time AI Trading Panel</footer>
+
   <script>
-    // === Настройки ===
-    const API_BASE = "http://89.23.98.206:8080";
-    const FULL_URL = API_BASE + "/api/latest_full.json";
-    const HIST_URL = API_BASE + "/api/trade_history.json"; // опционально (если добавишь в API)
-    const REFRESH_MS = 5000;
+    const API_URL = "http://89.23.98.206:8080/api/latest_full.json";
 
-    function logout(){
-      try{localStorage.clear()}catch(e){}
-      location.href = "login.html";
-    }
+    async function loadData() {
+      document.getElementById("signalContent").textContent = "Загрузка...";
+      document.getElementById("chartContent").textContent = "Загрузка...";
+      document.getElementById("systemContent").textContent = "Загрузка...";
+      document.getElementById("resultContent").textContent = "Загрузка...";
 
-    function setStatus(ok){
-      const pill = document.getElementById("status-pill");
-      if(!pill) return;
-      pill.classList.remove("ok","warn","err");
-      pill.classList.add(ok ? "ok" : "warn");
-      pill.textContent = ok ? "Статус: ONLINE" : "Статус: —";
-    }
-
-    function fmt(n, p=5){
-      const v = (typeof n === "number") ? n : parseFloat(n);
-      if(isNaN(v)) return "—";
-      return v.toFixed(p);
-    }
-
-    function dirClass(d){ return (d||"").toUpperCase()==="BUY" ? "dir-buy" : "dir-sell"; }
-
-    async function loadFull(){
-      try{
-        const res = await fetch(FULL_URL + "?t=" + Date.now());
+      try {
+        const res = await fetch(API_URL);
         const data = await res.json();
 
-        // === kpis ===
-        const sys = data?.system || {};
-        document.getElementById("kpi-users").textContent = sys.active_users ?? "—";
-        document.getElementById("kpi-trades").textContent = sys.total_trades ?? "—";
-        document.getElementById("kpi-win").textContent = (sys.win_rate!=null? sys.win_rate+"%":"—");
-        document.getElementById("kpi-ml").textContent = (sys.ml_accuracy!=null? sys.ml_accuracy+"%":"—");
-        setStatus(true);
-
-        // === signal ===
-        const s = data?.signal;
-        const sb = document.getElementById("signal-box");
-        if(s && !s.error){
-          sb.innerHTML = `
-            <div class="signal-row">
-              <span class="chip mono">${s.pair || "—"}</span>
-              <span class="chip ${dirClass(s.direction)} mono"><b>${(s.direction||"—").toUpperCase()}</b></span>
-              <span class="chip mono">🎯 ${s.confidence ?? "—"}/10</span>
-              <span class="chip mono">⏱ ${s.expiry_minutes ?? s.expiry ?? "—"} мин</span>
-              <span class="chip mono">🧠 ${s.source || "—"}</span>
-            </div>
-            <div class="muted" style="margin-top:8px">
-              Цена входа: <b class="mono">${fmt(s.entry_price)}</b>
-            </div>
+        // === SIGNAL ===
+        const sig = data.signal;
+        if (!sig || sig.error) {
+          document.getElementById("signalContent").innerHTML = `<p class="error">${sig?.error || "Нет данных"}</p>`;
+        } else {
+          document.getElementById("signalContent").innerHTML = `
+            <span>💼 Пара: <b>${sig.pair}</b></span><br>
+            <span>📊 Направление: <b>${sig.direction}</b></span><br>
+            <span>🎯 Уверенность: <b>${sig.confidence || 0}/10</b></span><br>
+            <span>⏰ Экспирация: ${sig.expiry || 1} мин</span><br>
+            <span>🔍 Источник: ${sig.source || "N/A"}</span>
           `;
-        } else {
-          sb.textContent = "Нет активного сигнала";
         }
 
-        // === chart (base64) ===
-        const img = document.getElementById("chart");
-        if(data?.chart_base64){
-          img.src = data.chart_base64; // уже "data:image/png;base64,..."
-          img.style.display = "block";
+        // === CHART ===
+        if (data.chart_base64) {
+          document.getElementById("chartContent").innerHTML = `<img src="${data.chart_base64}" alt="chart">`;
         } else {
-          img.removeAttribute("src");
-          img.style.display = "none";
+          document.getElementById("chartContent").innerHTML = `<p class="error">Нет доступного графика</p>`;
         }
 
-        // === last result ===
-        const r = data?.result;
-        const rb = document.getElementById("result-box");
-        if(r && !r.error){
-          rb.innerHTML = `
-            <div class="signal-row">
-              <span class="chip mono">${r.pair || "—"}</span>
-              <span class="chip ${dirClass(r.direction)} mono">${(r.direction||"—").toUpperCase()}</span>
-              <span class="chip mono">${(r.result||"—").toUpperCase()}</span>
-            </div>
-            <div class="muted" style="margin-top:8px">
-              Вход: <b class="mono">${fmt(r.entry_price)}</b>
-              &nbsp;→&nbsp;
-              Выход: <b class="mono">${fmt(r.exit_price)}</b>
-            </div>
-            <div class="muted" style="margin-top:6px">
-              Завершено: <span class="mono">${(r.completed_at||r.timestamp||"").replace("T"," ").slice(0,19)}</span>
-            </div>
+        // === SYSTEM ===
+        const sys = data.system;
+        document.getElementById("systemContent").innerHTML = `
+          👥 Активных пользователей: <b>${sys.active_users}</b><br>
+          📈 Всего сделок: <b>${sys.total_trades}</b><br>
+          🎯 Win Rate: <b>${sys.win_rate}%</b><br>
+          🧠 ML точность: <b>${sys.ml_accuracy}%</b>
+        `;
+
+        // === RESULT ===
+        const resu = data.result;
+        if (!resu || resu.error) {
+          document.getElementById("resultContent").innerHTML = `<p class="error">${resu?.error || "Нет данных"}</p>`;
+        } else {
+          document.getElementById("resultContent").innerHTML = `
+            #${resu.id} ${resu.pair} — ${resu.direction}<br>
+            Результат: <b>${resu.result}</b><br>
+            💰 Вход: ${resu.entry_price}<br>
+            💰 Выход: ${resu.exit_price}
           `;
-        } else {
-          rb.textContent = "Нет завершённых сделок";
         }
 
-      } catch(e){
-        console.error("FULL API error:", e);
-        setStatus(false);
+      } catch (err) {
+        console.error(err);
+        document.getElementById("signalContent").innerHTML = `<p class="error">Ошибка загрузки API</p>`;
       }
     }
 
-    async function loadHistory(){
-      try{
-        const res = await fetch(HIST_URL + "?t=" + Date.now());
-        if(!res.ok) throw new Error("no history endpoint");
-        const hist = await res.json(); // ожидаем массив
-        const rows = Array.isArray(hist) ? hist.slice(-10).reverse() : [];
-        const tb = document.getElementById("hist-body");
-        if(!rows.length){
-          tb.innerHTML = `<tr><td colspan="7" class="muted">Нет истории</td></tr>`;
-          return;
-        }
-        tb.innerHTML = rows.map((t, i)=>`
-          <tr>
-            <td class="mono">${i+1}</td>
-            <td class="mono">${t.pair||"—"}</td>
-            <td class="mono ${dirClass(t.direction)}">${(t.direction||"—").toUpperCase()}</td>
-            <td class="mono">${(t.result||"—").toUpperCase()}</td>
-            <td class="mono">${fmt(t.entry_price)}</td>
-            <td class="mono">${fmt(t.exit_price)}</td>
-            <td class="mono">${(t.completed_at||t.timestamp||"").replace("T"," ").slice(0,19)}</td>
-          </tr>
-        `).join("");
-      }catch(e){
-        // Истории нет — просто показываем прочерк
-        const tb = document.getElementById("hist-body");
-        tb.innerHTML = `<tr><td colspan="7" class="muted">—</td></tr>`;
-      }
-    }
-
-    function tick(){
-      loadFull();
-      loadHistory();
-    }
-    // старт и автообновление
-    tick();
-    setInterval(tick, REFRESH_MS);
+    loadData();
+    setInterval(loadData, 5000); // автообновление каждые 5 сек
   </script>
 </body>
 </html>
