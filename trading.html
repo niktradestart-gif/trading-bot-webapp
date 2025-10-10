@@ -211,31 +211,29 @@
 
     // === UI ELEMENTS ===
     const el = {
-      pair: qs('#pair'),
-      direction: qs('#direction'),
-      confidence: qs('#confidence'),
-      expiry: qs('#expiry'),
-      source: qs('#source'),
-      entry: qs('#entry'),
-      chart: qs('#chart'),
-      note: qs('#signalNote'),
-      err: qs('#signalError'),
-      updatedAt: qs('#updatedAt'),
-      sysUpdated: qs('#sysUpdated'),
-      winRate: qs('#winRate'),
-      mlAcc: qs('#mlAcc'),
-      totalTrades: qs('#totalTrades'),
-      activeUsers: qs('#activeUsers'),
-      lastResultTbody: qs('#lastResultTbody'),
-      liveBadge: qs('#liveBadge'),
-      btnRefresh: qs('#btnRefresh'),
-      btnLogout: qs('#btnLogout'),
+      pair: document.querySelector('#pair'),
+      direction: document.querySelector('#direction'),
+      confidence: document.querySelector('#confidence'),
+      expiry: document.querySelector('#expiry'),
+      source: document.querySelector('#source'),
+      entry: document.querySelector('#entry'),
+      chart: document.querySelector('#chart'),
+      note: document.querySelector('#signalNote'),
+      err: document.querySelector('#signalError'),
+      updatedAt: document.querySelector('#updatedAt'),
+      sysUpdated: document.querySelector('#sysUpdated'),
+      winRate: document.querySelector('#winRate'),
+      mlAcc: document.querySelector('#mlAcc'),
+      totalTrades: document.querySelector('#totalTrades'),
+      activeUsers: document.querySelector('#activeUsers'),
+      lastResultTbody: document.querySelector('#lastResultTbody'),
+      liveBadge: document.querySelector('#liveBadge'),
+      btnRefresh: document.querySelector('#btnRefresh'),
+      btnLogout: document.querySelector('#btnLogout'),
     };
 
-    function qs(s, r=document){return r.querySelector(s)}
-
     // === HELPERS ===
-    const fmtPct = v => (v==null || isNaN(v)) ? '—' : (v.toFixed ? v.toFixed(2) : v) + '%';
+    const fmtPct = v => (v == null || isNaN(v)) ? '—' : (v.toFixed ? v.toFixed(2) : v) + '%';
     const nowText = () => new Date().toLocaleTimeString();
 
     function setSignalEmpty(reason){
@@ -256,17 +254,26 @@
     }
 
     async function fetchJSON(url){
-      const r = await fetch(url,{cache:'no-store'});
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
+      try {
+        const r = await fetch(url, {cache: 'no-store'});
+        if(!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r.json();
+      } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
+      }
     }
 
     async function loadAll(){
       try{
-        const data = await fetchJSON(`${API}/latest_full.json?ts=${Date.now()}`);
+        console.log('🔄 Загрузка данных...');
+        const data = await fetchJSON(`${API}/api/latest_full.json?ts=${Date.now()}`);
+        console.log('📊 Получены данные:', data);
 
         // --- System ---
         const sys = data.system || {};
+        console.log('📈 Системные данные:', sys);
+        
         el.winRate.textContent = fmtPct(sys.win_rate);
         el.mlAcc.textContent = fmtPct(sys.ml_accuracy);
         el.totalTrades.textContent = sys.total_trades ?? '—';
@@ -274,53 +281,67 @@
         el.sysUpdated.textContent = nowText();
 
         // --- Signal ---
+        console.log('📡 Данные сигнала:', data.signal);
         if(data.signal && !data.signal.error){
           const s = data.signal;
+          console.log('🎯 Обработка сигнала:', s);
+          
           el.pair.textContent = s.pair || '—';
           el.direction.textContent = s.direction || '—';
           el.direction.classList.remove('dir-buy','dir-sell');
           if(s.direction){
-            el.direction.classList.add(s.direction.toUpperCase()==='BUY' ? 'dir-buy' : 'dir-sell');
+            el.direction.classList.add(s.direction.toUpperCase() === 'BUY' ? 'dir-buy' : 'dir-sell');
           }
-          el.confidence.textContent = (s.confidence!=null ? s.confidence : '—') + (s.confidence!=null ? '/10':'');
-          el.expiry.textContent = s.expiry + ' мин';
+          el.confidence.textContent = (s.confidence != null ? s.confidence : '—') + (s.confidence != null ? '/10' : '');
+          
+          // 🔥 ИСПРАВЛЕНИЕ: проверка на undefined для expiry
+          el.expiry.textContent = (s.expiry != null ? s.expiry : '—') + ' мин';
+          
           el.source.textContent = s.source || '—';
-          el.entry.textContent = (s.entry_price!=null) ? Number(s.entry_price).toFixed(5) : '—';
+          el.entry.textContent = (s.entry_price != null) ? Number(s.entry_price).toFixed(5) : '—';
           el.note.textContent = 'Сигнал активен';
           el.err.style.display = 'none';
 
-          // график: сначала base64, если нет — /chart.png
+          // график
           if(data.chart_base64){
             el.chart.src = data.chart_base64;
-          }else{
-            el.chart.src = `${API}/chart.png?ts=${Date.now()}`;
+          } else {
+            el.chart.src = `${API}/api/chart.png?ts=${Date.now()}`;
           }
-        }else{
+        } else {
+          console.log('❌ Нет активного сигнала');
           setSignalEmpty('Нет активных сигналов');
         }
         el.updatedAt.textContent = nowText();
 
         // --- Last Result ---
+        console.log('📊 Данные результата:', data.result);
         if(data.result && !data.result.error){
           const r = data.result;
+          console.log('🎯 Обработка результата:', r);
+          
+          // 🔥 ИСПРАВЛЕНИЕ: безопасная обработка данных результата
           el.lastResultTbody.innerHTML = `
             <tr>
-              <td>${r.pair ?? '—'}</td>
-              <td>${r.direction ?? '—'}</td>
+              <td>${r.pair || '—'}</td>
+              <td>${r.direction || '—'}</td>
               <td>
-                <span class="chip ${r.result==='WIN'?'win':'loss'}">${r.result ?? '—'}</span>
+                <span class="chip ${r.result === 'WIN' ? 'win' : 'loss'}">${r.result || '—'}</span>
               </td>
-              <td>${r.time ?? r.completed_at ?? '—'}</td>
+              <td>${r.time || r.completed_at || '—'}</td>
             </tr>
           `;
-        }else{
+        } else {
+          console.log('❌ Нет данных о результате');
           setResultEmpty();
         }
 
         // live badge
         el.liveBadge.textContent = 'LIVE';
-      }catch(err){
-        // общая ошибка
+        console.log('✅ Данные успешно загружены');
+
+      } catch(err) {
+        console.error('❌ Ошибка загрузки:', err);
         el.err.textContent = 'Ошибка загрузки данных: ' + (err.message || err);
         el.err.style.display = 'block';
         el.liveBadge.textContent = 'OFFLINE';
@@ -335,6 +356,7 @@
     });
 
     // === INIT ===
+    console.log('🚀 Инициализация веб-интерфейса...');
     loadAll();
     setInterval(loadAll, POLL_MS);
   </script>
