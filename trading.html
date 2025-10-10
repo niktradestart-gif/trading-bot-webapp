@@ -37,7 +37,7 @@
         }
         
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
         }
         
@@ -72,6 +72,14 @@
             font-size: 0.8rem;
             font-weight: bold;
             margin-left: 10px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
         
         .user-actions {
@@ -138,7 +146,7 @@
         
         .content-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.2fr 0.8fr;
             gap: 20px;
         }
         
@@ -159,23 +167,47 @@
             align-items: center;
         }
         
-        .signal-main {
+        /* Стили для активного сигнала */
+        .signal-container {
+            min-height: 400px;
+        }
+        
+        .signal-header {
+            text-align: center;
             margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .signal-trade-id {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        
+        .signal-type {
+            font-size: 1.1rem;
+            color: var(--accent-blue);
+            margin-bottom: 15px;
+            font-weight: 600;
         }
         
         .signal-pair {
-            font-size: 1.6rem;
+            font-size: 2rem;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             color: var(--text-primary);
         }
         
         .signal-direction {
             display: inline-block;
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 10px 20px;
+            border-radius: 10px;
             font-weight: bold;
-            font-size: 1rem;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
         }
         
         .direction-buy {
@@ -190,9 +222,9 @@
         
         .signal-details {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 15px;
-            margin-top: 20px;
+            margin-bottom: 25px;
         }
         
         .detail-group {
@@ -200,38 +232,156 @@
             padding: 15px;
             border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
         }
         
         .detail-label {
             font-size: 0.9rem;
             color: var(--text-secondary);
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
         
         .detail-value {
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             font-weight: bold;
             color: var(--text-primary);
         }
         
-        .result-item {
-            background: rgba(255,255,255,0.05);
+        .signal-countdown {
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--warning);
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255,165,0,0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255,165,0,0.3);
+        }
+        
+        /* Стили для завершенной сделки */
+        .result-container {
+            min-height: 400px;
+        }
+        
+        .result-header {
+            text-align: center;
+            margin-bottom: 25px;
             padding: 20px;
+            background: rgba(0,210,106,0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(0,210,106,0.3);
+        }
+        
+        .result-status {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: var(--success);
+        }
+        
+        .result-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .stat-item {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-wins { color: var(--success); }
+        .stat-losses { color: var(--danger); }
+        .stat-total { color: var(--text-primary); }
+        
+        .stat-description {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        
+        /* График */
+        .chart-container {
+            margin-top: 25px;
+        }
+        
+        .chart-placeholder {
+            width: 100%;
+            height: 300px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .chart-image {
+            width: 100%;
+            height: 300px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* История сделок */
+        .history-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
             border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         
-        .result-pair {
-            font-weight: bold;
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 8px;
-            font-size: 1.1rem;
         }
         
-        .result-details {
+        .history-pair {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        
+        .history-direction {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .history-details {
             color: var(--text-secondary);
             font-size: 0.9rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
+        
+        .history-profit {
+            font-weight: bold;
+            text-align: right;
+        }
+        
+        .profit-positive { color: var(--success); }
+        .profit-negative { color: var(--danger); }
         
         .blink {
             animation: blink 2s infinite;
@@ -247,6 +397,13 @@
             color: var(--text-secondary);
         }
         
+        .no-data {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 40px;
+            font-style: italic;
+        }
+        
         @media (max-width: 768px) {
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
@@ -257,6 +414,10 @@
             }
             
             .signal-details {
+                grid-template-columns: 1fr;
+            }
+            
+            .result-stats {
                 grid-template-columns: 1fr;
             }
         }
@@ -270,68 +431,150 @@
                 <span>ТРЕЙДИНГ БОТ</span>
                 <div class="status-badge" id="status-badge">LIVE</div>
             </div>
-            <div class="user-actions">
-                <button class="btn btn-secondary" id="refresh-btn">Обновить</button>
-                <button class="btn btn-danger" id="logout-btn">Выход</button>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="user-info">
+                    ID: <span id="user-id">-</span>
+                </div>
+                <div class="user-actions">
+                    <button class="btn btn-secondary" id="refresh-btn">Обновить</button>
+                    <button class="btn btn-danger" id="logout-btn">Выход</button>
+                </div>
             </div>
         </div>
         
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">Точность</div>
-                <div class="stat-value accuracy" id="accuracy">93%</div>
+                <div class="stat-value accuracy" id="accuracy">—%</div>
                 <div class="stat-label">за сегодня</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Сигналы</div>
-                <div class="stat-value signals" id="active-signals">0</div>
+                <div class="stat-value signals" id="active-signals">—</div>
                 <div class="stat-label">активно</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Время</div>
-                <div class="stat-value time" id="server-time">14:49:15</div>
+                <div class="stat-value time" id="server-time">—:—:—</div>
                 <div class="stat-label">сервера</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Статус</div>
-                <div class="stat-value status" id="status">бета</div>
+                <div class="stat-value status" id="status">—</div>
                 <div class="stat-label">&nbsp;</div>
             </div>
         </div>
         
         <div class="content-grid">
+            <!-- Левая колонка - Активный сигнал/Результат -->
             <div class="panel">
                 <div class="panel-title">
-                    <span>📈 Активный сигнал</span>
-                    <span class="last-update" id="signal-update">обновлено: --:--:--</span>
+                    <span>🎯 Торговая панель</span>
+                    <span class="last-update" id="signal-update">обновлено: —:—:—</span>
                 </div>
-                <div class="signal-main">
-                    <div class="signal-pair" id="active-pair">USDJPY</div>
-                    <div class="signal-direction direction-sell" id="active-direction">SELL (9/10)</div>
+                
+                <!-- Контейнер для активного сигнала -->
+                <div id="signal-container" class="signal-container" style="display: none;">
+                    <div class="signal-header">
+                        <div class="signal-trade-id" id="signal-trade-id">🎯 СДЕЛКА #—</div>
+                        <div class="signal-type" id="signal-type">🤖 АВТО-ТРЕЙДИНГ СИГНАЛ</div>
+                        <div class="signal-pair" id="signal-pair">—</div>
+                        <div class="signal-direction" id="signal-direction">—</div>
+                    </div>
                     
                     <div class="signal-details">
                         <div class="detail-group">
-                            <div class="detail-label">Вход</div>
-                            <div class="detail-value" id="entry-price">152.61</div>
+                            <div class="detail-label">💰 Цена входа</div>
+                            <div class="detail-value" id="signal-entry">—</div>
                         </div>
                         <div class="detail-group">
-                            <div class="detail-label">Экспирация</div>
-                            <div class="detail-value" id="expiry">undefined или @Chart</div>
+                            <div class="detail-label">⏰ Экспирация</div>
+                            <div class="detail-value" id="signal-expiry">—</div>
+                        </div>
+                        <div class="detail-group">
+                            <div class="detail-label">🎯 Уверенность</div>
+                            <div class="detail-value" id="signal-confidence">—/10</div>
+                        </div>
+                        <div class="detail-group">
+                            <div class="detail-label">🔍 Источник</div>
+                            <div class="detail-value" id="signal-source">—</div>
                         </div>
                     </div>
+                    
+                    <div class="signal-countdown" id="signal-countdown">
+                        Сделка открыта! Результат через —...
+                    </div>
+                </div>
+                
+                <!-- Контейнер для завершенной сделки -->
+                <div id="result-container" class="result-container" style="display: none;">
+                    <div class="result-header">
+                        <div class="result-status">🟢 СДЕЛКА #— ЗАВЕРШЕНА</div>
+                        <div class="signal-pair" id="result-pair">—</div>
+                        <div class="signal-direction" id="result-direction">—</div>
+                    </div>
+                    
+                    <div class="signal-details">
+                        <div class="detail-group">
+                            <div class="detail-label">💰 Вход</div>
+                            <div class="detail-value" id="result-entry">—</div>
+                        </div>
+                        <div class="detail-group">
+                            <div class="detail-label">💰 Выход</div>
+                            <div class="detail-value" id="result-exit">—</div>
+                        </div>
+                        <div class="detail-group">
+                            <div class="detail-label">🎯 Результат</div>
+                            <div class="detail-value" id="result-outcome">—</div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-stats">
+                        <div class="stat-item">
+                            <div class="stat-number stat-total" id="stat-total">—</div>
+                            <div class="stat-description">Всего</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number stat-wins" id="stat-wins">—</div>
+                            <div class="stat-description">Выигрыши</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number stat-losses" id="stat-losses">—</div>
+                            <div class="stat-description">Проигрыши</div>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px; color: var(--text-secondary);">
+                        📊 Win Rate: <span id="win-rate" style="color: var(--success); font-weight: bold;">—%</span>
+                    </div>
+                </div>
+                
+                <!-- Сообщение когда нет данных -->
+                <div id="no-signal" class="no-data">
+                    Ожидание торговых сигналов...
+                </div>
+                
+                <!-- График -->
+                <div class="chart-container">
+                    <div class="panel-title">
+                        <span>📈 График</span>
+                    </div>
+                    <div id="chart-placeholder" class="chart-placeholder">
+                        Загрузка графика...
+                    </div>
+                    <img id="chart-image" class="chart-image" style="display: none;" alt="Торговый график">
                 </div>
             </div>
             
+            <!-- Правая колонка - История и статистика -->
             <div class="panel">
                 <div class="panel-title">
-                    <span>📊 Последний результат</span>
-                    <span class="last-update" id="result-update">обновлено: --:--:--</span>
+                    <span>📊 История сделок</span>
+                    <span class="last-update" id="history-update">обновлено: —:—:—</span>
                 </div>
-                <div class="result-item">
-                    <div class="result-pair" id="last-pair">undefined — undefined (undefined)</div>
-                    <div class="result-details">
-                        Вход: <span id="last-entry">undefined</span>
-                    </div>
+                
+                <div class="history-list" id="history-list">
+                    <div class="no-data">Загрузка истории...</div>
                 </div>
             </div>
         </div>
@@ -349,22 +592,58 @@
                 return;
             }
             
+            document.getElementById('user-id').textContent = userId;
+            
             // Элементы DOM
             const elements = {
+                // Статистика
                 accuracy: document.getElementById('accuracy'),
                 activeSignals: document.getElementById('active-signals'),
                 serverTime: document.getElementById('server-time'),
                 status: document.getElementById('status'),
-                activePair: document.getElementById('active-pair'),
-                activeDirection: document.getElementById('active-direction'),
-                entryPrice: document.getElementById('entry-price'),
-                expiry: document.getElementById('expiry'),
-                lastPair: document.getElementById('last-pair'),
-                lastEntry: document.getElementById('last-entry'),
+                statusBadge: document.getElementById('status-badge'),
+                
+                // Контейнеры
+                signalContainer: document.getElementById('signal-container'),
+                resultContainer: document.getElementById('result-container'),
+                noSignal: document.getElementById('no-signal'),
+                
+                // Активный сигнал
+                signalTradeId: document.getElementById('signal-trade-id'),
+                signalType: document.getElementById('signal-type'),
+                signalPair: document.getElementById('signal-pair'),
+                signalDirection: document.getElementById('signal-direction'),
+                signalEntry: document.getElementById('signal-entry'),
+                signalExpiry: document.getElementById('signal-expiry'),
+                signalConfidence: document.getElementById('signal-confidence'),
+                signalSource: document.getElementById('signal-source'),
+                signalCountdown: document.getElementById('signal-countdown'),
+                
+                // Результат сделки
+                resultPair: document.getElementById('result-pair'),
+                resultDirection: document.getElementById('result-direction'),
+                resultEntry: document.getElementById('result-entry'),
+                resultExit: document.getElementById('result-exit'),
+                resultOutcome: document.getElementById('result-outcome'),
+                statTotal: document.getElementById('stat-total'),
+                statWins: document.getElementById('stat-wins'),
+                statLosses: document.getElementById('stat-losses'),
+                winRate: document.getElementById('win-rate'),
+                
+                // График
+                chartPlaceholder: document.getElementById('chart-placeholder'),
+                chartImage: document.getElementById('chart-image'),
+                
+                // История
+                historyList: document.getElementById('history-list'),
+                
+                // Время обновления
                 signalUpdate: document.getElementById('signal-update'),
-                resultUpdate: document.getElementById('result-update'),
-                statusBadge: document.getElementById('status-badge')
+                historyUpdate: document.getElementById('history-update')
             };
+            
+            // Текущее состояние
+            let currentState = 'no_signal'; // no_signal, active_signal, trade_result
             
             // Обновление времени сервера
             function updateServerTime() {
@@ -373,68 +652,44 @@
                 elements.serverTime.textContent = timeString;
             }
             
+            // Переключение состояний
+            function showState(state) {
+                elements.signalContainer.style.display = 'none';
+                elements.resultContainer.style.display = 'none';
+                elements.noSignal.style.display = 'none';
+                
+                currentState = state;
+                
+                switch(state) {
+                    case 'active_signal':
+                        elements.signalContainer.style.display = 'block';
+                        break;
+                    case 'trade_result':
+                        elements.resultContainer.style.display = 'block';
+                        break;
+                    default:
+                        elements.noSignal.style.display = 'block';
+                }
+            }
+            
+            // Форматирование чисел
+            function formatPrice(price) {
+                if (!price || isNaN(price)) return '—';
+                return Number(price).toFixed(5);
+            }
+            
             // Получение данных с API
             async function fetchTradingData() {
                 try {
                     console.log('🔄 Загрузка данных с API...');
                     
-                    const response = await fetch(`${API_BASE}/api/latest_full.json?ts=${Date.now()}`, {
-                        method: 'GET',
-                        headers: {
-                            'Cache-Control': 'no-cache',
-                            'Pragma': 'no-cache'
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
+                    const response = await fetch(`${API_BASE}/api/latest_full.json?ts=${Date.now()}`);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     
                     const data = await response.json();
                     console.log('📊 Получены данные:', data);
                     
-                    // Обновление статистики
-                    if (data.system) {
-                        elements.accuracy.textContent = `${Math.round(data.system.win_rate || 0)}%`;
-                        elements.activeSignals.textContent = data.system.active_signals || '0';
-                        elements.status.textContent = data.system.status || 'бета';
-                    }
-                    
-                    // Обновление активного сигнала
-                    if (data.signal && !data.signal.error) {
-                        const signal = data.signal;
-                        elements.activePair.textContent = signal.pair || '—';
-                        
-                        if (signal.direction) {
-                            elements.activeDirection.textContent = `${signal.direction.toUpperCase()} (${signal.confidence || '?'}/10)`;
-                            elements.activeDirection.className = `signal-direction direction-${signal.direction.toLowerCase()}`;
-                        }
-                        
-                        elements.entryPrice.textContent = signal.entry_price ? Number(signal.entry_price).toFixed(5) : '—';
-                        elements.expiry.textContent = signal.expiry ? `${signal.expiry} мин` : '—';
-                        elements.signalUpdate.textContent = `обновлено: ${new Date().toLocaleTimeString('ru-RU')}`;
-                    } else {
-                        // Нет активного сигнала
-                        elements.activePair.textContent = '—';
-                        elements.activeDirection.textContent = '—';
-                        elements.activeDirection.className = 'signal-direction';
-                        elements.entryPrice.textContent = '—';
-                        elements.expiry.textContent = '—';
-                        elements.signalUpdate.textContent = 'нет активных сигналов';
-                    }
-                    
-                    // Обновление последнего результата
-                    if (data.result && !data.result.error) {
-                        const result = data.result;
-                        elements.lastPair.textContent = `${result.pair || '—'} — ${result.direction || '—'} (${result.result || '—'})`;
-                        elements.lastEntry.textContent = result.entry_price ? Number(result.entry_price).toFixed(5) : '—';
-                        elements.resultUpdate.textContent = `обновлено: ${new Date().toLocaleTimeString('ru-RU')}`;
-                    } else {
-                        elements.lastPair.textContent = 'undefined — undefined (undefined)';
-                        elements.lastEntry.textContent = 'undefined';
-                        elements.resultUpdate.textContent = 'нет данных';
-                    }
-                    
+                    updateUI(data);
                     elements.statusBadge.textContent = 'LIVE';
                     elements.statusBadge.style.background = 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))';
                     
@@ -442,19 +697,141 @@
                     console.error('❌ Ошибка загрузки данных:', error);
                     elements.statusBadge.textContent = 'OFFLINE';
                     elements.statusBadge.style.background = 'linear-gradient(135deg, #ff5c7a, #ff8e53)';
-                    
-                    // Используем данные из скриншота как fallback
-                    elements.accuracy.textContent = '93%';
-                    elements.activeSignals.textContent = '0';
-                    elements.status.textContent = 'бета';
-                    elements.activePair.textContent = 'USDJPY';
-                    elements.activeDirection.textContent = 'SELL (9/10)';
-                    elements.activeDirection.className = 'signal-direction direction-sell';
-                    elements.entryPrice.textContent = '152.61';
-                    elements.expiry.textContent = 'undefined или @Chart';
-                    elements.lastPair.textContent = 'undefined — undefined (undefined)';
-                    elements.lastEntry.textContent = 'undefined';
                 }
+            }
+            
+            // Обновление интерфейса
+            function updateUI(data) {
+                const now = new Date().toLocaleTimeString('ru-RU');
+                
+                // Обновление статистики
+                if (data.system) {
+                    elements.accuracy.textContent = `${Math.round(data.system.win_rate || 0)}%`;
+                    elements.activeSignals.textContent = data.system.active_signals || '0';
+                    elements.status.textContent = data.system.status || 'бета';
+                }
+                
+                // Определяем что показывать
+                if (data.signal && !data.signal.error) {
+                    showActiveSignal(data.signal, data.system);
+                    elements.signalUpdate.textContent = `обновлено: ${now}`;
+                } else if (data.result && !data.result.error) {
+                    showTradeResult(data.result, data.system);
+                    elements.signalUpdate.textContent = `обновлено: ${now}`;
+                } else {
+                    showState('no_signal');
+                    elements.signalUpdate.textContent = 'нет данных';
+                }
+                
+                // Обновление истории
+                updateHistory(data.history || []);
+                elements.historyUpdate.textContent = `обновлено: ${now}`;
+            }
+            
+            // Показать активный сигнал
+            function showActiveSignal(signal, system) {
+                showState('active_signal');
+                
+                elements.signalTradeId.textContent = `🎯 СДЕЛКА #${signal.trade_id || system.total_trades || '—'}`;
+                elements.signalPair.textContent = signal.pair || '—';
+                elements.signalEntry.textContent = formatPrice(signal.entry_price);
+                elements.signalExpiry.textContent = signal.expiry ? `${signal.expiry} мин` : '—';
+                elements.signalConfidence.textContent = signal.confidence ? `${signal.confidence}/10` : '—/10';
+                elements.signalSource.textContent = signal.source || 'ENHANCED_SMART_MONEY';
+                
+                if (signal.direction) {
+                    const direction = signal.direction.toUpperCase();
+                    elements.signalDirection.textContent = `${direction} (${signal.confidence || '?'}/10)`;
+                    elements.signalDirection.className = `signal-direction direction-${signal.direction.toLowerCase()}`;
+                }
+                
+                // Таймер обратного отсчета
+                if (signal.expiry) {
+                    elements.signalCountdown.textContent = `Сделка открыта! Результат через ${signal.expiry} минут...`;
+                }
+                
+                // Загрузка графика
+                loadChart(signal.pair);
+            }
+            
+            // Показать результат сделки
+            function showTradeResult(result, system) {
+                showState('trade_result');
+                
+                elements.resultPair.textContent = result.pair || '—';
+                elements.resultEntry.textContent = formatPrice(result.entry_price);
+                elements.resultExit.textContent = formatPrice(result.exit_price);
+                elements.resultOutcome.textContent = result.result || '—';
+                
+                if (result.direction) {
+                    const direction = result.direction.toUpperCase();
+                    elements.resultDirection.textContent = direction;
+                    elements.resultDirection.className = `signal-direction direction-${result.direction.toLowerCase()}`;
+                }
+                
+                // Статистика
+                elements.statTotal.textContent = system.total_trades || '—';
+                elements.statWins.textContent = system.total_wins || '—';
+                elements.statLosses.textContent = system.total_losses || '—';
+                elements.winRate.textContent = system.win_rate ? `${system.win_rate}%` : '—%';
+                
+                // Загрузка графика для последней пары
+                loadChart(result.pair);
+            }
+            
+            // Загрузка графика
+            function loadChart(pair) {
+                if (!pair) {
+                    elements.chartImage.style.display = 'none';
+                    elements.chartPlaceholder.style.display = 'flex';
+                    elements.chartPlaceholder.textContent = 'Нет данных для графика';
+                    return;
+                }
+                
+                const chartUrl = `${API_BASE}/api/chart.png?pair=${pair}&ts=${Date.now()}`;
+                
+                elements.chartImage.onload = function() {
+                    elements.chartPlaceholder.style.display = 'none';
+                    elements.chartImage.style.display = 'block';
+                };
+                
+                elements.chartImage.onerror = function() {
+                    elements.chartPlaceholder.style.display = 'flex';
+                    elements.chartImage.style.display = 'none';
+                    elements.chartPlaceholder.textContent = 'График недоступен';
+                };
+                
+                elements.chartImage.src = chartUrl;
+            }
+            
+            // Обновление истории
+            function updateHistory(history) {
+                if (!history || history.length === 0) {
+                    elements.historyList.innerHTML = '<div class="no-data">Нет данных о сделках</div>';
+                    return;
+                }
+                
+                const historyHTML = history.slice(0, 8).map(trade => `
+                    <div class="history-item">
+                        <div class="history-header">
+                            <div class="history-pair">${trade.pair || '—'}</div>
+                            <div class="history-direction direction-${(trade.direction || '').toLowerCase()}">
+                                ${(trade.direction || '—').toUpperCase()}
+                            </div>
+                        </div>
+                        <div class="history-details">
+                            <div>
+                                <div>Вход: ${formatPrice(trade.entry_price)}</div>
+                                <div>Выход: ${formatPrice(trade.exit_price)}</div>
+                            </div>
+                            <div class="history-profit ${trade.result === 'WIN' ? 'profit-positive' : 'profit-negative'}">
+                                ${trade.result || '—'}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                elements.historyList.innerHTML = historyHTML;
             }
             
             // Инициализация
