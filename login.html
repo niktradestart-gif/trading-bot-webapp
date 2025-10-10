@@ -1,31 +1,174 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>ASPIRE TRADE — Вход</title>
-  <link rel="stylesheet" href="assets/trading.css">
-</head>
-<body class="login-body">
-  <div class="gradient-bg"></div>
-  <div class="glass login-card">
-    <h2 class="logo">ASPIRE TRADE</h2>
-    <input id="pocketId" type="text" placeholder="Введите ваш Pocket ID">
-    <button onclick="login()">Войти</button>
-    <div id="error" class="error"></div>
-  </div>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Трейдинг Бот • Авторизация</title>
+    <link rel="stylesheet" href="trading.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: "Inter", sans-serif;
+            background: linear-gradient(180deg, #5c6bc0 0%, #512da8 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #fff;
+        }
 
-<script>
-async function login(){
-  const id=document.getElementById('pocketId').value.trim();
-  const res=await fetch('pocket_users.json');
-  const users=await res.json();
-  if(users[id]){
-    localStorage.setItem('pocketId',id);
-    window.location.href=users[id].role==='admin'?'admin.html':'trading.html';
-  }else{
-    document.getElementById('error').innerText='ID не найден в белом списке';
-  }
-}
-</script>
+        .container {
+            background: #ffffff;
+            color: #333;
+            border-radius: 14px;
+            padding: 30px 40px;
+            width: 360px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+        }
+
+        h1 {
+            font-size: 26px;
+            margin-bottom: 6px;
+            color: #2c2c2c;
+        }
+
+        h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: left;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .info-box b {
+            color: #1976d2;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .btn {
+            width: 100%;
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn:hover {
+            background: #43a047;
+        }
+
+        .verified-box {
+            background: #c8e6c9;
+            color: #2e7d32;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 15px;
+            font-weight: 600;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 13px;
+            color: rgba(255,255,255,0.9);
+            margin-top: 20px;
+        }
+
+        .pocket-btn {
+            margin-top: 12px;
+            background: #ff7043;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .pocket-btn:hover {
+            background: #f4511e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Трейдинг Бот</h1>
+        <p style="color: #666; font-size: 14px;">Pocket Option Auth System</p>
+        <hr style="margin: 10px 0 20px; border: none; border-top: 1px solid #eee;">
+
+        <h2>Авторизация</h2>
+        <p style="font-size: 14px;">Введите ваш ID аккаунта Pocket Option</p>
+
+        <div class="info-box">
+            <b>Как найти ID:</b><br>
+            1. Откройте приложение Pocket Option<br>
+            2. Нажмите на аватар профиля<br>
+            3. Ваш ID указан в формате: <b>69662105</b>
+        </div>
+
+        <input type="text" id="pocketId" placeholder="ID аккаунта Pocket Option">
+
+        <button class="btn" onclick="checkID()">Проверить ID</button>
+
+        <div id="verifyBox" class="verified-box" style="display:none;">
+            ✅ ID подтверждён!
+        </div>
+
+        <button id="goBtn" class="btn" style="margin-top: 10px; background:#00c853; display:none;" onclick="goToTrading()">
+            ↗ Перейти в трейдинг
+        </button>
+
+        <a href="https://pocket-friends.com/r/0qrjewbjlf" target="_blank" class="pocket-btn">
+            Зарегистрироваться в Pocket Option
+        </a>
+    </div>
+
+    <div class="footer">
+        Трейдинг Бот • Pocket Option Auth v1.0<br>
+        Только для зарегистрированных пользователей<br>
+        <span style="opacity:0.8;">@aspiretrad_bot</span>
+    </div>
+
+    <script>
+        function checkID() {
+            const input = document.getElementById('pocketId').value.trim();
+            if (input === '' || isNaN(input)) {
+                alert('Введите корректный ID!');
+                return;
+            }
+            document.getElementById('verifyBox').style.display = 'block';
+            document.getElementById('goBtn').style.display = 'inline-block';
+        }
+
+        function goToTrading() {
+            const id = document.getElementById('pocketId').value.trim();
+            if (id) {
+                localStorage.setItem("pocket_id", id);
+                window.location.href = "trading.html";
+            }
+        }
+    </script>
 </body>
 </html>
