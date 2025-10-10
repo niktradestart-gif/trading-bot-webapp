@@ -7,27 +7,25 @@
 </head>
 <body class="login-body">
   <div class="gradient-bg"></div>
-
-  <div class="login-card glass card">
-    <h2 class="neon">ASPIRE TRADE</h2>
-    <p>Введите ваш Pocket ID</p>
-    <input id="userId" type="text" placeholder="Например: 5129282647">
+  <div class="glass login-card">
+    <h2 class="logo">ASPIRE TRADE</h2>
+    <input id="pocketId" type="text" placeholder="Введите ваш Pocket ID">
     <button onclick="login()">Войти</button>
     <div id="error" class="error"></div>
   </div>
 
-  <script>
-  async function login(){
-    const id = document.getElementById('userId').value.trim();
-    const res = await fetch('pocket_users.json');
-    const list = await res.json();
-    if(list[id] || list.includes?.(id)){
-      localStorage.setItem("userId", id);
-      window.location.href = "trading.html";
-    } else {
-      document.getElementById('error').innerText = "❌ ID не найден в белом списке";
-    }
+<script>
+async function login(){
+  const id=document.getElementById('pocketId').value.trim();
+  const res=await fetch('pocket_users.json');
+  const users=await res.json();
+  if(users[id]){
+    localStorage.setItem('pocketId',id);
+    window.location.href=users[id].role==='admin'?'admin.html':'trading.html';
+  }else{
+    document.getElementById('error').innerText='ID не найден в белом списке';
   }
-  </script>
+}
+</script>
 </body>
 </html>
