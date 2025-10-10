@@ -1,1 +1,10 @@
-
+{
+  "win_rate": 0,
+  "active_signals": 1,
+  "status": "LIVE",
+  "total_trades": 0,
+  "total_wins": 985,
+  "total_losses": 285,
+  "last_updated": "2025-10-10T13:54:39.406712",
+  "source": "live_bot"
+}
