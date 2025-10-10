@@ -1,11 +1,11 @@
 {
-  "confidence": 7,
+  "confidence": 6,
   "direction": "SELL",
-  "entry_price": 0.93152,
+  "entry_price": 0.80534,
   "error": null,
   "expiry": 2,
-  "pair": "EURCHF",
+  "pair": "USDCHF",
   "source": "live_bot",
-  "timestamp": "2025-10-10T16:57:08.066599",
-  "last_updated": "2025-10-10T13:58:25.227144"
+  "timestamp": "2025-10-10T17:12:38.799249",
+  "last_updated": "2025-10-10T14:14:22.026244"
 }
