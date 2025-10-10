@@ -45,8 +45,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
-            padding: 20px 0;
+            margin-bottom: 20px;
+            padding: 15px 0;
         }
         
         .logo {
@@ -88,7 +88,7 @@
         }
         
         .btn {
-            padding: 10px 20px;
+            padding: 8px 16px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
@@ -115,23 +115,22 @@
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 30px;
+            gap: 12px;
+            margin-bottom: 20px;
         }
         
         .stat-card {
             background: var(--bg-card);
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: 10px;
+            padding: 15px;
             text-align: center;
             border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         }
         
         .stat-value {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: bold;
-            margin: 8px 0;
+            margin: 5px 0;
         }
         
         .accuracy { color: var(--success); }
@@ -140,7 +139,7 @@
         .status { color: var(--warning); }
         
         .stat-label {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
         }
         
@@ -153,169 +152,27 @@
         .panel {
             background: var(--bg-panel);
             border-radius: 12px;
-            padding: 25px;
+            padding: 20px;
             border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         }
         
         .panel-title {
             font-size: 1.1rem;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             color: var(--text-primary);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         
-        /* Стили для активного сигнала */
-        .signal-container {
-            min-height: 400px;
-        }
-        
-        .signal-header {
-            text-align: center;
-            margin-bottom: 25px;
-            padding: 20px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .signal-trade-id {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-bottom: 10px;
-        }
-        
-        .signal-type {
-            font-size: 1.1rem;
-            color: var(--accent-blue);
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-        
-        .signal-pair {
-            font-size: 2rem;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: var(--text-primary);
-        }
-        
-        .signal-direction {
-            display: inline-block;
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-weight: bold;
-            font-size: 1.1rem;
-            margin-bottom: 20px;
-        }
-        
-        .direction-buy {
-            background: var(--success);
-            color: white;
-        }
-        
-        .direction-sell {
-            background: var(--danger);
-            color: white;
-        }
-        
-        .signal-details {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-        
-        .detail-group {
-            background: rgba(255,255,255,0.05);
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        
-        .detail-label {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-        }
-        
-        .detail-value {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--text-primary);
-        }
-        
-        .signal-countdown {
-            text-align: center;
-            font-size: 1.1rem;
-            color: var(--warning);
-            margin-top: 20px;
-            padding: 15px;
-            background: rgba(255,165,0,0.1);
-            border-radius: 8px;
-            border: 1px solid rgba(255,165,0,0.3);
-        }
-        
-        /* Стили для завершенной сделки */
-        .result-container {
-            min-height: 400px;
-        }
-        
-        .result-header {
-            text-align: center;
-            margin-bottom: 25px;
-            padding: 20px;
-            background: rgba(0,210,106,0.1);
-            border-radius: 12px;
-            border: 1px solid rgba(0,210,106,0.3);
-        }
-        
-        .result-status {
-            font-size: 1.3rem;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: var(--success);
-        }
-        
-        .result-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 20px;
-        }
-        
-        .stat-item {
-            background: rgba(255,255,255,0.05);
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .stat-number {
-            font-size: 1.3rem;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .stat-wins { color: var(--success); }
-        .stat-losses { color: var(--danger); }
-        .stat-total { color: var(--text-primary); }
-        
-        .stat-description {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-        
-        /* График */
+        /* ГРАФИК - ПЕРВЫЙ И ГЛАВНЫЙ */
         .chart-container {
-            margin-top: 25px;
+            margin-bottom: 20px;
         }
         
         .chart-placeholder {
             width: 100%;
-            height: 300px;
+            height: 350px;
             background: rgba(0,0,0,0.3);
             border-radius: 12px;
             display: flex;
@@ -331,11 +188,152 @@
         
         .chart-image {
             width: 100%;
-            height: 300px;
+            height: 350px;
             border-radius: 12px;
             object-fit: contain;
             background: #0a0a1a;
             border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* Стили для активного сигнала */
+        .signal-container {
+            min-height: 200px;
+        }
+        
+        .signal-header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .signal-trade-id {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .signal-type {
+            font-size: 1rem;
+            color: var(--accent-blue);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .signal-pair {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+        
+        .signal-direction {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+        
+        .direction-buy {
+            background: var(--success);
+            color: white;
+        }
+        
+        .direction-sell {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .signal-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .detail-group {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+        
+        .detail-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        
+        .detail-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+        
+        .signal-countdown {
+            text-align: center;
+            font-size: 1rem;
+            color: var(--warning);
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255,165,0,0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255,165,0,0.3);
+        }
+        
+        /* Стили для завершенной сделки */
+        .result-container {
+            min-height: 200px;
+        }
+        
+        .result-header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: rgba(0,210,106,0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(0,210,106,0.3);
+        }
+        
+        .result-status {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--success);
+        }
+        
+        .result-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        .stat-item {
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        
+        .stat-wins { color: var(--success); }
+        .stat-losses { color: var(--danger); }
+        .stat-total { color: var(--text-primary); }
+        
+        .stat-description {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
         }
         
         /* История сделок */
@@ -346,37 +344,37 @@
         
         .history-item {
             background: rgba(255,255,255,0.05);
-            padding: 15px;
+            padding: 12px;
             border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         
         .history-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         
         .history-pair {
             font-weight: bold;
-            font-size: 1rem;
+            font-size: 0.9rem;
         }
         
         .history-direction {
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.8rem;
+            padding: 3px 6px;
+            border-radius: 5px;
+            font-size: 0.75rem;
             font-weight: bold;
         }
         
         .history-details {
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 8px;
         }
         
         .history-profit {
@@ -387,24 +385,15 @@
         .profit-positive { color: var(--success); }
         .profit-negative { color: var(--danger); }
         
-        .blink {
-            animation: blink 2s infinite;
-        }
-        
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0.7; }
-        }
-        
         .last-update {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
         }
         
         .no-data {
             color: var(--text-secondary);
             text-align: center;
-            padding: 40px;
+            padding: 30px;
             font-style: italic;
         }
         
@@ -428,6 +417,11 @@
             .result-stats {
                 grid-template-columns: 1fr;
             }
+            
+            .chart-image,
+            .chart-placeholder {
+                height: 250px;
+            }
         }
     </style>
 </head>
@@ -439,7 +433,7 @@
                 <span>ТРЕЙДИНГ БОТ</span>
                 <div class="status-badge" id="status-badge">LIVE</div>
             </div>
-            <div style="display: flex; align-items: center; gap: 20px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
                 <div class="user-info">
                     ID: <span id="user-id">-</span>
                 </div>
@@ -474,11 +468,20 @@
         </div>
         
         <div class="content-grid">
-            <!-- Левая колонка - Активный сигнал/Результат -->
+            <!-- Левая колонка - ГРАФИК ПЕРВЫЙ -->
             <div class="panel">
                 <div class="panel-title">
-                    <span>🎯 Торговая панель</span>
-                    <span class="last-update" id="signal-update">обновлено: —:—:—</span>
+                    <span>📈 Торговый график</span>
+                    <span class="last-update" id="chart-update">—</span>
+                </div>
+                
+                <!-- ГРАФИК - САМЫЙ ВЕРХ -->
+                <div class="chart-container">
+                    <div id="chart-placeholder" class="chart-placeholder">
+                        <div class="chart-loading">🔄 Ожидание торгового сигнала</div>
+                        <div style="font-size: 0.9rem;">График появится здесь</div>
+                    </div>
+                    <img id="chart-image" class="chart-image" style="display: none;" alt="Торговый график">
                 </div>
                 
                 <!-- Контейнер для активного сигнала -->
@@ -552,7 +555,7 @@
                         </div>
                     </div>
                     
-                    <div style="text-align: center; margin-top: 20px; color: var(--text-secondary);">
+                    <div style="text-align: center; margin-top: 15px; color: var(--text-secondary);">
                         📊 Win Rate: <span id="win-rate" style="color: var(--success); font-weight: bold;">—%</span>
                     </div>
                 </div>
@@ -561,22 +564,9 @@
                 <div id="no-signal" class="no-data">
                     Ожидание торговых сигналов...
                 </div>
-                
-                <!-- График -->
-                <div class="chart-container">
-                    <div class="panel-title">
-                        <span>📈 График</span>
-                        <span class="last-update" id="chart-update">—</span>
-                    </div>
-                    <div id="chart-placeholder" class="chart-placeholder">
-                        <div class="chart-loading">🔄 Загрузка графика...</div>
-                        <div style="font-size: 0.9rem;">Ожидание торгового сигнала</div>
-                    </div>
-                    <img id="chart-image" class="chart-image" style="display: none;" alt="Торговый график">
-                </div>
             </div>
             
-            <!-- Правая колонка - История и статистика -->
+            <!-- Правая колонка - История -->
             <div class="panel">
                 <div class="panel-title">
                     <span>📊 История сделок</span>
@@ -657,7 +647,6 @@
             // Текущее состояние
             let currentState = 'no_signal';
             let currentPair = null;
-            let lastChartPath = null;
 
             // Обновление времени сервера
             function updateServerTime() {
@@ -692,12 +681,45 @@
                 return Number(price).toFixed(5);
             }
             
+            // Загрузка графика - ПРОСТАЯ ВЕРСИЯ
+            function loadChart(pair) {
+                if (!pair) {
+                    elements.chartImage.style.display = 'none';
+                    elements.chartPlaceholder.style.display = 'flex';
+                    elements.chartPlaceholder.innerHTML = `
+                        <div>📊 Ожидание торгового сигнала</div>
+                        <div style="font-size: 0.9rem;">График появится здесь</div>
+                    `;
+                    return;
+                }
+                
+                const chartUrl = `${BOT_API}/smc_chart_${pair}_latest.png?ts=${Date.now()}`;
+                console.log(`📈 Загрузка графика: ${chartUrl}`);
+                
+                elements.chartImage.onload = function() {
+                    elements.chartPlaceholder.style.display = 'none';
+                    elements.chartImage.style.display = 'block';
+                    elements.chartUpdate.textContent = `активно: ${pair}`;
+                    console.log('✅ График загружен');
+                };
+                
+                elements.chartImage.onerror = function() {
+                    elements.chartImage.style.display = 'none';
+                    elements.chartPlaceholder.style.display = 'flex';
+                    elements.chartPlaceholder.innerHTML = `
+                        <div>📊 График готовится...</div>
+                        <div style="font-size: 0.9rem;">Пара: ${pair}</div>
+                    `;
+                    console.log('⏳ График еще не готов');
+                };
+                
+                elements.chartImage.src = chartUrl;
+                currentPair = pair;
+            }
+            
             // Получение данных с API
             async function fetchTradingData() {
                 try {
-                    console.log('🔄 Загрузка данных с API...');
-                    
-                    // Загружаем все файлы параллельно
                     const [systemResponse, signalResponse, resultResponse] = await Promise.all([
                         fetch(`${API_BASE}/system_status.json?ts=${Date.now()}`),
                         fetch(`${API_BASE}/last_signal.json?ts=${Date.now()}`),
@@ -708,18 +730,11 @@
                     const signalData = signalResponse.ok ? await signalResponse.json() : null;
                     const resultData = resultResponse.ok ? await resultResponse.json() : null;
                     
-                    console.log('📊 Получены данные:', {
-                        system: systemData,
-                        signal: signalData, 
-                        result: resultData
-                    });
-                    
-                    // Собираем данные в один объект
                     const data = {
                         system: systemData,
                         signal: signalData,
                         result: resultData,
-                        history: [] // временно пустая история
+                        history: []
                     };
                     
                     updateUI(data);
@@ -730,8 +745,6 @@
                     console.error('❌ Ошибка загрузки данных:', error);
                     elements.statusBadge.textContent = 'OFFLINE';
                     elements.statusBadge.style.background = 'linear-gradient(135deg, #ff5c7a, #ff8e53)';
-                    
-                    // Показываем демо-данные при ошибке
                     showDemoData();
                 }
             }
@@ -755,13 +768,6 @@
                         expiry: 2,
                         source: "ENHANCED_SMART_MONEY",
                         trade_id: 1275
-                    },
-                    result: {
-                        pair: "GBPJPY",
-                        direction: "SELL",
-                        result: "WIN",
-                        entry_price: 185.723,
-                        exit_price: 185.615
                     }
                 };
                 
@@ -816,14 +822,12 @@
                     elements.signalDirection.className = `signal-direction direction-${signal.direction.toLowerCase()}`;
                 }
                 
-                // Таймер обратного отсчета
                 if (signal.expiry) {
                     elements.signalCountdown.textContent = `Сделка открыта! Результат через ${signal.expiry} минут...`;
                 }
                 
-                // Загрузка графика
-                if (signal.pair && signal.pair !== currentPair) {
-                    currentPair = signal.pair;
+                // ЗАГРУЗКА ГРАФИКА ПРИ СИГНАЛЕ
+                if (signal.pair) {
                     loadChart(signal.pair);
                 }
             }
@@ -843,99 +847,15 @@
                     elements.resultDirection.className = `signal-direction direction-${result.direction.toLowerCase()}`;
                 }
                 
-                // Статистика
                 elements.statTotal.textContent = system.total_trades || '—';
                 elements.statWins.textContent = system.total_wins || '—';
                 elements.statLosses.textContent = system.total_losses || '—';
                 elements.winRate.textContent = system.win_rate ? `${system.win_rate}%` : '—%';
                 
-                // Загрузка графика для последней пары
-                if (result.pair && result.pair !== currentPair) {
-                    currentPair = result.pair;
+                // ЗАГРУЗКА ГРАФИКА ДЛЯ РЕЗУЛЬТАТА
+                if (result.pair) {
                     loadChart(result.pair);
                 }
-            }
-            
-            // Загрузка графика - ИСПРАВЛЕННАЯ ВЕРСИЯ
-            function loadChart(pair) {
-                if (!pair) {
-                    elements.chartImage.style.display = 'none';
-                    elements.chartPlaceholder.style.display = 'flex';
-                    elements.chartPlaceholder.innerHTML = `
-                        <div>📊 Ожидание торгового сигнала</div>
-                        <div style="font-size: 0.9rem;">График появится при активной сделке</div>
-                    `;
-                    return;
-                }
-                
-                // Пробуем разные варианты загрузки графика
-                const chartUrls = [
-                    // Вариант 1: Прямой доступ к файлу графика
-                    `${BOT_API}/smc_chart_${pair}_latest.png`,
-                    // Вариант 2: API эндпоинт
-                    `${BOT_API}/api/chart.png?pair=${pair}`,
-                    // Вариант 3: Статический файл
-                    `${API_BASE}/charts/smc_chart_${pair}_latest.png`
-                ];
-                
-                console.log(`📈 Поиск графика для ${pair}`);
-                
-                // Показываем загрузку
-                elements.chartImage.style.display = 'none';
-                elements.chartPlaceholder.style.display = 'flex';
-                elements.chartPlaceholder.innerHTML = `
-                    <div class="chart-loading">🔄 Поиск графика ${pair}...</div>
-                    <div style="font-size: 0.9rem;">Проверка доступных источников</div>
-                `;
-                
-                // Пробуем загрузить график по очереди из всех источников
-                tryLoadChart(chartUrls, 0);
-            }
-            
-            // Рекурсивная попытка загрузки графика из разных источников
-            function tryLoadChart(urls, index) {
-                if (index >= urls.length) {
-                    // Все источники исчерпаны
-                    elements.chartImage.style.display = 'none';
-                    elements.chartPlaceholder.style.display = 'flex';
-                    elements.chartPlaceholder.innerHTML = `
-                        <div>❌ График временно недоступен</div>
-                        <div style="font-size: 0.9rem;">Пара: ${currentPair}</div>
-                        <div style="font-size: 0.8rem; color: var(--warning);">Бот обновляет данные...</div>
-                    `;
-                    elements.chartUpdate.textContent = 'ожидание данных';
-                    console.log('❌ Все источники графиков недоступны');
-                    return;
-                }
-                
-                const currentUrl = urls[index] + `?ts=${Date.now()}`;
-                console.log(`🔍 Попытка ${index + 1}: ${currentUrl}`);
-                
-                elements.chartPlaceholder.innerHTML = `
-                    <div class="chart-loading">🔄 Загрузка графика...</div>
-                    <div style="font-size: 0.9rem;">Источник ${index + 1}/${urls.length}</div>
-                    <div style="font-size: 0.8rem;">${currentUrl}</div>
-                `;
-                
-                // Создаем временный image для проверки
-                const testImage = new Image();
-                
-                testImage.onload = function() {
-                    console.log(`✅ График найден: ${currentUrl}`);
-                    elements.chartImage.src = currentUrl;
-                    elements.chartImage.style.display = 'block';
-                    elements.chartPlaceholder.style.display = 'none';
-                    elements.chartUpdate.textContent = `активно: ${currentPair}`;
-                };
-                
-                testImage.onerror = function() {
-                    console.log(`❌ Не удалось загрузить: ${currentUrl}`);
-                    // Пробуем следующий источник
-                    setTimeout(() => tryLoadChart(urls, index + 1), 1000);
-                };
-                
-                // Запускаем проверку
-                testImage.src = currentUrl;
             }
             
             // Обновление истории
