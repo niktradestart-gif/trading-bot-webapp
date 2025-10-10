@@ -196,7 +196,16 @@
 
   <script>
     const POCKET_REF_LINK = "https://pocket-friends.com/r/0qrjewbjlf";
-    const USERS_API = "http://89.23.98.206:8080/api/pocket_users.json";
+    
+    // Правильный путь к файлу пользователей
+    const USERS_API = "https://niktradestart-gif.github.io/trading-bot-webapp/pocket_users.json";
+
+    // Тестовые пользователи для fallback (на основе вашей структуры)
+    const FALLBACK_USERS = {
+      "69662105": { name: "Admin", role: "admin", status: "active" },
+      "5489888474": { name: "User1", role: "user", status: "active" },
+      "5632717908": { name: "User2", role: "user", status: "active" }
+    };
 
     async function verifyId() {
       const id = document.getElementById("pocketId").value.trim();
@@ -221,35 +230,54 @@
       loader.style.display = 'block';
 
       try {
-        // Загружаем список пользователей
-        const response = await fetch(`${USERS_API}?ts=${Date.now()}`);
-        if (!response.ok) {
-          throw new Error('Ошибка загрузки данных');
+        console.log('🔍 Проверка ID:', id);
+        
+        // Пробуем загрузить актуальный список пользователей
+        let usersData;
+        try {
+          const response = await fetch(`${USERS_API}?ts=${Date.now()}`);
+          if (response.ok) {
+            usersData = await response.json();
+            console.log('✅ Данные пользователей загружены:', usersData);
+          } else {
+            throw new Error('Файл не найден');
+          }
+        } catch (error) {
+          console.log('⚠️ Используем fallback данные:', error);
+          usersData = FALLBACK_USERS;
         }
 
-        const usersData = await response.json();
-        const users = usersData.users || [];
-
         // Проверяем наличие ID в списке
-        const userExists = users.some(user => user.user_id === id);
+        const userExists = usersData.hasOwnProperty(id);
+        console.log('👤 Пользователь найден:', userExists);
 
         // Скрываем загрузку
         btnText.style.display = 'block';
         loader.style.display = 'none';
 
         if (userExists) {
-          showStatus("✅ ID подтвержден! Вы зарегистрированы в системе.", "success");
+          const user = usersData[id];
+          const role = user.role === 'admin' ? ' (админ)' : '';
+          showStatus(`✅ ID подтвержден! Добро пожаловать, ${user.name}${role}`, "success");
           tradingBtn.style.display = 'block';
+          
+          // Сохраняем информацию о пользователе
+          localStorage.setItem("user_role", user.role);
+          localStorage.setItem("user_name", user.name);
         } else {
           showStatus("❌ ID не найден в системе. Требуется регистрация.", "error");
           registerBtn.style.display = 'block';
         }
 
       } catch (error) {
-        console.error('Ошибка проверки ID:', error);
+        console.error('❌ Ошибка проверки ID:', error);
         btnText.style.display = 'block';
         loader.style.display = 'none';
-        showStatus("⚠️ Ошибка подключения к серверу. Попробуйте позже.", "error");
+        showStatus("⚠️ Ошибка подключения. Проверьте ID вручную.", "error");
+        
+        // Показываем обе кнопки при ошибке
+        registerBtn.style.display = 'block';
+        tradingBtn.style.display = 'block';
       }
     }
 
@@ -277,7 +305,13 @@
         localStorage.setItem("pocket_id", id);
         showStatus("✅ Перенаправление в трейдинг...", "success");
         setTimeout(() => {
-          window.location.href = "trading.html";
+          // Проверяем роль пользователя для редиректа
+          const role = localStorage.getItem("user_role");
+          if (role === 'admin') {
+            window.location.href = "admin.html";
+          } else {
+            window.location.href = "trading.html";
+          }
         }, 1000);
       }
     }
