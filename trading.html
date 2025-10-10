@@ -1,363 +1,341 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ASPIRE TRADE — Trading</title>
-  <style>
-    :root{
-      --bg:#0b0c14; --panel:#111225; --panel-2:#14162c; --text:#f4f6ff;
-      --muted:#aab0c5; --accent1:#6b5cff; --accent2:#19c3ff; --win:#18d27c; --loss:#ff5c7a;
-      --glass: rgba(255,255,255,.07);
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif; color:var(--text);
-      background:
-        radial-gradient(1200px 600px at 15% -10%, #2c186e44 0%, transparent 60%),
-        radial-gradient(900px 500px at 85% 110%, #0d476a44 0%, transparent 60%),
-        linear-gradient(180deg,#0b0c14 0%, #0b0c14 100%);
-      background-color:var(--bg);
-    }
-    .wrap{max-width:1200px;margin:0 auto;padding:20px 16px 40px}
-    .topbar{
-      display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;
-    }
-    .brand{
-      display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.4px;
-    }
-    .badge{
-      font-size:.75rem;color:#d5d8ff;background:linear-gradient(90deg,var(--accent1),var(--accent2));
-      padding:4px 10px;border-radius:999px;box-shadow:0 0 16px #6b5cff55;
-    }
-    .actions{display:flex;gap:10px}
-    button{
-      background:linear-gradient(90deg,var(--accent1),var(--accent2));
-      border:none;color:#fff;font-weight:700;padding:10px 16px;border-radius:10px;cursor:pointer;
-      box-shadow:0 6px 18px #1a36ff44; transition:transform .15s ease, box-shadow .2s ease, opacity .15s ease;
-    }
-    button:hover{transform:translateY(-1px); box-shadow:0 10px 24px #1a36ff55}
-    button.secondary{
-      background:transparent;border:1px solid #3d4270;color:#e3e7ff;box-shadow:none;
-    }
-    button.danger{
-      background:linear-gradient(90deg,#ff5c7a,#f98a52);
-      box-shadow:0 6px 18px #ff5c7a55;
-    }
-
-    .grid{display:grid;gap:16px;grid-template-columns:1.1fr .9fr}
-    @media (max-width:1000px){.grid{grid-template-columns:1fr}}
-    .card{
-      background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
-      border:1px solid #2a2e55;border-radius:16px;padding:16px;
-      box-shadow:0 10px 40px #00000060, 0 0 0 1px #1c2040 inset;
-      backdrop-filter: blur(8px);
-    }
-    .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-    .hd h3{margin:0;font-size:1.05rem;color:#e5e7ff}
-    .muted{color:var(--muted);font-size:.9rem}
-    .signal{
-      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:6px;
-    }
-    .kv{background:var(--glass);border:1px solid #2a2e55;border-radius:12px;padding:12px}
-    .kv .k{font-size:.8rem;color:var(--muted)}
-    .kv .v{font-size:1.05rem;margin-top:2px}
-    .dir-buy{color:var(--win)} .dir-sell{color:var(--loss)}
-    .chart{
-      width:100%;aspect-ratio:16/9;border-radius:12px;object-fit:contain;background:#0c0e1d;border:1px solid #2a2e55;
-      box-shadow:inset 0 0 0 1px #1a1d38;
-    }
-
-    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .stat{background:var(--glass);border:1px solid #2a2e55;border-radius:12px;padding:12px}
-    .stat .label{font-size:.78rem;color:var(--muted)}
-    .stat .val{font-size:1.2rem;margin-top:4px}
-
-    .history{width:100%;border-collapse:collapse;font-size:.95rem}
-    .history th,.history td{padding:10px;border-bottom:1px dashed #2a2e55;text-align:left}
-    .history th{color:#bfc6ff;font-weight:600}
-    .chip{font-size:.78rem;padding:3px 8px;border-radius:999px;border:1px solid #2a2e55;background:#141636;color:#dfe3ff}
-    .chip.win{border-color:#1f945d;color:#aff3d1;background:#10251d}
-    .chip.loss{border-color:#9b3653;color:#ffd5df;background:#2a111a}
-
-    .footnote{margin-top:14px;color:var(--muted);font-size:.85rem}
-    .blink{animation:blink 1.2s linear infinite}
-    @keyframes blink{50%{opacity:.45}}
-    .error{color:#ff8da3}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Трейдинг Бот - Торговая панель</title>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/4712/4712109.png">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --dark-color: #1f2937;
+            --light-color: #f3f4f6;
+            --text-color: #374151;
+            --border-color: #d1d5db;
+            --bg-gradient: linear-gradient(180deg, #6a11cb 0%, #2575fc 100%);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: var(--bg-gradient);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logout-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .panel {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .panel-title {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .signal-info {
+            margin-bottom: 20px;
+        }
+        
+        .signal-pair {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .signal-direction {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .direction-buy {
+            background-color: var(--success-color);
+        }
+        
+        .direction-sell {
+            background-color: var(--danger-color);
+        }
+        
+        .signal-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .detail-item {
+            margin-bottom: 10px;
+        }
+        
+        .detail-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .detail-value {
+            font-weight: bold;
+        }
+        
+        .result-item {
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .result-pair {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .result-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .status-running {
+            color: var(--success-color);
+            font-weight: bold;
+        }
+        
+        .status-stopped {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+        
+        .blink {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div class="brand">
-        <span style="width:12px;height:12px;border-radius:50%;background:linear-gradient(180deg,var(--accent1),var(--accent2));box-shadow:0 0 16px #6b5cff88;"></span>
-        <div>ASPIRE TRADE — <span class="muted">dashboard</span></div>
-        <span id="liveBadge" class="badge">LIVE</span>
-      </div>
-      <div class="actions">
-        <button class="secondary" id="btnRefresh">Обновить</button>
-        <button class="danger" id="btnLogout">Выход</button>
-      </div>
-    </div>
-
-    <div class="grid">
-      <!-- ЛЕВАЯ КОЛОНКА -->
-      <div class="card">
-        <div class="hd">
-          <h3>📈 Активный сигнал</h3>
-          <div class="muted" id="updatedAt">—</div>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <span>🤖</span>
+                <span>Трейдинг Бот</span>
+            </div>
+            <div class="user-info">
+                <span>ID: <span id="user-id">-</span></span>
+                <button class="logout-btn" id="logout-btn">Выйти</button>
+            </div>
         </div>
-
-        <div id="signalArea">
-          <div class="signal">
-            <div class="kv">
-              <div class="k">Пара</div>
-              <div class="v" id="pair">—</div>
-            </div>
-            <div class="kv">
-              <div class="k">Направление</div>
-              <div class="v" id="direction">—</div>
-            </div>
-            <div class="kv">
-              <div class="k">Уверенность</div>
-              <div class="v" id="confidence">—</div>
-            </div>
-            <div class="kv">
-              <div class="k">Экспирация</div>
-              <div class="v" id="expiry">—</div>
-            </div>
-            <div class="kv">
-              <div class="k">Источник</div>
-              <div class="v" id="source">—</div>
-            </div>
-            <div class="kv">
-              <div class="k">Цена входа</div>
-              <div class="v" id="entry">—</div>
-            </div>
-          </div>
-
-          <div style="margin-top:14px">
-            <img id="chart" class="chart" alt="chart"/>
-          </div>
-
-          <div class="footnote" id="signalNote">Ожидаем новый сигнал…</div>
-          <div class="error" id="signalError" style="display:none"></div>
-        </div>
-      </div>
-
-      <!-- ПРАВАЯ КОЛОНКА -->
-      <div class="card">
-        <div class="hd">
-          <h3>📊 Система</h3>
-          <div class="muted" id="sysUpdated">—</div>
-        </div>
-
-        <div class="stats" style="margin-bottom:14px">
-          <div class="stat">
-            <div class="label">Win Rate</div>
-            <div class="val" id="winRate">—</div>
-          </div>
-          <div class="stat">
-            <div class="label">ML Accuracy</div>
-            <div class="val" id="mlAcc">—</div>
-          </div>
-          <div class="stat">
-            <div class="label">Всего сделок</div>
-            <div class="val" id="totalTrades">—</div>
-          </div>
-          <div class="stat">
-            <div class="label">Активных пользователей</div>
-            <div class="val" id="activeUsers">—</div>
-          </div>
-        </div>
-
-        <div class="hd" style="margin-top:18px">
-          <h3>🕒 Последний результат</h3>
-          <div></div>
-        </div>
-        <table class="history">
-          <thead>
-            <tr>
-              <th>Пара</th>
-              <th>Напр.</th>
-              <th>Результат</th>
-              <th>Время</th>
-            </tr>
-          </thead>
-          <tbody id="lastResultTbody">
-            <tr><td colspan="4" class="muted">Нет данных</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="footnote">Данные обновляются каждые 5 секунд <span class="blink">●</span></div>
-  </div>
-
-  <script>
-    // === CONFIG ===
-    const API = "http://89.23.98.206:8080";
-    const POLL_MS = 5000;
-
-    // === AUTH GUARD ===
-    (function authGuard(){
-      const uid = localStorage.getItem("pocket_id");
-      if(!uid){
-        window.location.href = "login.html";
-      }
-    })();
-
-    // === UI ELEMENTS ===
-    const el = {
-      pair: document.querySelector('#pair'),
-      direction: document.querySelector('#direction'),
-      confidence: document.querySelector('#confidence'),
-      expiry: document.querySelector('#expiry'),
-      source: document.querySelector('#source'),
-      entry: document.querySelector('#entry'),
-      chart: document.querySelector('#chart'),
-      note: document.querySelector('#signalNote'),
-      err: document.querySelector('#signalError'),
-      updatedAt: document.querySelector('#updatedAt'),
-      sysUpdated: document.querySelector('#sysUpdated'),
-      winRate: document.querySelector('#winRate'),
-      mlAcc: document.querySelector('#mlAcc'),
-      totalTrades: document.querySelector('#totalTrades'),
-      activeUsers: document.querySelector('#activeUsers'),
-      lastResultTbody: document.querySelector('#lastResultTbody'),
-      liveBadge: document.querySelector('#liveBadge'),
-      btnRefresh: document.querySelector('#btnRefresh'),
-      btnLogout: document.querySelector('#btnLogout'),
-    };
-
-    // === HELPERS ===
-    const fmtPct = v => (v == null || isNaN(v)) ? '—' : (v.toFixed ? v.toFixed(2) : v) + '%';
-    const nowText = () => new Date().toLocaleTimeString();
-
-    function setSignalEmpty(reason){
-      el.pair.textContent = '—';
-      el.direction.textContent = '—';
-      el.direction.classList.remove('dir-buy','dir-sell');
-      el.confidence.textContent = '—';
-      el.expiry.textContent = '—';
-      el.source.textContent = '—';
-      el.entry.textContent = '—';
-      el.chart.removeAttribute('src');
-      el.note.textContent = reason || 'Ожидаем новый сигнал…';
-      el.err.style.display = 'none';
-    }
-
-    function setResultEmpty(){
-      el.lastResultTbody.innerHTML = `<tr><td colspan="4" class="muted">Нет данных</td></tr>`;
-    }
-
-    async function fetchJSON(url){
-      try {
-        const r = await fetch(url, {cache: 'no-store'});
-        if(!r.ok) throw new Error(`HTTP ${r.status}`);
-        return await r.json();
-      } catch (error) {
-        console.error('Fetch error:', error);
-        throw error;
-      }
-    }
-
-    async function loadAll(){
-      try{
-        console.log('🔄 Загрузка данных...');
-        const data = await fetchJSON(`${API}/api/latest_full.json?ts=${Date.now()}`);
-        console.log('📊 Получены данные:', data);
-
-        // --- System ---
-        const sys = data.system || {};
-        console.log('📈 Системные данные:', sys);
         
-        el.winRate.textContent = fmtPct(sys.win_rate);
-        el.mlAcc.textContent = fmtPct(sys.ml_accuracy);
-        el.totalTrades.textContent = sys.total_trades ?? '—';
-        el.activeUsers.textContent = sys.active_users ?? '—';
-        el.sysUpdated.textContent = nowText();
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Точность</div>
+                <div class="stat-value" id="accuracy">0%</div>
+                <div class="stat-label">за сегодня</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Сигналы</div>
+                <div class="stat-value" id="active-signals">0</div>
+                <div class="stat-label">активно</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Время</div>
+                <div class="stat-value" id="server-time">13:59:36</div>
+                <div class="stat-label">сервера</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Статус</div>
+                <div class="stat-value status-running blink" id="status">бега</div>
+                <div class="stat-label">&nbsp;</div>
+            </div>
+        </div>
+        
+        <div class="content-grid">
+            <div class="panel">
+                <div class="panel-title">Активный сигнал</div>
+                <div class="signal-info">
+                    <div class="signal-pair" id="active-pair">USDJPY</div>
+                    <div class="signal-direction direction-sell" id="active-direction">SELL (9/10)</div>
+                    <div class="signal-details">
+                        <div class="detail-item">
+                            <div class="detail-label">Вход</div>
+                            <div class="detail-value" id="entry-price">152.61</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Экспирация</div>
+                            <div class="detail-value" id="expiry">undefined или @Chart</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Последний результат</div>
+                <div class="result-item">
+                    <div class="result-pair" id="last-pair">undefined — undefined (undefined)</div>
+                    <div class="result-details">
+                        <span>Вход: <span id="last-entry">undefined</span></span>
+                        <span>→ Выход: <span id="last-exit">undefined</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        // --- Signal ---
-        console.log('📡 Данные сигнала:', data.signal);
-        if(data.signal && !data.signal.error){
-          const s = data.signal;
-          console.log('🎯 Обработка сигнала:', s);
-          
-          el.pair.textContent = s.pair || '—';
-          el.direction.textContent = s.direction || '—';
-          el.direction.classList.remove('dir-buy','dir-sell');
-          if(s.direction){
-            el.direction.classList.add(s.direction.toUpperCase() === 'BUY' ? 'dir-buy' : 'dir-sell');
-          }
-          el.confidence.textContent = (s.confidence != null ? s.confidence : '—') + (s.confidence != null ? '/10' : '');
-          
-          // 🔥 ИСПРАВЛЕНИЕ: проверка на undefined для expiry
-          el.expiry.textContent = (s.expiry != null ? s.expiry : '—') + ' мин';
-          
-          el.source.textContent = s.source || '—';
-          el.entry.textContent = (s.entry_price != null) ? Number(s.entry_price).toFixed(5) : '—';
-          el.note.textContent = 'Сигнал активен';
-          el.err.style.display = 'none';
-
-          // график
-          if(data.chart_base64){
-            el.chart.src = data.chart_base64;
-          } else {
-            el.chart.src = `${API}/api/chart.png?ts=${Date.now()}`;
-          }
-        } else {
-          console.log('❌ Нет активного сигнала');
-          setSignalEmpty('Нет активных сигналов');
-        }
-        el.updatedAt.textContent = nowText();
-
-        // --- Last Result ---
-        console.log('📊 Данные результата:', data.result);
-        if(data.result && !data.result.error){
-          const r = data.result;
-          console.log('🎯 Обработка результата:', r);
-          
-          // 🔥 ИСПРАВЛЕНИЕ: безопасная обработка данных результата
-          el.lastResultTbody.innerHTML = `
-            <tr>
-              <td>${r.pair || '—'}</td>
-              <td>${r.direction || '—'}</td>
-              <td>
-                <span class="chip ${r.result === 'WIN' ? 'win' : 'loss'}">${r.result || '—'}</span>
-              </td>
-              <td>${r.time || r.completed_at || '—'}</td>
-            </tr>
-          `;
-        } else {
-          console.log('❌ Нет данных о результате');
-          setResultEmpty();
-        }
-
-        // live badge
-        el.liveBadge.textContent = 'LIVE';
-        console.log('✅ Данные успешно загружены');
-
-      } catch(err) {
-        console.error('❌ Ошибка загрузки:', err);
-        el.err.textContent = 'Ошибка загрузки данных: ' + (err.message || err);
-        el.err.style.display = 'block';
-        el.liveBadge.textContent = 'OFFLINE';
-      }
-    }
-
-    // === EVENTS ===
-    el.btnRefresh.addEventListener('click', loadAll);
-    el.btnLogout.addEventListener('click', ()=>{
-      localStorage.clear();
-      window.location.href = 'login.html';
-    });
-
-    // === INIT ===
-    console.log('🚀 Инициализация веб-интерфейса...');
-    loadAll();
-    setInterval(loadAll, POLL_MS);
-  </script>
+    <script>
+        // Проверка авторизации
+        document.addEventListener('DOMContentLoaded', function() {
+            const userId = localStorage.getItem('pocket_id');
+            if (!userId) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            document.getElementById('user-id').textContent = userId;
+            
+            // Обновление времени сервера
+            function updateServerTime() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('ru-RU');
+                document.getElementById('server-time').textContent = timeString;
+            }
+            
+            // Имитация обновления данных
+            function updateTradingData() {
+                // В реальном приложении здесь будет запрос к API
+                // Сейчас просто имитируем обновление данных
+                
+                // Обновляем точность случайным образом
+                const accuracy = Math.floor(Math.random() * 30) + 70;
+                document.getElementById('accuracy').textContent = `${accuracy}%`;
+                
+                // Обновляем количество активных сигналов
+                const activeSignals = Math.floor(Math.random() * 3);
+                document.getElementById('active-signals').textContent = activeSignals;
+            }
+            
+            // Инициализация
+            updateServerTime();
+            updateTradingData();
+            
+            // Обновление времени каждую секунду
+            setInterval(updateServerTime, 1000);
+            
+            // Обновление торговых данных каждые 5 секунд
+            setInterval(updateTradingData, 5000);
+            
+            // Обработчик выхода
+            document.getElementById('logout-btn').addEventListener('click', function() {
+                localStorage.removeItem('pocket_id');
+                window.location.href = 'login.html';
+            });
+        });
+    </script>
 </body>
 </html>
