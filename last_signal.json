@@ -1,11 +1,11 @@
 {
   "confidence": 10,
-  "direction": "SELL",
-  "entry_price": 0.6543,
+  "direction": "BUY",
+  "entry_price": 0.93221,
   "error": null,
   "expiry": 1,
-  "pair": "AUDUSD",
+  "pair": "EURCHF",
   "source": "live_bot",
-  "timestamp": "2025-10-10T17:41:15.550424",
-  "last_updated": "2025-10-10T14:41:20.954135"
+  "timestamp": "2025-10-10T17:51:21.939941",
+  "last_updated": "2025-10-10T14:51:37.702969"
 }
