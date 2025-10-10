@@ -580,180 +580,313 @@
         </div>
     </div>
 
-        <script>
-// Конфигурация API
-const API_BASE = "https://niktradestart-gif.github.io/trading-bot-webapp";
-const BOT_API = "http://89.23.98.206:8080";
-
-// Проверка авторизации
-document.addEventListener('DOMContentLoaded', function() {
-    const userId = localStorage.getItem('pocket_id');
-    if (!userId) {
-        window.location.href = 'login.html';
-        return;
-    }
-    
-    // Безопасное получение элементов
-    const getElement = (id) => document.getElementById(id) || console.error(`Element not found: ${id}`);
-    
-    const elements = {
-        accuracy: getElement('accuracy'),
-        activeSignals: getElement('active-signals'),
-        serverTime: getElement('server-time'),
-        status: getElement('status'),
-        statusBadge: getElement('status-badge'),
-        signalContainer: getElement('signal-container'),
-        resultContainer: getElement('result-container'),
-        noSignal: getElement('no-signal'),
-        signalTradeId: getElement('signal-trade-id'),
-        signalType: getElement('signal-type'),
-        signalPair: getElement('signal-pair'),
-        signalDirection: getElement('signal-direction'),
-        signalEntry: getElement('signal-entry'),
-        signalExpiry: getElement('signal-expiry'),
-        signalConfidence: getElement('signal-confidence'),
-        signalSource: getElement('signal-source'),
-        signalCountdown: getElement('signal-countdown'),
-        resultPair: getElement('result-pair'),
-        resultDirection: getElement('result-direction'),
-        resultEntry: getElement('result-entry'),
-        resultExit: getElement('result-exit'),
-        resultOutcome: getElement('result-outcome'),
-        statTotal: getElement('stat-total'),
-        statWins: getElement('stat-wins'),
-        statLosses: getElement('stat-losses'),
-        winRate: getElement('win-rate'),
-        chartPlaceholder: getElement('chart-placeholder'),
-        chartImage: getElement('chart-image'),
-        chartUpdate: getElement('chart-update'),
-        historyList: getElement('history-list'),
-        signalUpdate: getElement('signal-update'),
-        historyUpdate: getElement('history-update'),
-        userId: getElement('user-id')
-    };
-
-    // Показываем ID пользователя
-    if (elements.userId) elements.userId.textContent = userId;
-    
-    let currentPair = null;
-
-    // Обновление времени сервера
-    function updateServerTime() {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('ru-RU');
-        if (elements.serverTime) elements.serverTime.textContent = timeString;
-    }
-
-    // Загрузка графика - УПРОЩЕННАЯ
-    function loadChart(pair) {
-        if (!pair || !elements.chartImage || !elements.chartPlaceholder) return;
+    <script>
+        // Конфигурация API
+        const API_BASE = "https://niktradestart-gif.github.io/trading-bot-webapp";
+        const BOT_API = "http://89.23.98.206:8080";
         
-        const chartUrl = `${BOT_API}/charts/smc_chart_${pair}_latest.png?ts=${Date.now()}`;
-        console.log(`📈 Загрузка графика: ${chartUrl}`);
-        
-        // Сбрасываем предыдущие обработчики
-        elements.chartImage.onload = null;
-        elements.chartImage.onerror = null;
-        
-        elements.chartImage.onload = function() {
-            console.log('✅ График загружен');
-            if (elements.chartPlaceholder) elements.chartPlaceholder.style.display = 'none';
-            if (elements.chartImage) elements.chartImage.style.display = 'block';
-            if (elements.chartUpdate) elements.chartUpdate.textContent = `активно: ${pair}`;
-        };
-        
-        elements.chartImage.onerror = function() {
-            console.log('❌ График не загружен');
-            if (elements.chartPlaceholder) {
-                elements.chartPlaceholder.innerHTML = `📊 График ${pair} готовится...`;
-                elements.chartPlaceholder.style.display = 'flex';
+        // Проверка авторизации
+        document.addEventListener('DOMContentLoaded', function() {
+            const userId = localStorage.getItem('pocket_id');
+            if (!userId) {
+                window.location.href = 'login.html';
+                return;
             }
-            if (elements.chartImage) elements.chartImage.style.display = 'none';
-        };
-        
-        elements.chartImage.src = chartUrl;
-        currentPair = pair;
-    }
-
-    // Остальные функции с проверками
-    function showState(state) {
-        if (!elements.signalContainer || !elements.resultContainer || !elements.noSignal) return;
-        
-        elements.signalContainer.style.display = 'none';
-        elements.resultContainer.style.display = 'none';
-        elements.noSignal.style.display = 'none';
-        
-        switch(state) {
-            case 'active_signal':
-                elements.signalContainer.style.display = 'block';
-                break;
-            case 'trade_result':
-                elements.resultContainer.style.display = 'block';
-                break;
-            default:
-                elements.noSignal.style.display = 'block';
-        }
-    }
-
-    async function fetchTradingData() {
-        try {
-            const [systemResponse, signalResponse, resultResponse] = await Promise.all([
-                fetch(`${API_BASE}/system_status.json?ts=${Date.now()}`),
-                fetch(`${API_BASE}/last_signal.json?ts=${Date.now()}`),
-                fetch(`${API_BASE}/last_result.json?ts=${Date.now()}`)
-            ]);
             
-            const systemData = systemResponse.ok ? await systemResponse.json() : null;
-            const signalData = signalResponse.ok ? await signalResponse.json() : null;
-            const resultData = resultResponse.ok ? await resultResponse.json() : null;
+            document.getElementById('user-id').textContent = userId;
             
-            updateUI({
-                system: systemData,
-                signal: signalData,
-                result: resultData,
-                history: []
+            // Элементы DOM
+            const elements = {
+                // Статистика
+                accuracy: document.getElementById('accuracy'),
+                activeSignals: document.getElementById('active-signals'),
+                serverTime: document.getElementById('server-time'),
+                status: document.getElementById('status'),
+                statusBadge: document.getElementById('status-badge'),
+                
+                // Контейнеры
+                signalContainer: document.getElementById('signal-container'),
+                resultContainer: document.getElementById('result-container'),
+                noSignal: document.getElementById('no-signal'),
+                
+                // Активный сигнал
+                signalTradeId: document.getElementById('signal-trade-id'),
+                signalType: document.getElementById('signal-type'),
+                signalPair: document.getElementById('signal-pair'),
+                signalDirection: document.getElementById('signal-direction'),
+                signalEntry: document.getElementById('signal-entry'),
+                signalExpiry: document.getElementById('signal-expiry'),
+                signalConfidence: document.getElementById('signal-confidence'),
+                signalSource: document.getElementById('signal-source'),
+                signalCountdown: document.getElementById('signal-countdown'),
+                
+                // Результат сделки
+                resultPair: document.getElementById('result-pair'),
+                resultDirection: document.getElementById('result-direction'),
+                resultEntry: document.getElementById('result-entry'),
+                resultExit: document.getElementById('result-exit'),
+                resultOutcome: document.getElementById('result-outcome'),
+                statTotal: document.getElementById('stat-total'),
+                statWins: document.getElementById('stat-wins'),
+                statLosses: document.getElementById('stat-losses'),
+                winRate: document.getElementById('win-rate'),
+                
+                // График
+                chartPlaceholder: document.getElementById('chart-placeholder'),
+                chartImage: document.getElementById('chart-image'),
+                chartUpdate: document.getElementById('chart-update'),
+                
+                // История
+                historyList: document.getElementById('history-list'),
+                
+                // Время обновления
+                signalUpdate: document.getElementById('signal-update'),
+                historyUpdate: document.getElementById('history-update')
+            };
+            
+            // Текущее состояние
+            let currentState = 'no_signal';
+            let currentPair = null;
+
+            // Обновление времени сервера
+            function updateServerTime() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('ru-RU');
+                elements.serverTime.textContent = timeString;
+            }
+            
+            // Переключение состояний
+            function showState(state) {
+                elements.signalContainer.style.display = 'none';
+                elements.resultContainer.style.display = 'none';
+                elements.noSignal.style.display = 'none';
+                
+                currentState = state;
+                
+                switch(state) {
+                    case 'active_signal':
+                        elements.signalContainer.style.display = 'block';
+                        break;
+                    case 'trade_result':
+                        elements.resultContainer.style.display = 'block';
+                        break;
+                    default:
+                        elements.noSignal.style.display = 'block';
+                }
+            }
+            
+            // Форматирование чисел
+            function formatPrice(price) {
+                if (!price || isNaN(price)) return '—';
+                return Number(price).toFixed(5);
+            }
+            
+            // Загрузка графика - УПРОЩЕННАЯ ВЕРСИЯ
+            function loadChart(pair) {
+                if (!pair) {
+                    elements.chartImage.style.display = 'none';
+                    elements.chartPlaceholder.style.display = 'flex';
+                    elements.chartPlaceholder.innerHTML = `
+                        <div>📊 Ожидание торгового сигнала</div>
+                        <div style="font-size: 0.9rem;">График появится здесь</div>
+                    `;
+                    return;
+                }
+                
+                const chartUrl = `${BOT_API}/charts/smc_chart_${pair}_latest.png?ts=${Date.now()}`;
+                console.log(`📈 Загрузка графика: ${chartUrl}`);
+                
+                elements.chartImage.onload = function() {
+                    console.log('✅ График загружен');
+                    elements.chartPlaceholder.style.display = 'none';
+                    elements.chartImage.style.display = 'block';
+                    elements.chartUpdate.textContent = `активно: ${pair}`;
+                };
+                
+                elements.chartImage.onerror = function() {
+                    console.log('❌ График не загружен');
+                    elements.chartImage.style.display = 'none';
+                    elements.chartPlaceholder.style.display = 'flex';
+                    elements.chartPlaceholder.innerHTML = `
+                        <div>📊 График готовится...</div>
+                        <div style="font-size: 0.9rem;">Пара: ${pair}</div>
+                    `;
+                };
+                
+                elements.chartImage.src = chartUrl;
+                currentPair = pair;
+            }
+            
+            // Получение данных с API
+            async function fetchTradingData() {
+                try {
+                    console.log('🔄 Загрузка данных с API...');
+                    
+                    const [systemResponse, signalResponse, resultResponse] = await Promise.all([
+                        fetch(`${API_BASE}/system_status.json?ts=${Date.now()}`),
+                        fetch(`${API_BASE}/last_signal.json?ts=${Date.now()}`),
+                        fetch(`${API_BASE}/last_result.json?ts=${Date.now()}`)
+                    ]);
+                    
+                    const systemData = systemResponse.ok ? await systemResponse.json() : null;
+                    const signalData = signalResponse.ok ? await signalResponse.json() : null;
+                    const resultData = resultResponse.ok ? await resultResponse.json() : null;
+                    
+                    console.log('📊 Получены данные:', { signal: signalData, result: resultData });
+                    
+                    const data = {
+                        system: systemData,
+                        signal: signalData,
+                        result: resultData,
+                        history: []
+                    };
+                    
+                    updateUI(data);
+                    elements.statusBadge.textContent = 'LIVE';
+                    elements.statusBadge.style.background = 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))';
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка загрузки данных:', error);
+                    elements.statusBadge.textContent = 'OFFLINE';
+                    elements.statusBadge.style.background = 'linear-gradient(135deg, #ff5c7a, #ff8e53)';
+                }
+            }
+            
+            // Обновление интерфейса
+            function updateUI(data) {
+                const now = new Date().toLocaleTimeString('ru-RU');
+                
+                // Обновление статистики
+                if (data.system) {
+                    elements.accuracy.textContent = `${Math.round(data.system.win_rate || 0)}%`;
+                    elements.activeSignals.textContent = data.system.active_signals || '0';
+                    elements.status.textContent = data.system.status || 'бета';
+                }
+                
+                // Определяем что показывать
+                const hasSignal = data.signal && !data.signal.error && data.signal.pair;
+                const hasResult = data.result && !data.result.error && data.result.pair;
+                
+                if (hasSignal) {
+                    showActiveSignal(data.signal, data.system);
+                    elements.signalUpdate.textContent = `обновлено: ${now}`;
+                } else if (hasResult) {
+                    showTradeResult(data.result, data.system);
+                    elements.signalUpdate.textContent = `обновлено: ${now}`;
+                } else {
+                    showState('no_signal');
+                    elements.signalUpdate.textContent = 'нет активных сигналов';
+                }
+                
+                // Обновление истории
+                updateHistory(data.history || []);
+                elements.historyUpdate.textContent = `обновлено: ${now}`;
+            }
+            
+            // Показать активный сигнал
+            function showActiveSignal(signal, system) {
+                showState('active_signal');
+                
+                elements.signalTradeId.textContent = `🎯 СДЕЛКА #${signal.trade_id || system.total_trades || '—'}`;
+                elements.signalPair.textContent = signal.pair || '—';
+                elements.signalEntry.textContent = formatPrice(signal.entry_price);
+                elements.signalExpiry.textContent = signal.expiry ? `${signal.expiry} мин` : '—';
+                elements.signalConfidence.textContent = signal.confidence ? `${signal.confidence}/10` : '—/10';
+                elements.signalSource.textContent = signal.source || 'ENHANCED_SMART_MONEY';
+                
+                if (signal.direction) {
+                    const direction = signal.direction.toUpperCase();
+                    elements.signalDirection.textContent = `${direction} (${signal.confidence || '?'}/10)`;
+                    elements.signalDirection.className = `signal-direction direction-${signal.direction.toLowerCase()}`;
+                }
+                
+                // Таймер обратного отсчета
+                if (signal.expiry) {
+                    elements.signalCountdown.textContent = `Сделка открыта! Результат через ${signal.expiry} минут...`;
+                }
+                
+                // Загрузка графика
+                if (signal.pair && signal.pair !== currentPair) {
+                    currentPair = signal.pair;
+                    loadChart(signal.pair);
+                }
+            }
+            
+            // Показать результат сделки
+            function showTradeResult(result, system) {
+                showState('trade_result');
+                
+                elements.resultPair.textContent = result.pair || '—';
+                elements.resultEntry.textContent = formatPrice(result.entry_price);
+                elements.resultExit.textContent = formatPrice(result.exit_price);
+                elements.resultOutcome.textContent = result.result || '—';
+                
+                if (result.direction) {
+                    const direction = result.direction.toUpperCase();
+                    elements.resultDirection.textContent = direction;
+                    elements.resultDirection.className = `signal-direction direction-${result.direction.toLowerCase()}`;
+                }
+                
+                // Статистика
+                elements.statTotal.textContent = system.total_trades || '—';
+                elements.statWins.textContent = system.total_wins || '—';
+                elements.statLosses.textContent = system.total_losses || '—';
+                elements.winRate.textContent = system.win_rate ? `${system.win_rate}%` : '—%';
+                
+                // Загрузка графика для последней пары
+                if (result.pair && result.pair !== currentPair) {
+                    currentPair = result.pair;
+                    loadChart(result.pair);
+                }
+            }
+            
+            // Обновление истории
+            function updateHistory(history) {
+                if (!history || history.length === 0) {
+                    elements.historyList.innerHTML = '<div class="no-data">Нет данных о сделках</div>';
+                    return;
+                }
+                
+                const historyHTML = history.slice(0, 8).map(trade => `
+                    <div class="history-item">
+                        <div class="history-header">
+                            <div class="history-pair">${trade.pair || '—'}</div>
+                            <div class="history-direction direction-${(trade.direction || '').toLowerCase()}">
+                                ${(trade.direction || '—').toUpperCase()}
+                            </div>
+                        </div>
+                        <div class="history-details">
+                            <div>
+                                <div>Вход: ${formatPrice(trade.entry_price)}</div>
+                                <div>Выход: ${formatPrice(trade.exit_price)}</div>
+                            </div>
+                            <div class="history-profit ${trade.result === 'WIN' ? 'profit-positive' : 'profit-negative'}">
+                                ${trade.result || '—'}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                elements.historyList.innerHTML = historyHTML;
+            }
+            
+            // Инициализация
+            updateServerTime();
+            fetchTradingData();
+            
+            // Обновление времени каждую секунду
+            setInterval(updateServerTime, 1000);
+            
+            // Обновление торговых данных каждые 5 секунд
+            setInterval(fetchTradingData, 5000);
+            
+            // Обработчики кнопок
+            document.getElementById('refresh-btn').addEventListener('click', fetchTradingData);
+            document.getElementById('logout-btn').addEventListener('click', function() {
+                localStorage.removeItem('pocket_id');
+                window.location.href = 'login.html';
             });
-            
-        } catch (error) {
-            console.error('❌ Ошибка загрузки данных:', error);
-        }
-    }
-
-    function updateUI(data) {
-        if (!data) return;
-        
-        // Безопасное обновление элементов
-        if (data.system) {
-            if (elements.accuracy) elements.accuracy.textContent = `${Math.round(data.system.win_rate || 0)}%`;
-            if (elements.activeSignals) elements.activeSignals.textContent = data.system.active_signals || '0';
-            if (elements.status) elements.status.textContent = data.system.status || 'бета';
-        }
-        
-        const hasSignal = data.signal && !data.signal.error && data.signal.pair;
-        const hasResult = data.result && !data.result.error && data.result.pair;
-        
-        if (hasSignal) {
-            showActiveSignal(data.signal, data.system);
-        } else if (hasResult) {
-            showTradeResult(data.result, data.system);
-        } else {
-            showState('no_signal');
-        }
-    }
-
-    function showActiveSignal(signal, system) {
-        showState('active_signal');
-        
-        if (elements.signalPair && signal.pair) {
-            elements.signalPair.textContent = signal.pair;
-            loadChart(signal.pair);
-        }
-    }
-
-    // Инициализация
-    updateServerTime();
-    fetchTradingData();
-    setInterval(updateServerTime, 1000);
-    setInterval(fetchTradingData, 5000);
-});
+        });
     </script>
+</body>
+</html>
