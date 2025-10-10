@@ -20,7 +20,7 @@
       background: #fff;
       border-radius: 14px;
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-      width: 360px;
+      width: 380px;
       padding: 32px 28px;
       text-align: center;
       animation: fadeIn 0.8s ease both;
@@ -48,7 +48,7 @@
       background: #e7f7ff;
       border: 1px solid #c2ecff;
       border-radius: 8px;
-      padding: 10px;
+      padding: 12px;
       font-size: 0.85em;
       color: #333;
       text-align: left;
@@ -56,11 +56,16 @@
     }
     input {
       width: 100%;
-      padding: 10px;
+      padding: 12px;
       border-radius: 8px;
       border: 1px solid #ccc;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
       font-size: 1em;
+      transition: border 0.3s;
+    }
+    input:focus {
+      border-color: #4facfe;
+      outline: none;
     }
     button {
       width: 100%;
@@ -73,19 +78,45 @@
       font-weight: 600;
       cursor: pointer;
       transition: 0.3s;
+      margin-bottom: 8px;
     }
     button:hover {
       background: linear-gradient(90deg, #00f2fe, #4facfe);
       transform: translateY(-2px);
     }
-    .verified {
+    .btn-register {
+      background: linear-gradient(90deg, #ff5722, #ff784e);
+    }
+    .btn-register:hover {
+      background: linear-gradient(90deg, #ff784e, #ff5722);
+    }
+    .btn-trading {
+      background: linear-gradient(90deg, #00d26a, #00f2a1);
+    }
+    .btn-trading:hover {
+      background: linear-gradient(90deg, #00f2a1, #00d26a);
+    }
+    .status-box {
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      display: none;
+      font-weight: 500;
+    }
+    .status-success {
       background: #e9ffe9;
       color: #1e7b1e;
       border: 1px solid #8be18b;
-      border-radius: 8px;
-      padding: 8px;
-      margin-bottom: 12px;
-      display: none;
+    }
+    .status-error {
+      background: #ffe9e9;
+      color: #7b1e1e;
+      border: 1px solid #e18b8b;
+    }
+    .status-info {
+      background: #e9f7ff;
+      color: #1e5a7b;
+      border: 1px solid #8bc4e1;
     }
     footer {
       text-align: center;
@@ -104,7 +135,24 @@
       margin-left: 5px;
       transition: 0.3s;
     }
-    .pocket-link:hover { background: #ff784e; }
+    .pocket-link:hover { 
+      background: #ff784e; 
+      transform: translateY(-1px);
+    }
+    .loader {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #4facfe;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -122,36 +170,134 @@
       3️⃣ Ваш ID указан в формате: <b>69662105</b>
     </div>
 
-    <input id="pocketId" type="text" placeholder="ID аккаунта Pocket Option" />
+    <input id="pocketId" type="text" placeholder="Введите ваш ID Pocket Option" />
 
-    <div id="verifiedBox" class="verified">✅ ID подтвержден!</div>
+    <div id="statusBox" class="status-box"></div>
 
-    <button onclick="verifyId()">🔍 Проверить ID</button>
-    <button id="goBtn" style="display:none;margin-top:8px;" onclick="goToTrading()">🚀 Перейти в трейдинг</button>
+    <button onclick="verifyId()">
+      <span id="btnText">🔍 Проверить ID</span>
+      <div id="loader" class="loader"></div>
+    </button>
+
+    <button id="registerBtn" class="btn-register" style="display:none;" onclick="registerUser()">
+      📝 Зарегистрироваться
+    </button>
+
+    <button id="tradingBtn" class="btn-trading" style="display:none;" onclick="goToTrading()">
+      🚀 Перейти в трейдинг
+    </button>
 
     <footer>
-      Трейдинг Бот • Pocket Option Auth v1.0<br>
+      Трейдинг Бот • Pocket Option Auth v2.0<br>
       Только для зарегистрированных пользователей 
       <a href="https://pocket-friends.com/r/0qrjewbjlf" target="_blank" class="pocket-link">POCKET</a>
     </footer>
   </div>
 
   <script>
-    function verifyId() {
+    const POCKET_REF_LINK = "https://pocket-friends.com/r/0qrjewbjlf";
+    const USERS_API = "http://89.23.98.206:8080/api/pocket_users.json";
+
+    async function verifyId() {
       const id = document.getElementById("pocketId").value.trim();
+      const statusBox = document.getElementById("statusBox");
+      const btnText = document.getElementById("btnText");
+      const loader = document.getElementById("loader");
+      const registerBtn = document.getElementById("registerBtn");
+      const tradingBtn = document.getElementById("tradingBtn");
+
+      // Сброс состояний
+      statusBox.style.display = 'none';
+      registerBtn.style.display = 'none';
+      tradingBtn.style.display = 'none';
+
       if (!id || id.length < 6) {
-        alert("Введите корректный ID Pocket Option!");
+        showStatus("Введите корректный ID Pocket Option!", "error");
         return;
       }
-      document.getElementById("verifiedBox").style.display = "block";
-      document.getElementById("goBtn").style.display = "inline-block";
+
+      // Показываем загрузку
+      btnText.style.display = 'none';
+      loader.style.display = 'block';
+
+      try {
+        // Загружаем список пользователей
+        const response = await fetch(`${USERS_API}?ts=${Date.now()}`);
+        if (!response.ok) {
+          throw new Error('Ошибка загрузки данных');
+        }
+
+        const usersData = await response.json();
+        const users = usersData.users || [];
+
+        // Проверяем наличие ID в списке
+        const userExists = users.some(user => user.user_id === id);
+
+        // Скрываем загрузку
+        btnText.style.display = 'block';
+        loader.style.display = 'none';
+
+        if (userExists) {
+          showStatus("✅ ID подтвержден! Вы зарегистрированы в системе.", "success");
+          tradingBtn.style.display = 'block';
+        } else {
+          showStatus("❌ ID не найден в системе. Требуется регистрация.", "error");
+          registerBtn.style.display = 'block';
+        }
+
+      } catch (error) {
+        console.error('Ошибка проверки ID:', error);
+        btnText.style.display = 'block';
+        loader.style.display = 'none';
+        showStatus("⚠️ Ошибка подключения к серверу. Попробуйте позже.", "error");
+      }
+    }
+
+    function showStatus(message, type) {
+      const statusBox = document.getElementById("statusBox");
+      statusBox.textContent = message;
+      statusBox.className = `status-box status-${type}`;
+      statusBox.style.display = 'block';
+    }
+
+    function registerUser() {
+      const id = document.getElementById("pocketId").value.trim();
+      if (id) {
+        showStatus("🔗 Перенаправление на регистрацию...", "info");
+        setTimeout(() => {
+          window.open(POCKET_REF_LINK, '_blank');
+          showStatus("📝 После регистрации вернитесь и проверьте ID снова.", "info");
+        }, 1000);
+      }
     }
 
     function goToTrading() {
       const id = document.getElementById("pocketId").value.trim();
-      localStorage.setItem("pocket_id", id);
-      window.location.href = "trading.html";
+      if (id) {
+        localStorage.setItem("pocket_id", id);
+        showStatus("✅ Перенаправление в трейдинг...", "success");
+        setTimeout(() => {
+          window.location.href = "trading.html";
+        }, 1000);
+      }
     }
+
+    // Автопроверка если ID уже в localStorage
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedId = localStorage.getItem("pocket_id");
+      if (savedId) {
+        document.getElementById("pocketId").value = savedId;
+        // Автоматически проверяем сохраненный ID
+        setTimeout(verifyId, 500);
+      }
+    });
+
+    // Enter для проверки
+    document.getElementById("pocketId").addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        verifyId();
+      }
+    });
   </script>
 </body>
 </html>
