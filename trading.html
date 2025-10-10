@@ -582,7 +582,7 @@
 
     <script>
         // Конфигурация API
-        const API_BASE = "http://89.23.98.206:8080";
+        const API_BASE = "https://niktradestart-gif.github.io/trading-bot-webapp";
         
         // Проверка авторизации
         document.addEventListener('DOMContentLoaded', function() {
@@ -683,7 +683,7 @@
                 try {
                     console.log('🔄 Загрузка данных с API...');
                     
-                    const response = await fetch(`${API_BASE}/api/latest_full.json?ts=${Date.now()}`);
+                    const response = await fetch(`${API_BASE}/last_signal.json?ts=${Date.now()}`);
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     
                     const data = await response.json();
