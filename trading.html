@@ -643,8 +643,8 @@
             };
             
             // Текущее состояние
-            let currentState = 'no_signal'; // no_signal, active_signal, trade_result
-            
+            let currentState = 'no_signal';
+
             // Обновление времени сервера
             function updateServerTime() {
                 const now = new Date();
@@ -683,11 +683,30 @@
                 try {
                     console.log('🔄 Загрузка данных с API...');
                     
-                    const response = await fetch(`${API_BASE}/last_signal.json?ts=${Date.now()}`);
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    // Загружаем все файлы параллельно
+                    const [systemResponse, signalResponse, resultResponse] = await Promise.all([
+                        fetch(`${API_BASE}/system_status.json?ts=${Date.now()}`),
+                        fetch(`${API_BASE}/last_signal.json?ts=${Date.now()}`),
+                        fetch(`${API_BASE}/last_result.json?ts=${Date.now()}`)
+                    ]);
                     
-                    const data = await response.json();
-                    console.log('📊 Получены данные:', data);
+                    const systemData = systemResponse.ok ? await systemResponse.json() : null;
+                    const signalData = signalResponse.ok ? await signalResponse.json() : null;
+                    const resultData = resultResponse.ok ? await resultResponse.json() : null;
+                    
+                    console.log('📊 Получены данные:', {
+                        system: systemData,
+                        signal: signalData, 
+                        result: resultData
+                    });
+                    
+                    // Собираем данные в один объект
+                    const data = {
+                        system: systemData,
+                        signal: signalData,
+                        result: resultData,
+                        history: [] // временно пустая история
+                    };
                     
                     updateUI(data);
                     elements.statusBadge.textContent = 'LIVE';
@@ -697,7 +716,42 @@
                     console.error('❌ Ошибка загрузки данных:', error);
                     elements.statusBadge.textContent = 'OFFLINE';
                     elements.statusBadge.style.background = 'linear-gradient(135deg, #ff5c7a, #ff8e53)';
+                    
+                    // Показываем демо-данные при ошибке
+                    showDemoData();
                 }
+            }
+            
+            // Функция для демо-данных
+            function showDemoData() {
+                const demoData = {
+                    system: {
+                        win_rate: 78.5,
+                        active_signals: 1,
+                        status: "DEMO",
+                        total_trades: 1275,
+                        total_wins: 1001,
+                        total_losses: 274
+                    },
+                    signal: {
+                        pair: "EURUSD",
+                        direction: "BUY",
+                        confidence: 8,
+                        entry_price: 1.07542,
+                        expiry: 2,
+                        source: "ENHANCED_SMART_MONEY",
+                        trade_id: 1275
+                    },
+                    result: {
+                        pair: "GBPJPY",
+                        direction: "SELL",
+                        result: "WIN",
+                        entry_price: 185.723,
+                        exit_price: 185.615
+                    }
+                };
+                
+                updateUI(demoData);
             }
             
             // Обновление интерфейса
@@ -712,15 +766,18 @@
                 }
                 
                 // Определяем что показывать
-                if (data.signal && !data.signal.error) {
+                const hasSignal = data.signal && !data.signal.error && data.signal.pair;
+                const hasResult = data.result && !data.result.error && data.result.pair;
+                
+                if (hasSignal) {
                     showActiveSignal(data.signal, data.system);
                     elements.signalUpdate.textContent = `обновлено: ${now}`;
-                } else if (data.result && !data.result.error) {
+                } else if (hasResult) {
                     showTradeResult(data.result, data.system);
                     elements.signalUpdate.textContent = `обновлено: ${now}`;
                 } else {
                     showState('no_signal');
-                    elements.signalUpdate.textContent = 'нет данных';
+                    elements.signalUpdate.textContent = 'нет активных сигналов';
                 }
                 
                 // Обновление истории
