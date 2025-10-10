@@ -1,11 +1,11 @@
 {
-  "confidence": 8,
+  "confidence": 6,
   "direction": "SELL",
-  "entry_price": 1.39955,
+  "entry_price": 151.617,
   "error": null,
   "expiry": 2,
-  "pair": "USDCAD",
+  "pair": "USDJPY",
   "source": "live_bot",
-  "timestamp": "2025-10-10T22:34:53.903940",
-  "last_updated": "2025-10-10T19:36:31.380829"
+  "timestamp": "2025-10-10T22:45:24.497353",
+  "last_updated": "2025-10-10T19:46:46.042916"
 }
