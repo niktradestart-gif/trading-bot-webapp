@@ -977,25 +977,50 @@
                 }
                 
                 // Обновление статистики
-                document.getElementById('stat-users').textContent = data.active_users || '—';
+                document.getElementById('stat-users').textContent = data.total_users || '—';
                 document.getElementById('stat-accuracy').textContent = data.win_rate ? `${data.win_rate}%` : '—%';
                 document.getElementById('stat-trades').textContent = data.total_trades || '—';
-                document.getElementById('stat-status').textContent = 'Работает';
-                document.getElementById('stat-status-label').textContent = 'Система активна';
+                document.getElementById('stat-status').textContent = data.bot_status === 'running' ? 'Работает' : 'Остановлен';
+                document.getElementById('stat-status-label').textContent = data.bot_status === 'running' ? 'Система активна' : 'Система остановлена';
                 
                 // ML данные
                 document.getElementById('ml-accuracy').textContent = data.ml_accuracy ? `${data.ml_accuracy}%` : '—%';
                 document.getElementById('ml-trades').textContent = data.total_trades || '—';
                 
                 currentData = data;
-                
+                // Загружаем детальную статистику пользователей
+                loadUsersStats();
             } catch (error) {
                 console.error('Ошибка загрузки данных:', error);
                 document.getElementById('stat-status').textContent = 'Ошибка';
                 document.getElementById('stat-status-label').textContent = 'Нет связи с API';
             }
         }
+        // Загрузка статистики пользователей из pocket_users.json
+async function loadUsersStats() {
+    try {
+        const token = localStorage.getItem('admin_token');
+        if (!token) return;
 
+        const response = await fetch('/admin/users/stats', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const stats = await response.json();
+            // Обновляем статистику в хедере
+            document.getElementById('stat-users').textContent = stats.total_users;
+            document.getElementById('stat-accuracy').textContent = `${stats.win_rate}%`;
+            document.getElementById('stat-trades').textContent = stats.total_trades;
+            document.getElementById('stat-status').textContent = stats.active_users > 0 ? 'Работает' : 'Нет активных';
+            document.getElementById('stat-status-label').textContent = `${stats.active_users} активных`;
+        }
+    } catch (error) {
+        console.error('Error loading users stats:', error);
+    }
+}
         // Загрузка логов системы
         async function loadSystemLogs() {
             const container = document.getElementById('system-logs');
@@ -1125,44 +1150,99 @@
             }
         }
 
-        // Загрузка таблицы пользователей
-        function loadUsersTable() {
-            const container = document.getElementById('usersTable');
-            
-            // Заглушка - в реальности будет запрос к API
-            const sampleUsers = [
-                { id: "5489888474", name: "Иван Петров", regDate: "15.01.2024", activity: "Высокая", accuracy: "78%", status: "active" },
-                { id: "5489888475", name: "Мария Сидорова", regDate: "14.01.2024", activity: "Средняя", accuracy: "82%", status: "active" },
-                { id: "5489888476", name: "Алексей Козлов", regDate: "13.01.2024", activity: "Низкая", accuracy: "65%", status: "inactive" }
-            ];
-            
-            container.innerHTML = '';
-            sampleUsers.forEach(user => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><input type="checkbox"></td>
-                    <td>${user.id}</td>
-                    <td>${user.name}</td>
-                    <td>${user.regDate}</td>
-                    <td>${user.activity}</td>
-                    <td>${user.accuracy}</td>
-                    <td class="${user.status === 'active' ? 'status-active' : 'status-inactive'}">
-                        ${user.status === 'active' ? 'Активен' : 'Неактивен'}
-                    </td>
-                    <td>
-                        <button class="btn" style="padding: 6px 12px; font-size: 12px;" onclick="manageUser('${user.id}')">
-                            <i class="fas fa-cog"></i>
-                        </button>
-                    </td>
-                `;
-                container.appendChild(row);
-            });
+        // Загрузка таблицы пользователей из pocket_users.json
+async function loadUsersTable() {
+    try {
+        const token = localStorage.getItem('admin_token');
+        if (!token) {
+            showNotification('Требуется авторизация', 'error');
+            return;
         }
 
-        function manageUser(userId) {
-            showNotification(`Управление пользователем ${userId}`, 'info');
+        const response = await fetch('/admin/users', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load users');
         }
-
+        
+        const users = await response.json();
+        const container = document.getElementById('usersTable');
+        
+        container.innerHTML = '';
+        
+        if (users.length === 0) {
+            container.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                        Нет пользователей в системе
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        users.forEach(user => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><input type="checkbox" data-user-id="${user.id}"></td>
+                <td>${user.id}</td>
+                <td>${user.name}</td>
+                <td>${user.registration_date}</td>
+                <td>${user.last_activity}</td>
+                <td>${user.accuracy}%</td>
+                <td class="${user.status === 'active' ? 'status-active' : 'status-inactive'}">
+                    ${user.status === 'active' ? 'Активен' : 'Неактивен'}
+                </td>
+                <td>
+                    <button class="btn" style="padding: 6px 12px; font-size: 12px;" onclick="manageUser('${user.id}')">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </td>
+            `;
+            container.appendChild(row);
+        });
+        
+    } catch (error) {
+        console.error('Error loading users:', error);
+        const container = document.getElementById('usersTable');
+        container.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 20px; color: var(--danger);">
+                    Ошибка загрузки пользователей: ${error.message}
+                </td>
+            </tr>
+        `;
+    }
+}
+        // Управление пользователем
+async function manageUser(userId) {
+    try {
+        const token = localStorage.getItem('admin_token');
+        const response = await fetch(`/admin/users/${userId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const userData = await response.json();
+            showNotification(`Данные пользователя ${userId} загружены`, 'info');
+            // Здесь можно открыть модальное окно с детальной информацией
+            console.log('User data:', userData);
+            
+            // Показать детали пользователя в alert (временное решение)
+            alert(`Данные пользователя ${userId}:\nИмя: ${userData.first_name || 'Не указано'}\nСделок: ${userData.trade_history?.length || 0}\nАктивен: ${userData.last_activity ? 'Да' : 'Нет'}`);
+        } else {
+            throw new Error('Failed to load user data');
+        }
+    } catch (error) {
+        showNotification(`Ошибка загрузки данных пользователя: ${error.message}`, 'error');
+    }
+}
         // Загрузка сигналов
         async function loadAdminSignals() {
             const container = document.getElementById('adminSignalsContainer');
