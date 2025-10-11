@@ -1,11 +1,11 @@
 {
-  "confidence": 9,
+  "confidence": 10,
   "direction": "SELL",
-  "entry_price": 1.06703,
+  "entry_price": 0.90584,
   "error": null,
-  "expiry": 2,
-  "pair": "GBPCHF",
+  "expiry": 1,
+  "pair": "AUDCAD",
   "source": "live_bot",
-  "timestamp": "2025-10-11T08:08:52.423460",
-  "last_updated": "2025-10-11T05:10:06.492296"
+  "timestamp": "2025-10-11T08:29:22.438187",
+  "last_updated": "2025-10-11T05:29:54.715066"
 }
