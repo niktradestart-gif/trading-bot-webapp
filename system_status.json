@@ -1,10 +1,10 @@
 {
-  "win_rate": 0,
+  "win_rate": 78.2,
   "active_signals": 1,
-  "status": "LIVE",
-  "total_trades": 0,
-  "total_wins": 985,
-  "total_losses": 285,
-  "last_updated": "2025-10-11T20:49:24.632601",
-  "source": "live_bot"
+  "status": "DEMO",
+  "total_trades": 1270,
+  "total_wins": 992,
+  "total_losses": 278,
+  "last_updated": "2025-10-11T20:59:06.095728",
+  "source": "demo_data"
 }

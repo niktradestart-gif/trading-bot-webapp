@@ -1,11 +1,10 @@
 {
+  "pair": "EURUSD",
+  "direction": "BUY",
   "confidence": 8,
-  "direction": "SELL",
-  "entry_price": 1.06703,
-  "error": null,
+  "entry_price": 1.07521,
   "expiry": 2,
-  "pair": "GBPCHF",
-  "source": "live_bot",
-  "timestamp": "2025-10-11T23:46:03.559666",
-  "last_updated": "2025-10-11T20:49:24.632601"
+  "source": "ENHANCED_SMART_MONEY",
+  "last_updated": "2025-10-11T20:59:06.095728",
+  "note": "Demo signal"
 }
