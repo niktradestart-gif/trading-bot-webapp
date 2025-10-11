@@ -583,7 +583,7 @@
     <script>
         // Конфигурация API
         const API_BASE = "https://niktradestart-gif.github.io/trading-bot-webapp";
-        const BOT_API = "https://cors-anywhere.herokuapp.com/http://89.23.98.206:8080/api";
+        const BOT_API = "https://api.allorigins.win/get?url=" + encodeURIComponent("http://89.23.98.206:8080/api");
         
         // Проверка авторизации
         document.addEventListener('DOMContentLoaded', function() {
@@ -727,28 +727,26 @@
                 currentPair = pair;
             }
             
-            async function fetchTradingData() {
+           async function fetchTradingData() {
     try {
         console.log('🔄 Загрузка данных с API...');
         
-        // ЗАМЕНИТЬ API_BASE на BOT_API
         const [systemResponse, signalResponse, resultResponse] = await Promise.all([
             fetch(`${BOT_API}/system_status.json?ts=${Date.now()}`),
             fetch(`${BOT_API}/last_signal.json?ts=${Date.now()}`),
             fetch(`${BOT_API}/last_result.json?ts=${Date.now()}`)
         ]);
         
-        // Остальной код без изменений...
+        // Обработка ответа от allorigins.win
         const systemData = systemResponse.ok ? await systemResponse.json() : null;
         const signalData = signalResponse.ok ? await signalResponse.json() : null;
         const resultData = resultResponse.ok ? await resultResponse.json() : null;
         
-        console.log('📊 Получены данные:', { signal: signalData, result: resultData });
-        
+        // Извлекаем содержимое из ответа allorigins.win
         const data = {
-            system: systemData,
-            signal: signalData,
-            result: resultData,
+            system: systemData ? JSON.parse(systemData.contents) : null,
+            signal: signalData ? JSON.parse(signalData.contents) : null,
+            result: resultData ? JSON.parse(resultData.contents) : null,
             history: []
         };
         
