@@ -583,7 +583,7 @@
     <script>
         // Конфигурация API
         const API_BASE = "https://niktradestart-gif.github.io/trading-bot-webapp";
-        const BOT_API = "https://api.allorigins.win/get?url=" + encodeURIComponent("http://89.23.98.206:8080/api");
+        const BOT_API = "https://cors-anywhere.herokuapp.com/http://89.23.98.206:8080";
         
         // Проверка авторизации
         document.addEventListener('DOMContentLoaded', function() {
@@ -732,21 +732,26 @@
         console.log('🔄 Загрузка данных с API...');
         
         const [systemResponse, signalResponse, resultResponse] = await Promise.all([
-            fetch(`${BOT_API}/system_status.json?ts=${Date.now()}`),
-            fetch(`${BOT_API}/last_signal.json?ts=${Date.now()}`),
-            fetch(`${BOT_API}/last_result.json?ts=${Date.now()}`)
+            fetch(`${BOT_API}/api/system_status.json?ts=${Date.now()}`),
+            fetch(`${BOT_API}/api/last_signal.json?ts=${Date.now()}`),
+            fetch(`${BOT_API}/api/last_result.json?ts=${Date.now()}`)
         ]);
         
-        // Обработка ответа от allorigins.win
-        const systemData = systemResponse.ok ? await systemResponse.json() : null;
-        const signalData = signalResponse.ok ? await signalResponse.json() : null;
-        const resultData = resultResponse.ok ? await resultResponse.json() : null;
+        // Проверяем каждый ответ
+        if (!systemResponse.ok) throw new Error('System status failed');
+        if (!signalResponse.ok) throw new Error('Signal data failed');
+        if (!resultResponse.ok) throw new Error('Result data failed');
         
-        // Извлекаем содержимое из ответа allorigins.win
+        const systemData = await systemResponse.json();
+        const signalData = await signalResponse.json();
+        const resultData = await resultResponse.json();
+        
+        console.log('📊 Получены данные:', { signal: signalData, result: resultData });
+        
         const data = {
-            system: systemData ? JSON.parse(systemData.contents) : null,
-            signal: signalData ? JSON.parse(signalData.contents) : null,
-            result: resultData ? JSON.parse(resultData.contents) : null,
+            system: systemData,
+            signal: signalData,
+            result: resultData,
             history: []
         };
         
