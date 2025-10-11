@@ -727,45 +727,45 @@
                 currentPair = pair;
             }
             
-            // Получение данных с API
             async function fetchTradingData() {
-                try {
-                    console.log('🔄 Загрузка данных с API...');
-                    
-                    const [systemResponse, signalResponse, resultResponse] = await Promise.all([
-                        fetch(`${API_BASE}/system_status.json?ts=${Date.now()}`),
-                        fetch(`${API_BASE}/last_signal.json?ts=${Date.now()}`),
-                        fetch(`${API_BASE}/last_result.json?ts=${Date.now()}`)
-                    ]);
-                    
-                    const systemData = systemResponse.ok ? await systemResponse.json() : null;
-                    const signalData = signalResponse.ok ? await signalResponse.json() : null;
-                    const resultData = resultResponse.ok ? await resultResponse.json() : null;
-                    
-                    console.log('📊 Получены данные:', { signal: signalData, result: resultData });
-                    
-                    const data = {
-                        system: systemData,
-                        signal: signalData,
-                        result: resultData,
-                        history: []
-                    };
-                    
-                    updateUI(data);
-                    if (elements.statusBadge) {
-                        elements.statusBadge.textContent = 'LIVE';
-                        elements.statusBadge.style.background = 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))';
-                    }
-                    
-                } catch (error) {
-                    console.error('❌ Ошибка загрузки данных:', error);
-                    if (elements.statusBadge) {
-                        elements.statusBadge.textContent = 'OFFLINE';
-                        elements.statusBadge.style.background = 'linear-gradient(135deg, #ff5c7a, #ff8e53)';
-                    }
-                }
-            }
-            
+    try {
+        console.log('🔄 Загрузка данных с API...');
+        
+        // ЗАМЕНИТЬ API_BASE на BOT_API
+        const [systemResponse, signalResponse, resultResponse] = await Promise.all([
+            fetch(`${BOT_API}/system_status.json?ts=${Date.now()}`),
+            fetch(`${BOT_API}/last_signal.json?ts=${Date.now()}`),
+            fetch(`${BOT_API}/last_result.json?ts=${Date.now()}`)
+        ]);
+        
+        // Остальной код без изменений...
+        const systemData = systemResponse.ok ? await systemResponse.json() : null;
+        const signalData = signalResponse.ok ? await signalResponse.json() : null;
+        const resultData = resultResponse.ok ? await resultResponse.json() : null;
+        
+        console.log('📊 Получены данные:', { signal: signalData, result: resultData });
+        
+        const data = {
+            system: systemData,
+            signal: signalData,
+            result: resultData,
+            history: []
+        };
+        
+        updateUI(data);
+        if (elements.statusBadge) {
+            elements.statusBadge.textContent = 'LIVE';
+            elements.statusBadge.style.background = 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))';
+        }
+        
+    } catch (error) {
+        console.error('❌ Ошибка загрузки данных:', error);
+        if (elements.statusBadge) {
+            elements.statusBadge.textContent = 'OFFLINE';
+            elements.statusBadge.style.background = 'linear-gradient(135deg, #ff5c7a, #ff8e53)';
+        }
+    }
+}
             // Обновление интерфейса
             function updateUI(data) {
                 const now = new Date().toLocaleTimeString('ru-RU');
