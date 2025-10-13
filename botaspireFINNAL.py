@@ -24,7 +24,6 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, ContextTypes, filters
 )
-
 # ML
 import talib as ta
 from sklearn.ensemble import RandomForestClassifier
@@ -2864,7 +2863,7 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
         # Получаем текущую цену
         df = get_mt5_data(pair, 2, mt5.TIMEFRAME_M1)
         if df is None or len(df) < 1:
-            logging.error(f"❌ Не удалось получить данных для {pair}")
+            logging.error(f"❌ Не удалось получить данные для {pair}")
             return
 
         current_price = df['close'].iloc[-1]
@@ -2913,14 +2912,10 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
         # ✅ Сохраняем обновлённые данные пользователя
         save_users_data()
 
-        # ✅ ОБНОВЛЯЕМ ВЕБ-JSON ФАЙЛЫ ПОСЛЕ ЗАКРЫТИЯ СДЕЛКИ
-        try:
-            update_web_jsons()
-            logging.info("🌐 Web JSON файлы обновлены после закрытия сделки")
-        except Exception as e:
-            logging.error(f"❌ Ошибка обновления web JSON: {e}")
+        # ✅ ДОБАВИТЬ ЗДЕСЬ: Обновляем веб-JSON файлы после закрытия сделки
+        update_web_jsons()
 
-        # ✅ Логируем сделку в файл истории
+        # ✅ Логируем сделку в файл истории (если функция есть)
         try:
             log_trade_to_file(closed_trade, result)
         except Exception as e:
@@ -2959,8 +2954,7 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"❌ Ошибка отправки уведомления: {e}")
 
     except Exception as e:
-        logging.error(f"💥 Критическая ошибка в check_trade_result: {e}", exc_info=True)
-        
+        logging.error(f"💥 Критическая ошибка в check_trade_result: {e}", exc_info=True)   
 # ===================== 🤖 PROCESS AUTO TRADE =====================
 async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE):
     """Авто-трейдинг: анализ, открытие сделки и отложенная запись после закрытия"""
