@@ -1,11 +1,11 @@
 {
   "confidence": 10,
   "direction": "BUY",
-  "entry_price": 202.861,
+  "entry_price": 0.65144,
   "error": null,
-  "expiry": 2,
-  "pair": "GBPJPY",
+  "expiry": 1,
+  "pair": "AUDUSD",
   "source": "live_bot",
-  "timestamp": "2025-10-13T09:54:37.713411",
-  "last_updated": "2025-10-13T06:54:46.346933"
+  "timestamp": "2025-10-13T10:17:09.323518",
+  "last_updated": "2025-10-13T07:17:26.550992"
 }
