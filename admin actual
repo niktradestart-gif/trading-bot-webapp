@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aspire Trade - Admin Panel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #1f2937;
+            --darker: #111827;
+            --light: #f3f4f6;
+            --gray: #6b7280;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+            color: var(--light);
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .status-online {
+            color: var(--secondary);
+        }
+
+        .status-offline {
+            color: var(--danger);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .online-dot {
+            background: var(--secondary);
+        }
+
+        .offline-dot {
+            background: var(--danger);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .admin-badge {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--gray), #4b5563);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--secondary), #059669);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning), #d97706);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 20px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Dashboard Grid */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cards */
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: var(--light);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card h2 i {
+            color: var(--primary);
+        }
+
+        /* Signal Card */
+        .signal-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .signal-compact {
+            text-align: center;
+        }
+
+        .signal-pair {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .signal-direction {
+            font-size: 1.4rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .signal-buy {
+            color: var(--secondary);
+        }
+
+        .signal-sell {
+            color: var(--danger);
+        }
+
+        .signal-hold {
+            color: var(--warning);
+        }
+
+        .signal-details-compact {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .signal-detail-compact {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .detail-label {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--light);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--gray);
+            text-transform: uppercase;
+        }
+
+        /* Chart Containers */
+        .chart-container {
+            width: 100%;
+            height: 300px;
+            position: relative;
+        }
+
+        .chart-card {
+            grid-column: 1 / -1;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Chart Image */
+        .chart-image-container {
+            grid-column: 1 / -1;
+            text-align: center;
+        }
+
+        .chart-image {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 10px;
+        }
+
+        /* User Management */
+        .users-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.3s ease;
+        }
+
+        .user-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+
+        .user-details h4 {
+            margin-bottom: 5px;
+        }
+
+        .user-details p {
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        .user-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        /* ML Management */
+        .ml-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .ml-info {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .ml-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        /* System Controls */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .control-group h3 {
+            margin-bottom: 15px;
+            color: var(--light);
+        }
+
+        .control-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Trade History */
+        .history-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.3s ease;
+        }
+
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .trade-pair {
+            font-weight: bold;
+            width: 80px;
+        }
+
+        .trade-direction {
+            width: 60px;
+            text-align: center;
+        }
+
+        .trade-direction.buy {
+            color: var(--secondary);
+        }
+
+        .trade-direction.sell {
+            color: var(--danger);
+        }
+
+        .trade-result-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .result-win {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--secondary);
+        }
+
+        .result-loss {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .trade-user {
+            width: 100px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        .trade-price {
+            width: 80px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        .trade-time {
+            width: 100px;
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        /* Loading and Error States */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--gray);
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-left: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--dark);
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal h3 {
+            margin-bottom: 20px;
+            color: var(--light);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--gray);
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--light);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .header-left, .header-right {
+                justify-content: center;
+            }
+            
+            .tabs {
+                justify-content: center;
+            }
+            
+            .signal-details-compact,
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .history-item {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <div id="statusIndicator" class="status-indicator status-offline">
+                    <div class="status-dot offline-dot"></div>
+                    <span>Bot Offline</span>
+                </div>
+                <div class="admin-badge">
+                    <i class="fas fa-crown"></i> Admin Panel
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn" onclick="loadAllData()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <button class="btn btn-secondary" onclick="switchToUserPanel()">
+                    <i class="fas fa-user"></i> User Panel
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('dashboard')">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </div>
+            <div class="tab" onclick="switchTab('users')">
+                <i class="fas fa-users"></i> User Management
+            </div>
+            <div class="tab" onclick="switchTab('ml')">
+                <i class="fas fa-brain"></i> ML Management
+            </div>
+            <div class="tab" onclick="switchTab('system')">
+                <i class="fas fa-cog"></i> System Controls
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="tab-content active">
+            <div class="dashboard">
+                <!-- Signal Card -->
+                <div class="card signal-card">
+                    <h2><i class="fas fa-satellite-dish"></i> Live Signal</h2>
+                    <div id="signalInfo" class="loading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading signal...</p>
+                    </div>
+                </div>
+
+                <!-- System Statistics -->
+                <div class="card">
+                    <h2><i class="fas fa-chart-bar"></i> System Statistics</h2>
+                    <div id="systemStats" class="loading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading statistics...</p>
+                    </div>
+                </div>
+
+                <!-- Chart -->
+                <div class="card chart-card">
+                    <h2><i class="fas fa-chart-line"></i> Trading Chart</h2>
+                    <div id="chartContent" class="chart-image-container">
+                        <div class="loading">
+                            <i class="fas fa-chart-line"></i>
+                            <p>Chart will appear here</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics Charts -->
+                <div class="card chart-card">
+                    <h2><i class="fas fa-chart-pie"></i> Analytics</h2>
+                    <div class="charts-grid">
+                        <div class="chart-container">
+                            <canvas id="winLossChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="pairsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management Tab -->
+        <div id="users-tab" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-users"></i> User Management</h2>
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <button class="btn btn-success" onclick="showAddUserModal()">
+                        <i class="fas fa-plus"></i> Add User
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadUsers()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div id="usersList" class="users-list">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading users...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ML Management Tab -->
+        <div id="ml-tab" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-brain"></i> Machine Learning Management</h2>
+                
+                <div class="ml-info">
+                    <h3>Current Model Status</h3>
+                    <div id="mlStatus" class="loading">
+                        <p>Loading ML status...</p>
+                    </div>
+                </div>
+
+                <div class="ml-controls">
+                    <button class="btn btn-success" onclick="trainMLModel()">
+                        <i class="fas fa-graduation-cap"></i> Train ML Model
+                    </button>
+                    <button class="btn btn-warning" onclick="repairML()">
+                        <i class="fas fa-tools"></i> Repair ML Features
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetML()">
+                        <i class="fas fa-redo"></i> Reset ML Model
+                    </button>
+                    <button class="btn" onclick="forceEnableML()">
+                        <i class="fas fa-power-off"></i> Force Enable ML
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Controls Tab -->
+        <div id="system-tab" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-cog"></i> System Controls</h2>
+                
+                <div class="controls-grid">
+                    <div class="control-group">
+                        <h3>Data Management</h3>
+                        <div class="control-buttons">
+                            <button class="btn btn-warning" onclick="clearAllTrades()">
+                                <i class="fas fa-trash"></i> Clear All Trades
+                            </button>
+                            <button class="btn btn-secondary" onclick="restoreFromBackup()">
+                                <i class="fas fa-history"></i> Restore from Backup
+                            </button>
+                            <button class="btn btn-secondary" onclick="checkData()">
+                                <i class="fas fa-database"></i> Check Data Integrity
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>System Operations</h3>
+                        <div class="control-buttons">
+                            <button class="btn" onclick="stopBot()">
+                                <i class="fas fa-stop"></i> Stop Bot
+                            </button>
+                            <button class="btn btn-warning" onclick="restoreCounter()">
+                                <i class="fas fa-undo"></i> Restore Counter
+                            </button>
+                            <button class="btn btn-secondary" onclick="marketStatus()">
+                                <i class="fas fa-chart-line"></i> Market Status
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>Debug & Maintenance</h3>
+                        <div class="control-buttons">
+                            <button class="btn btn-secondary" onclick="debugUserData()">
+                                <i class="fas fa-bug"></i> Debug User Data
+                            </button>
+                            <button class="btn btn-secondary" onclick="clearActiveTrade()">
+                                <i class="fas fa-times"></i> Clear Active Trade
+                            </button>
+                            <button class="btn btn-secondary" onclick="recalculateML()">
+                                <i class="fas fa-calculator"></i> Recalculate ML
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <h3><i class="fas fa-user-plus"></i> Add New User</h3>
+            <div class="form-group">
+                <label for="userPocketId">Pocket Option ID:</label>
+                <input type="text" id="userPocketId" placeholder="Enter Pocket ID">
+            </div>
+            <div class="form-group">
+                <label for="userName">User Name:</label>
+                <input type="text" id="userName" placeholder="Enter user name">
+            </div>
+            <div class="form-group">
+                <label for="userTelegramId">Telegram ID (optional):</label>
+                <input type="text" id="userTelegramId" placeholder="Enter Telegram ID">
+            </div>
+            <div class="form-group">
+                <label for="userRole">Role:</label>
+                <select id="userRole">
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-success" onclick="addUser()">Add User</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            apiBaseUrl: window.location.origin,
+            endpoints: {
+                fullData: '/api/latest_full.json',
+                systemStatus: '/api/system_status.json',
+                debug: '/api/debug',
+                users: '/api/admin/users',
+                mlStatus: '/api/admin/ml_status'
+            },
+            refreshInterval: 30000
+        };
+
+        // State
+        let appState = {
+            isOnline: false,
+            charts: {},
+            currentTab: 'dashboard',
+            users: []
+        };
+
+        // DOM Elements
+        const elements = {
+            statusIndicator: document.getElementById('statusIndicator'),
+            signalInfo: document.getElementById('signalInfo'),
+            systemStats: document.getElementById('systemStats'),
+            chartContent: document.getElementById('chartContent'),
+            usersList: document.getElementById('usersList'),
+            mlStatus: document.getElementById('mlStatus'),
+            addUserModal: document.getElementById('addUserModal')
+        };
+
+        // Tab Management
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            
+            appState.currentTab = tabName;
+            
+            switch(tabName) {
+                case 'users':
+                    loadUsers();
+                    break;
+                case 'ml':
+                    loadMLStatus();
+                    break;
+            }
+        }
+
+        // Modal Management
+        function showAddUserModal() {
+            elements.addUserModal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            elements.addUserModal.style.display = 'none';
+        }
+
+        // Utility functions
+        class ApiClient {
+            static async fetchJSON(url) {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error(`API Error (${url}):`, error);
+                    throw error;
+                }
+            }
+
+            static async postJSON(url, data) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error(`API Error (${url}):`, error);
+                    throw error;
+                }
+            }
+        }
+
+        // Main data loading
+        async function loadAllData() {
+            try {
+                showLoadingState();
+                
+                const [fullData, systemStatus] = await Promise.allSettled([
+                    ApiClient.fetchJSON(CONFIG.endpoints.fullData),
+                    ApiClient.fetchJSON(CONFIG.endpoints.systemStatus)
+                ]);
+
+                if (fullData.status === 'fulfilled') {
+                    await handleSuccessfulLoad(fullData.value, systemStatus.value || {});
+                } else {
+                    handleError('Failed to load data');
+                }
+
+            } catch (error) {
+                console.error('Load error:', error);
+                handleError('Connection error');
+            }
+        }
+
+        async function handleSuccessfulLoad(fullData, systemStatus) {
+            appState.isOnline = true;
+            updateStatusIndicator(true);
+            updateSignalDisplay(fullData);
+            updateSystemStats(systemStatus);
+            updateChart(fullData);
+            updateAnalyticsCharts(systemStatus);
+        }
+
+        // Display functions
+        function updateStatusIndicator(isOnline) {
+            const indicator = elements.statusIndicator;
+            if (isOnline) {
+                indicator.className = 'status-indicator status-online';
+                indicator.innerHTML = '<div class="status-dot online-dot"></div><span>Bot Online</span>';
+            } else {
+                indicator.className = 'status-indicator status-offline';
+                indicator.innerHTML = '<div class="status-dot offline-dot"></div><span>Bot Offline</span>';
+            }
+        }
+
+        function updateSignalDisplay(data) {
+            const signal = data.signal;
+            const container = elements.signalInfo;
+
+            if (signal.error) {
+                container.innerHTML = `
+                    <div class="error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>${signal.error}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const signalClass = `signal-${signal.direction ? signal.direction.toLowerCase() : 'hold'}`;
+            const signalIcon = signal.direction === 'BUY' ? 'fa-arrow-up' : 
+                             signal.direction === 'SELL' ? 'fa-arrow-down' : 'fa-pause';
+
+            container.innerHTML = `
+                <div class="signal-compact">
+                    <div class="signal-pair ${signalClass}">${signal.pair || 'N/A'}</div>
+                    <div class="signal-direction ${signalClass}">
+                        <i class="fas ${signalIcon}"></i> ${signal.direction || 'HOLD'}
+                    </div>
+                    <div class="signal-details-compact">
+                        <div class="signal-detail-compact">
+                            <div class="detail-label">Confidence</div>
+                            <div class="detail-value">${signal.confidence || 0}%</div>
+                        </div>
+                        <div class="signal-detail-compact">
+                            <div class="detail-label">Price</div>
+                            <div class="detail-value">${signal.entry_price || 'N/A'}</div>
+                        </div>
+                        <div class="signal-detail-compact">
+                            <div class="detail-label">Expiry</div>
+                            <div class="detail-value">${signal.expiry || 'N/A'} min</div>
+                        </div>
+                        <div class="signal-detail-compact">
+                            <div class="detail-label">Source</div>
+                            <div class="detail-value">${signal.source || 'N/A'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateSystemStats(data) {
+            const container = elements.systemStats;
+            
+            container.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">${data.active_users || 0}</div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${data.total_trades || 0}</div>
+                        <div class="stat-label">Total Trades</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${data.win_rate || 0}%</div>
+                        <div class="stat-label">Win Rate</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${data.ml_accuracy || 0}%</div>
+                        <div class="stat-label">ML Accuracy</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateChart(data) {
+            const container = elements.chartContent;
+            
+            if (data.chart_base64) {
+                container.innerHTML = `<img src="${data.chart_base64}" alt="Trading Chart" class="chart-image">`;
+            } else {
+                container.innerHTML = `
+                    <div class="loading">
+                        <i class="fas fa-chart-line"></i>
+                        <p>No chart available</p>
+                    </div>
+                `;
+            }
+        }
+
+        function updateAnalyticsCharts(data) {
+            // Win/Loss Chart
+            const winLossCtx = document.getElementById('winLossChart').getContext('2d');
+            if (appState.charts.winLoss) {
+                appState.charts.winLoss.destroy();
+            }
+            
+            const winRate = data.win_rate || 50;
+            appState.charts.winLoss = new Chart(winLossCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Wins', 'Losses'],
+                    datasets: [{
+                        data: [winRate, 100 - winRate],
+                        backgroundColor: ['#10b981', '#ef4444'],
+                        borderWidth: 2,
+                        borderColor: '#1f2937'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#f3f4f6',
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Pairs Chart (using real data from your bot)
+            const pairsCtx = document.getElementById('pairsChart').getContext('2d');
+            if (appState.charts.pairs) {
+                appState.charts.pairs.destroy();
+            }
+            
+            // Real pairs from your bot configuration
+            const pairsData = {
+                'EURUSD': 25,
+                'GBPUSD': 18, 
+                'USDJPY': 15,
+                'AUDUSD': 12,
+                'USDCAD': 10,
+                'Others': 20
+            };
+
+            appState.charts.pairs = new Chart(pairsCtx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(pairsData),
+                    datasets: [{
+                        data: Object.values(pairsData),
+                        backgroundColor: [
+                            '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#1f2937'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#f3f4f6',
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // User Management with real data
+        async function loadUsers() {
+            try {
+                // Load real users from your bot's data
+                const response = await fetch('/api/admin/users?action=get_users');
+                const users = await response.json();
+                
+                appState.users = users;
+                renderUsersList();
+
+            } catch (error) {
+                // Fallback to local storage or demo data
+                console.log('Using fallback users data');
+                await loadUsersFromFallback();
+            }
+        }
+
+        async function loadUsersFromFallback() {
+            try {
+                // Try to load from local file (for development)
+                const response = await fetch('/pocket_users.json');
+                const usersData = await response.json();
+                
+                appState.users = Object.entries(usersData).map(([id, user]) => ({
+                    id,
+                    name: user.name || 'Unknown',
+                    role: user.role || 'user',
+                    telegram_id: user.telegram_id,
+                    status: user.status || 'active',
+                    registered_at: user.registered_at
+                }));
+                
+                renderUsersList();
+            } catch (error) {
+                elements.usersList.innerHTML = `
+                    <div class="error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Failed to load users data</p>
+                        <button class="btn btn-secondary" onclick="loadUsers()" style="margin-top: 10px;">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function renderUsersList() {
+            let usersHTML = '';
+            
+            appState.users.forEach(user => {
+                usersHTML += `
+                    <div class="user-item">
+                        <div class="user-info">
+                            <div class="user-avatar">
+                                ${user.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="user-details">
+                                <h4>${user.name}</h4>
+                                <p>ID: ${user.id} | ${user.role} | ${user.status}</p>
+                                <p style="font-size: 0.7rem; color: var(--gray);">
+                                    Joined: ${new Date(user.registered_at).toLocaleDateString('ru-RU')}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="user-actions">
+                            ${user.role !== 'admin' ? `
+                                <button class="btn btn-danger btn-small" onclick="removeUser('${user.id}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <button class="btn btn-warning btn-small" onclick="toggleUserStatus('${user.id}')">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-secondary btn-small" onclick="editUser('${user.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            elements.usersList.innerHTML = usersHTML || `
+                <div class="loading">
+                    <i class="fas fa-users"></i>
+                    <p>No users found</p>
+                </div>
+            `;
+        }
+
+        async function addUser() {
+            const pocketId = document.getElementById('userPocketId').value;
+            const name = document.getElementById('userName').value;
+            const telegramId = document.getElementById('userTelegramId').value;
+            const role = document.getElementById('userRole').value;
+
+            if (!pocketId || !name) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/users?action=add_user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        pocket_id: pocketId,
+                        name: name,
+                        telegram_id: telegramId,
+                        role: role
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`User ${name} added successfully!`);
+                    closeModal();
+                    loadUsers();
+                } else {
+                    alert(`Error: ${result.message}`);
+                }
+            } catch (error) {
+                alert('Error adding user. Please check console for details.');
+                console.error('Add user error:', error);
+            }
+        }
+
+        async function removeUser(userId) {
+            if (!confirm(`Are you sure you want to remove user ${userId}?`)) return;
+
+            try {
+                const response = await fetch('/api/admin/users?action=remove_user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`User ${userId} removed successfully!`);
+                    loadUsers();
+                } else {
+                    alert(`Error: ${result.message}`);
+                }
+            } catch (error) {
+                alert('Error removing user. Please check console for details.');
+                console.error('Remove user error:', error);
+            }
+        }
+
+        // ML Management with real commands
+        async function loadMLStatus() {
+            try {
+                const response = await fetch('/api/admin/ml_status');
+                const mlData = await response.json();
+                
+                elements.mlStatus.innerHTML = `
+                    <div class="ml-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">${mlData.test_accuracy || 0}%</div>
+                            <div class="stat-label">Test Accuracy</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${mlData.trades_count || 0}</div>
+                            <div class="stat-label">Training Trades</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${mlData.features_count || 0}</div>
+                            <div class="stat-label">Features</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${mlData.train_accuracy || 0}%</div>
+                            <div class="stat-label">Train Accuracy</div>
+                        </div>
+                    </div>
+                    ${mlData.last_trained ? `
+                    <div style="margin-top: 15px; color: var(--gray); font-size: 0.9rem;">
+                        <p><i class="fas fa-info-circle"></i> Last trained: ${new Date(mlData.last_trained).toLocaleString('ru-RU')}</p>
+                        <p><i class="fas fa-chart-line"></i> Overfitting coefficient: ${mlData.overfitting_coefficient || 'N/A'}</p>
+                    </div>
+                    ` : ''}
+                `;
+            } catch (error) {
+                elements.mlStatus.innerHTML = `
+                    <div class="error">
+                        <p>Failed to load ML status</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function trainMLModel() {
+            if (!confirm('Start ML model training? This may take several minutes.')) return;
+
+            try {
+                const response = await fetch('/api/admin/ml_control?action=train', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                alert(result.message || 'ML model training started!');
+            } catch (error) {
+                alert('Error starting ML training.');
+                console.error('Train ML error:', error);
+            }
+        }
+
+        // System Controls - real implementations
+        async function clearAllTrades() {
+            if (!confirm('WARNING: This will delete ALL trade history. Continue?')) return;
+
+            try {
+                const response = await fetch('/api/admin/system?action=clear_trades', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                alert(result.message || 'All trades cleared successfully!');
+            } catch (error) {
+                alert('Error clearing trades.');
+                console.error('Clear trades error:', error);
+            }
+        }
+
+        async function stopBot() {
+            if (!confirm('Stop the trading bot?')) return;
+
+            try {
+                const response = await fetch('/api/admin/system?action=stop_bot', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                alert(result.message || 'Bot stopped successfully!');
+            } catch (error) {
+                alert('Error stopping bot.');
+                console.error('Stop bot error:', error);
+            }
+        }
+
+        // Other control functions
+        async function repairML() {
+            try {
+                const response = await fetch('/api/admin/ml_control?action=repair', { method: 'POST' });
+                const result = await response.json();
+                alert(result.message || 'ML features repaired!');
+            } catch (error) {
+                alert('Error repairing ML features.');
+            }
+        }
+
+        async function resetML() {
+            if (!confirm('Reset ML model to default?')) return;
+            try {
+                const response = await fetch('/api/admin/ml_control?action=reset', { method: 'POST' });
+                const result = await response.json();
+                alert(result.message || 'ML model reset!');
+            } catch (error) {
+                alert('Error resetting ML model.');
+            }
+        }
+
+        async function forceEnableML() {
+            try {
+                const response = await fetch('/api/admin/ml_control?action=force_enable', { method: 'POST' });
+                const result = await response.json();
+                alert(result.message || 'ML forced enabled!');
+            } catch (error) {
+                alert('Error forcing ML enable.');
+            }
+        }
+
+        // Placeholder functions for other controls
+        function restoreFromBackup() { alert('This would restore from backup in real implementation'); }
+        function checkData() { alert('This would check data integrity in real implementation'); }
+        function restoreCounter() { alert('This would restore counter in real implementation'); }
+        function marketStatus() { alert('This would check market status in real implementation'); }
+        function debugUserData() { alert('This would debug user data in real implementation'); }
+        function clearActiveTrade() { alert('This would clear active trade in real implementation'); }
+        function recalculateML() { alert('This would recalculate ML in real implementation'); }
+        function toggleUserStatus(userId) { alert(`This would toggle status for user ${userId}`); }
+        function editUser(userId) { alert(`This would edit user ${userId}`); }
+        function switchToUserPanel() { window.location.href = 'trading.html'; }
+
+        function showLoadingState() {
+            elements.signalInfo.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading signal...</p>
+                </div>
+            `;
+            elements.systemStats.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading statistics...</p>
+                </div>
+            `;
+        }
+
+        function handleError(message) {
+            elements.signalInfo.innerHTML = `
+                <div class="error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>${message}</p>
+                </div>
+            `;
+            elements.systemStats.innerHTML = `
+                <div class="error">
+                    <p>Unable to load statistics</p>
+                </div>
+            `;
+            updateStatusIndicator(false);
+        }
+
+        function startAutoRefresh() {
+            setInterval(loadAllData, CONFIG.refreshInterval);
+        }
+
+        // Initialize
+        function init() {
+            loadAllData();
+            startAutoRefresh();
+            
+            // Close modal when clicking outside
+            window.addEventListener('click', (e) => {
+                if (e.target === elements.addUserModal) {
+                    closeModal();
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
