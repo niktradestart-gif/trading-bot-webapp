@@ -1,11 +1,10 @@
 {
-  "confidence": 10,
+  "pair": "EURUSD",
   "direction": "BUY",
-  "entry_price": 0.65144,
-  "error": null,
-  "expiry": 1,
-  "pair": "AUDUSD",
-  "source": "live_bot",
-  "timestamp": "2025-10-13T10:17:09.323518",
-  "last_updated": "2025-10-13T07:17:26.550992"
+  "confidence": 8,
+  "entry_price": 1.07521,
+  "expiry": 2,
+  "source": "ENHANCED_SMART_MONEY",
+  "last_updated": "2025-10-13T07:33:15.872019",
+  "note": "Demo signal"
 }
