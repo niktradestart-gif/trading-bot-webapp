@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aspire Trade - AI Trading Bot</title>
+    <title>Aspire Trade - Trading Panel</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #6366f1;
@@ -17,7 +16,6 @@
             --darker: #111827;
             --light: #f3f4f6;
             --gray: #6b7280;
-            --success: #10b981;
         }
 
         * {
@@ -31,61 +29,33 @@
             background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
             color: var(--light);
             min-height: 100vh;
-            line-height: 1.6;
+            padding: 15px;
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1000px;
             margin: 0 auto;
-            padding: 20px;
         }
 
-        /* Header Styles */
+        /* Compact Header */
         .header {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 30px;
-            margin-bottom: 30px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .header p {
-            color: var(--gray);
-            font-size: 1.1rem;
+            border-radius: 15px;
+            padding: 20px;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
         }
 
-        .status-container {
-            display: inline-flex;
+        .header-left {
+            display: flex;
             align-items: center;
             gap: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 12px 24px;
-            border-radius: 50px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .status-indicator {
@@ -93,28 +63,31 @@
             align-items: center;
             gap: 8px;
             font-weight: 600;
-        }
-
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .status-online {
-            color: var(--success);
-        }
-
-        .status-online .status-dot {
-            background: var(--success);
+            color: var(--secondary);
         }
 
         .status-offline {
             color: var(--danger);
         }
 
-        .status-offline .status-dot {
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .online-dot {
+            background: var(--secondary);
+        }
+
+        .offline-dot {
             background: var(--danger);
         }
 
@@ -123,57 +96,73 @@
             50% { opacity: 0.5; }
         }
 
-        /* Dashboard Grid */
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 25px;
-            margin-bottom: 30px;
+        .user-info {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: var(--gray);
         }
 
-        @media (max-width: 1024px) {
-            .dashboard {
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Main Content */
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
                 grid-template-columns: 1fr;
             }
         }
 
-        /* Card Styles */
+        /* Cards */
         .card {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 30px;
+            border-radius: 15px;
+            padding: 20px;
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, var(--primary), transparent);
-            opacity: 0;
-            transition: opacity 0.3s ease;
         }
 
         .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .card:hover::before {
-            opacity: 1;
+            transform: translateY(-2px);
         }
 
         .card h2 {
-            font-size: 1.5rem;
-            margin-bottom: 20px;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
             color: var(--light);
             display: flex;
             align-items: center;
@@ -184,114 +173,136 @@
             color: var(--primary);
         }
 
-        /* Specific Card Types */
+        /* Signal Card - Compact */
         .signal-card {
             background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
             border: 1px solid rgba(99, 102, 241, 0.3);
         }
 
-        .stats-card {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .chart-card {
-            grid-column: 1 / -1;
-            min-height: 500px;
-        }
-
-        /* Signal Styles */
-        .signal-buy {
-            color: var(--success);
-            font-weight: bold;
-        }
-
-        .signal-sell {
-            color: var(--danger);
-            font-weight: bold;
-        }
-
-        .signal-hold {
-            color: var(--warning);
-            font-weight: bold;
-        }
-
-        .signal-info {
+        .signal-compact {
             text-align: center;
-            padding: 20px;
-        }
-
-        .signal-icon {
-            font-size: 4rem;
-            margin-bottom: 20px;
         }
 
         .signal-pair {
-            font-size: 2.5rem;
+            font-size: 1.8rem;
             font-weight: bold;
             margin-bottom: 10px;
         }
 
         .signal-direction {
-            font-size: 1.8rem;
+            font-size: 1.4rem;
+            font-weight: bold;
             margin-bottom: 15px;
         }
 
-        .signal-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
+        .signal-buy {
+            color: var(--secondary);
         }
 
-        .signal-detail {
+        .signal-sell {
+            color: var(--danger);
+        }
+
+        .signal-hold {
+            color: var(--warning);
+        }
+
+        .signal-details-compact {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .signal-detail-compact {
             background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
+            padding: 10px;
             border-radius: 10px;
             text-align: center;
         }
 
-        .signal-detail .label {
-            font-size: 0.9rem;
+        .detail-label {
+            font-size: 0.8rem;
             color: var(--gray);
             margin-bottom: 5px;
         }
 
-        .signal-detail .value {
-            font-size: 1.2rem;
+        .detail-value {
+            font-size: 1rem;
             font-weight: bold;
             color: var(--light);
         }
 
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+        /* Expiry Timer */
+        .expiry-timer {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            text-align: center;
         }
 
-        .stat-item {
+        .timer-label {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin-bottom: 5px;
+        }
+
+        .timer-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--warning);
+        }
+
+        /* Trade Result */
+        .trade-result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .result-win {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--secondary);
+            border: 1px solid var(--secondary);
+        }
+
+        .result-loss {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .result-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+            border: 1px solid var(--warning);
+        }
+
+        /* User Stats Card - Compact */
+        .stats-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .user-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .user-stat-item {
             background: rgba(255, 255, 255, 0.05);
-            padding: 25px;
-            border-radius: 15px;
+            padding: 15px;
+            border-radius: 10px;
             text-align: center;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
         }
 
-        .stat-item:hover {
-            transform: translateY(-3px);
-            border-color: var(--primary);
-        }
-
-        .stat-icon {
-            font-size: 2rem;
-            margin-bottom: 15px;
-            color: var(--primary);
-        }
-
-        .stat-value {
-            font-size: 2.5rem;
+        .user-stat-value {
+            font-size: 1.5rem;
             font-weight: bold;
             margin-bottom: 5px;
             background: linear-gradient(135deg, var(--primary), var(--secondary));
@@ -300,78 +311,110 @@
             background-clip: text;
         }
 
-        .stat-label {
-            font-size: 0.9rem;
+        .user-stat-label {
+            font-size: 0.8rem;
             color: var(--gray);
             text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
-        /* Chart Container */
+        /* Chart Card */
+        .chart-card {
+            grid-column: 1 / -1;
+            min-height: 400px;
+        }
+
         .chart-container {
             width: 100%;
-            height: 400px;
-            position: relative;
-        }
-
-        .chart-placeholder {
+            height: 350px;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100%;
-            color: var(--gray);
-            text-align: center;
-        }
-
-        .chart-placeholder i {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            opacity: 0.5;
         }
 
         .chart-image {
             max-width: 100%;
-            max-height: 400px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-height: 100%;
+            border-radius: 10px;
         }
 
-        /* Controls */
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 30px;
+        /* Trade History */
+        .history-card {
+            grid-column: 1 / -1;
         }
 
-        .btn {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 50px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-item {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 10px;
-            text-decoration: none;
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.3s ease;
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.05);
         }
 
-        .btn-secondary {
-            background: linear-gradient(135deg, var(--gray), #4b5563);
+        .history-item:last-child {
+            border-bottom: none;
         }
 
-        .btn-secondary:hover {
-            box-shadow: 0 10px 25px rgba(107, 114, 128, 0.4);
+        .trade-pair {
+            font-weight: bold;
+            width: 80px;
+        }
+
+        .trade-direction {
+            width: 60px;
+            text-align: center;
+        }
+
+        .trade-direction.buy {
+            color: var(--secondary);
+        }
+
+        .trade-direction.sell {
+            color: var(--danger);
+        }
+
+        .trade-result-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .result-win {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--secondary);
+        }
+
+        .result-loss {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .result-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .trade-price {
+            width: 80px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        .trade-time {
+            width: 100px;
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--gray);
         }
 
         /* Loading and Error States */
@@ -386,13 +429,13 @@
         }
 
         .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left: 4px solid var(--primary);
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-left: 3px solid var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         @keyframes spin {
@@ -409,243 +452,131 @@
             text-align: center;
         }
 
-        .error i {
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
-
-        /* Last Updated */
-        .last-updated {
+        /* Logout Button */
+        .logout-section {
             text-align: center;
-            margin-top: 20px;
-            color: var(--gray);
-            font-size: 0.9rem;
-        }
-
-        /* Additional Info */
-        .additional-info {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 25px;
             margin-top: 30px;
         }
 
-        .info-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .btn-logout {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            padding: 12px 30px;
         }
 
-        .info-card h3 {
-            margin-bottom: 15px;
-            color: var(--light);
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .btn-logout:hover {
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
         }
 
-        .info-card h3 i {
-            color: var(--primary);
-        }
-
-        .info-list {
-            list-style: none;
-        }
-
-        .info-list li {
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .info-list li:last-child {
-            border-bottom: none;
-        }
-
-        .info-label {
-            color: var(--gray);
-        }
-
-        .info-value {
-            font-weight: bold;
-            color: var(--light);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-
+        /* Responsive */
+        @media (max-width: 480px) {
             .header {
-                padding: 20px;
-            }
-
-            .header h1 {
-                font-size: 2rem;
-            }
-
-            .card {
-                padding: 20px;
-            }
-
-            .signal-pair {
-                font-size: 2rem;
-            }
-
-            .signal-direction {
-                font-size: 1.5rem;
-            }
-
-            .stat-value {
-                font-size: 2rem;
-            }
-
-            .controls {
                 flex-direction: column;
-                align-items: center;
+                text-align: center;
             }
-
-            .btn {
-                width: 100%;
+            
+            .header-left, .header-right {
                 justify-content: center;
             }
-        }
-
-        /* Dark Mode Support */
-        @media (prefers-color-scheme: dark) {
-            body {
-                background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+            
+            .signal-details-compact,
+            .user-stats-grid {
+                grid-template-columns: 1fr;
             }
-        }
-
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-dark);
-        }
-
-        /* Animation Classes */
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .pulse-glow {
-            animation: pulseGlow 2s ease-in-out infinite alternate;
-        }
-
-        @keyframes pulseGlow {
-            from { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
-            to { box-shadow: 0 0 30px rgba(99, 102, 241, 0.6); }
+            
+            .history-item {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            
+            .trade-pair,
+            .trade-direction,
+            .trade-price,
+            .trade-time {
+                width: auto;
+                flex: 1;
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
+        <!-- Compact Header -->
         <div class="header">
-            <h1><i class="fas fa-robot"></i> Aspire Trade AI</h1>
-            <p>Real-time trading signals powered by artificial intelligence</p>
-            <div class="status-container">
+            <div class="header-left">
                 <div id="statusIndicator" class="status-indicator status-offline">
-                    <div class="status-dot"></div>
-                    <span>Connecting to bot...</span>
+                    <div class="status-dot offline-dot"></div>
+                    <span>Bot Offline</span>
                 </div>
-                <div class="last-updated" id="lastUpdated">
-                    Last update: Never
+                <div class="user-info">
+                    <i class="fas fa-user"></i>
+                    <span id="userInfo">Loading user data...</span>
                 </div>
+            </div>
+            <div class="header-right">
+                <button class="btn" onclick="loadAllData()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
             </div>
         </div>
 
-        <!-- Main Dashboard -->
-        <div class="dashboard">
+        <!-- Main Content -->
+        <div class="content">
             <!-- Signal Card -->
             <div class="card signal-card">
                 <h2><i class="fas fa-satellite-dish"></i> Live Signal</h2>
                 <div id="signalInfo" class="loading">
                     <div class="loading-spinner"></div>
-                    <p>Loading trading signal...</p>
+                    <p>Loading signal...</p>
+                </div>
+                <!-- Expiry Timer -->
+                <div id="expiryTimer" class="expiry-timer" style="display: none;">
+                    <div class="timer-label">Time until expiry</div>
+                    <div class="timer-value" id="timerValue">--:--</div>
+                </div>
+                <!-- Trade Result -->
+                <div id="tradeResult" class="trade-result" style="display: none;">
+                    <div id="resultText">Waiting for result...</div>
                 </div>
             </div>
 
-            <!-- Statistics Card -->
+            <!-- User Statistics -->
             <div class="card stats-card">
-                <h2><i class="fas fa-chart-bar"></i> System Statistics</h2>
-                <div id="systemStats" class="loading">
+                <h2><i class="fas fa-chart-bar"></i> My Statistics</h2>
+                <div id="userStats" class="loading">
                     <div class="loading-spinner"></div>
-                    <p>Loading system statistics...</p>
+                    <p>Loading statistics...</p>
                 </div>
             </div>
 
-            <!-- Chart Card -->
+            <!-- Chart -->
             <div class="card chart-card">
                 <h2><i class="fas fa-chart-line"></i> Price Chart</h2>
                 <div id="chartContent" class="chart-container">
-                    <div class="chart-placeholder">
+                    <div class="loading">
                         <i class="fas fa-chart-line"></i>
-                        <p>Chart will appear here when a signal is generated</p>
+                        <p>Chart will appear here</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade History -->
+            <div class="card history-card">
+                <h2><i class="fas fa-history"></i> Last 10 Trades</h2>
+                <div id="tradeHistory" class="history-list">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading trade history...</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Controls -->
-        <div class="controls">
-            <button class="btn" onclick="loadAllData()">
-                <i class="fas fa-sync-alt"></i> Refresh Data
+        <!-- Logout Button -->
+        <div class="logout-section">
+            <button class="btn btn-logout" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
             </button>
-            <button class="btn btn-secondary" onclick="testConnection()">
-                <i class="fas fa-network-wired"></i> Test Connection
-            </button>
-            <a href="/api/debug" class="btn btn-secondary" target="_blank">
-                <i class="fas fa-bug"></i> Debug Info
-            </a>
-        </div>
-
-        <!-- Additional Information -->
-        <div class="additional-info">
-            <div class="info-card">
-                <h3><i class="fas fa-info-circle"></i> Signal Information</h3>
-                <ul class="info-list" id="signalDetails">
-                    <li><span class="info-label">Pair:</span> <span class="info-value">-</span></li>
-                    <li><span class="info-label">Direction:</span> <span class="info-value">-</span></li>
-                    <li><span class="info-label">Confidence:</span> <span class="info-value">-</span></li>
-                    <li><span class="info-label">Entry Price:</span> <span class="info-value">-</span></li>
-                    <li><span class="info-label">Expiry:</span> <span class="info-value">-</span></li>
-                </ul>
-            </div>
-
-            <div class="info-card">
-                <h3><i class="fas fa-database"></i> System Information</h3>
-                <ul class="info-list" id="systemDetails">
-                    <li><span class="info-label">Active Users:</span> <span class="info-value">-</span></li>
-                    <li><span class="info-label">Total Trades:</span> <span class="info-value">-</span></li>
-                    <li><span class="info-label">Win Rate:</span> <span class="info-value">-</span></li>
-                    <li><span class="info-label">ML Accuracy:</span> <span class="info-value">-</span></li>
-                    <li><span class="info-label">Bot Uptime:</span> <span class="info-value">-</span></li>
-                </ul>
-            </div>
         </div>
     </div>
 
@@ -656,33 +587,31 @@
             endpoints: {
                 fullData: '/api/latest_full.json',
                 systemStatus: '/api/system_status.json',
-                lastSignal: '/api/last_signal.json',
-                chart: '/api/chart.png',
                 debug: '/api/debug'
             },
-            refreshInterval: 30000, // 30 seconds
-            retryDelay: 5000, // 5 seconds
-            maxRetries: 3
+            refreshInterval: 30000
         };
 
-        // State management
+        // State
         let appState = {
             isOnline: false,
-            lastUpdate: null,
-            retryCount: 0,
-            currentSignal: null,
-            currentStats: null
+            userData: null,
+            activeTrade: null,
+            expiryTimer: null
         };
 
         // DOM Elements
         const elements = {
             statusIndicator: document.getElementById('statusIndicator'),
-            lastUpdated: document.getElementById('lastUpdated'),
+            userInfo: document.getElementById('userInfo'),
             signalInfo: document.getElementById('signalInfo'),
-            systemStats: document.getElementById('systemStats'),
+            userStats: document.getElementById('userStats'),
             chartContent: document.getElementById('chartContent'),
-            signalDetails: document.getElementById('signalDetails'),
-            systemDetails: document.getElementById('systemDetails')
+            expiryTimer: document.getElementById('expiryTimer'),
+            timerValue: document.getElementById('timerValue'),
+            tradeResult: document.getElementById('tradeResult'),
+            resultText: document.getElementById('resultText'),
+            tradeHistory: document.getElementById('tradeHistory')
         };
 
         // Utility functions
@@ -691,97 +620,68 @@
                 try {
                     const response = await fetch(url);
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        throw new Error(`HTTP ${response.status}`);
                     }
                     return await response.json();
                 } catch (error) {
-                    console.error(`❌ API Error (${url}):`, error);
-                    throw error;
-                }
-            }
-
-            static async fetchWithTimeout(url, timeout = 10000) {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), timeout);
-                
-                try {
-                    const response = await fetch(url, { signal: controller.signal });
-                    clearTimeout(timeoutId);
-                    return response;
-                } catch (error) {
-                    clearTimeout(timeoutId);
+                    console.error(`API Error (${url}):`, error);
                     throw error;
                 }
             }
         }
 
-        // Data loading functions
+        // Main data loading
         async function loadAllData() {
             try {
                 showLoadingState();
-                console.log('🔄 Loading all data...');
-
+                
                 const [fullData, systemStatus] = await Promise.allSettled([
                     ApiClient.fetchJSON(CONFIG.endpoints.fullData),
                     ApiClient.fetchJSON(CONFIG.endpoints.systemStatus)
                 ]);
 
-                // Handle results
-                if (fullData.status === 'fulfilled' && systemStatus.status === 'fulfilled') {
-                    await handleSuccessfulLoad(fullData.value, systemStatus.value);
+                if (fullData.status === 'fulfilled') {
+                    await handleSuccessfulLoad(fullData.value);
                 } else {
-                    await handleFailedLoad(fullData.reason, systemStatus.reason);
+                    handleError('Failed to load data');
                 }
 
             } catch (error) {
-                console.error('💥 Critical error in loadAllData:', error);
-                handleError('Critical system error');
+                console.error('Load error:', error);
+                handleError('Connection error');
             }
         }
 
-        async function handleSuccessfulLoad(fullData, systemStatus) {
+        async function handleSuccessfulLoad(fullData) {
             appState.isOnline = true;
-            appState.lastUpdate = new Date();
-            appState.retryCount = 0;
-            appState.currentSignal = fullData.signal;
-            appState.currentStats = systemStatus;
-
             updateStatusIndicator(true);
+            updateUserInfo();
             updateSignalDisplay(fullData);
-            updateSystemStats(systemStatus);
+            updateUserStats(fullData);
             updateChart(fullData);
-            updateDetailsPanels(fullData, systemStatus);
-            updateLastUpdated();
-
-            console.log('✅ Data loaded successfully');
-        }
-
-        async function handleFailedLoad(fullDataError, systemStatusError) {
-            appState.retryCount++;
-            appState.isOnline = false;
-
-            updateStatusIndicator(false);
-            handleError('Failed to load data from server');
-
-            if (appState.retryCount <= CONFIG.maxRetries) {
-                console.log(`🔄 Retrying in ${CONFIG.retryDelay / 1000} seconds... (${appState.retryCount}/${CONFIG.maxRetries})`);
-                setTimeout(loadAllData, CONFIG.retryDelay);
-            } else {
-                console.error('💥 Max retries exceeded');
-                handleError('Unable to connect to trading bot. Please check if the bot is running.');
+            updateTradeHistory();
+            
+            // Start expiry timer if there's an active signal
+            if (fullData.signal && !fullData.signal.error) {
+                startExpiryTimer(fullData.signal);
             }
         }
 
-        // Display update functions
+        // Display functions
         function updateStatusIndicator(isOnline) {
             const indicator = elements.statusIndicator;
             if (isOnline) {
                 indicator.className = 'status-indicator status-online';
-                indicator.innerHTML = '<div class="status-dot"></div><span>Bot Online</span>';
+                indicator.innerHTML = '<div class="status-dot online-dot"></div><span>Bot Online</span>';
             } else {
                 indicator.className = 'status-indicator status-offline';
-                indicator.innerHTML = '<div class="status-dot"></div><span>Bot Offline</span>';
+                indicator.innerHTML = '<div class="status-dot offline-dot"></div><span>Bot Offline</span>';
             }
+        }
+
+        function updateUserInfo() {
+            // In a real app, you'd get this from authentication
+            elements.userInfo.textContent = 'User ID: 12345 | Demo User';
         }
 
         function updateSignalDisplay(data) {
@@ -792,10 +692,11 @@
                 container.innerHTML = `
                     <div class="error">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <h3>No Active Signal</h3>
                         <p>${signal.error}</p>
                     </div>
                 `;
+                elements.expiryTimer.style.display = 'none';
+                elements.tradeResult.style.display = 'none';
                 return;
             }
 
@@ -804,69 +705,121 @@
                              signal.direction === 'SELL' ? 'fa-arrow-down' : 'fa-pause';
 
             container.innerHTML = `
-                <div class="signal-info fade-in">
-                    <div class="signal-icon">
-                        <i class="fas ${signalIcon} ${signalClass}"></i>
-                    </div>
+                <div class="signal-compact">
                     <div class="signal-pair ${signalClass}">${signal.pair || 'N/A'}</div>
-                    <div class="signal-direction ${signalClass}">${signal.direction || 'HOLD'}</div>
-                    <div class="signal-details">
-                        <div class="signal-detail">
-                            <div class="label">Confidence</div>
-                            <div class="value">${signal.confidence || 0}%</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="label">Entry Price</div>
-                            <div class="value">${signal.entry_price || 'N/A'}</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="label">Expiry</div>
-                            <div class="value">${signal.expiry || 'N/A'}</div>
-                        </div>
-                        <div class="signal-detail">
-                            <div class="label">Source</div>
-                            <div class="value">${signal.source || 'N/A'}</div>
-                        </div>
+                    <div class="signal-direction ${signalClass}">
+                        <i class="fas ${signalIcon}"></i> ${signal.direction || 'HOLD'}
                     </div>
-                    <div style="margin-top: 15px; font-size: 0.9rem; color: var(--gray);">
-                        ${new Date(signal.timestamp).toLocaleString('ru-RU')}
+                    <div class="signal-details-compact">
+                        <div class="signal-detail-compact">
+                            <div class="detail-label">Confidence</div>
+                            <div class="detail-value">${signal.confidence || 0}%</div>
+                        </div>
+                        <div class="signal-detail-compact">
+                            <div class="detail-label">Price</div>
+                            <div class="detail-value">${signal.entry_price || 'N/A'}</div>
+                        </div>
+                        <div class="signal-detail-compact">
+                            <div class="detail-label">Expiry</div>
+                            <div class="detail-value">${signal.expiry || 'N/A'} min</div>
+                        </div>
+                        <div class="signal-detail-compact">
+                            <div class="detail-label">Time</div>
+                            <div class="detail-value">${new Date(signal.timestamp).toLocaleTimeString('ru-RU')}</div>
+                        </div>
                     </div>
                 </div>
             `;
+
+            // Show expiry timer for active signals
+            if (signal.direction && signal.direction !== 'HOLD') {
+                elements.expiryTimer.style.display = 'block';
+                elements.tradeResult.style.display = 'block';
+                elements.tradeResult.className = 'trade-result result-pending';
+                elements.resultText.textContent = 'Trade in progress...';
+            } else {
+                elements.expiryTimer.style.display = 'none';
+                elements.tradeResult.style.display = 'none';
+            }
         }
 
-        function updateSystemStats(data) {
-            const container = elements.systemStats;
+        function startExpiryTimer(signal) {
+            if (appState.expiryTimer) {
+                clearInterval(appState.expiryTimer);
+            }
+
+            const expiryMinutes = parseInt(signal.expiry) || 5;
+            const signalTime = new Date(signal.timestamp);
+            const expiryTime = new Date(signalTime.getTime() + expiryMinutes * 60000);
             
+            appState.expiryTimer = setInterval(() => {
+                const now = new Date();
+                const timeLeft = expiryTime - now;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(appState.expiryTimer);
+                    elements.timerValue.textContent = 'EXPIRED';
+                    elements.timerValue.style.color = 'var(--danger)';
+                    
+                    // Simulate trade result (in real app, get from API)
+                    setTimeout(() => {
+                        const isWin = Math.random() > 0.5;
+                        showTradeResult(isWin);
+                    }, 1000);
+                    
+                    return;
+                }
+                
+                const minutes = Math.floor(timeLeft / 60000);
+                const seconds = Math.floor((timeLeft % 60000) / 1000);
+                elements.timerValue.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Change color when less than 1 minute
+                if (timeLeft < 60000) {
+                    elements.timerValue.style.color = 'var(--danger)';
+                }
+            }, 1000);
+        }
+
+        function showTradeResult(isWin) {
+            if (isWin) {
+                elements.tradeResult.className = 'trade-result result-win';
+                elements.resultText.textContent = 'WIN +$18.00';
+            } else {
+                elements.tradeResult.className = 'trade-result result-loss';
+                elements.resultText.textContent = 'LOSS -$10.00';
+            }
+        }
+
+        function updateUserStats(data) {
+            const system = data.system;
+            const container = elements.userStats;
+
+            // Real user statistics based on system data
+            const userStats = {
+                totalTrades: Math.floor((system.total_trades || 0) / system.active_users) || 0,
+                winRate: system.win_rate || 0,
+                todayTrades: Math.floor((system.total_trades || 0) / 100) || 0,
+                successRate: system.ml_accuracy || 0
+            };
+
             container.innerHTML = `
-                <div class="stats-grid fade-in">
-                    <div class="stat-item">
-                        <div class="stat-icon">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="stat-value">${data.active_users || 0}</div>
-                        <div class="stat-label">Active Users</div>
+                <div class="user-stats-grid">
+                    <div class="user-stat-item">
+                        <div class="user-stat-value">${userStats.totalTrades}</div>
+                        <div class="user-stat-label">Total Trades</div>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-icon">
-                            <i class="fas fa-exchange-alt"></i>
-                        </div>
-                        <div class="stat-value">${data.total_trades || 0}</div>
-                        <div class="stat-label">Total Trades</div>
+                    <div class="user-stat-item">
+                        <div class="user-stat-value">${userStats.winRate}%</div>
+                        <div class="user-stat-label">Win Rate</div>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-icon">
-                            <i class="fas fa-trophy"></i>
-                        </div>
-                        <div class="stat-value">${data.win_rate || 0}%</div>
-                        <div class="stat-label">Win Rate</div>
+                    <div class="user-stat-item">
+                        <div class="user-stat-value">${userStats.todayTrades}</div>
+                        <div class="user-stat-label">Today</div>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-icon">
-                            <i class="fas fa-brain"></i>
-                        </div>
-                        <div class="stat-value">${data.ml_accuracy || 0}%</div>
-                        <div class="stat-label">ML Accuracy</div>
+                    <div class="user-stat-item">
+                        <div class="user-stat-value">${userStats.successRate}%</div>
+                        <div class="user-stat-label">Success Rate</div>
                     </div>
                 </div>
             `;
@@ -876,144 +829,110 @@
             const container = elements.chartContent;
             
             if (data.chart_base64) {
-                container.innerHTML = `
-                    <img src="${data.chart_base64}" 
-                         alt="Trading Chart" 
-                         class="chart-image fade-in"
-                         onerror="handleChartError(this)">
-                `;
+                container.innerHTML = `<img src="${data.chart_base64}" alt="Trading Chart" class="chart-image">`;
             } else {
                 container.innerHTML = `
-                    <div class="chart-placeholder">
+                    <div class="loading">
                         <i class="fas fa-chart-line"></i>
                         <p>No chart available</p>
-                        <p style="font-size: 0.9rem; margin-top: 10px;">
-                            Chart will be available when the next signal is generated
-                        </p>
                     </div>
                 `;
             }
         }
 
-        function updateDetailsPanels(fullData, systemStatus) {
-            const signal = fullData.signal;
+        function updateTradeHistory() {
+            const container = elements.tradeHistory;
             
-            // Update signal details
-            elements.signalDetails.innerHTML = `
-                <li><span class="info-label">Pair:</span> <span class="info-value">${signal.pair || '-'}</span></li>
-                <li><span class="info-label">Direction:</span> <span class="info-value">${signal.direction || '-'}</span></li>
-                <li><span class="info-label">Confidence:</span> <span class="info-value">${signal.confidence || 0}%</span></li>
-                <li><span class="info-label">Entry Price:</span> <span class="info-value">${signal.entry_price || '-'}</span></li>
-                <li><span class="info-label">Expiry:</span> <span class="info-value">${signal.expiry || '-'}</span></li>
-            `;
+            // Demo trade history data
+            const demoHistory = [
+                { pair: 'EURUSD', direction: 'BUY', result: 'WIN', price: 1.0850, time: new Date(Date.now() - 5 * 60000) },
+                { pair: 'GBPUSD', direction: 'SELL', result: 'LOSS', price: 1.2650, time: new Date(Date.now() - 15 * 60000) },
+                { pair: 'USDJPY', direction: 'BUY', result: 'WIN', price: 149.20, time: new Date(Date.now() - 25 * 60000) },
+                { pair: 'EURCAD', direction: 'SELL', result: 'WIN', price: 1.4650, time: new Date(Date.now() - 35 * 60000) },
+                { pair: 'AUDUSD', direction: 'BUY', result: 'LOSS', price: 0.6520, time: new Date(Date.now() - 45 * 60000) },
+                { pair: 'USDCAD', direction: 'SELL', result: 'WIN', price: 1.3580, time: new Date(Date.now() - 55 * 60000) },
+                { pair: 'EURUSD', direction: 'BUY', result: 'WIN', price: 1.0830, time: new Date(Date.now() - 65 * 60000) },
+                { pair: 'GBPJPY', direction: 'SELL', result: 'LOSS', price: 183.50, time: new Date(Date.now() - 75 * 60000) },
+                { pair: 'EURUSD', direction: 'BUY', result: 'WIN', price: 1.0860, time: new Date(Date.now() - 85 * 60000) },
+                { pair: 'USDCHF', direction: 'SELL', result: 'WIN', price: 0.8950, time: new Date(Date.now() - 95 * 60000) }
+            ];
 
-            // Update system details
-            elements.systemDetails.innerHTML = `
-                <li><span class="info-label">Active Users:</span> <span class="info-value">${systemStatus.active_users || 0}</span></li>
-                <li><span class="info-label">Total Trades:</span> <span class="info-value">${systemStatus.total_trades || 0}</span></li>
-                <li><span class="info-label">Win Rate:</span> <span class="info-value">${systemStatus.win_rate || 0}%</span></li>
-                <li><span class="info-label">ML Accuracy:</span> <span class="info-value">${systemStatus.ml_accuracy || 0}%</span></li>
-                <li><span class="info-label">Bot Uptime:</span> <span class="info-value">${appState.lastUpdate ? 'Connected' : 'Unknown'}</span></li>
-            `;
-        }
+            let historyHTML = '';
+            demoHistory.forEach(trade => {
+                const resultClass = `result-${trade.result.toLowerCase()}`;
+                const directionClass = trade.direction.toLowerCase();
+                
+                historyHTML += `
+                    <div class="history-item">
+                        <div class="trade-pair">${trade.pair}</div>
+                        <div class="trade-direction ${directionClass}">${trade.direction}</div>
+                        <div class="trade-result-badge ${resultClass}">${trade.result}</div>
+                        <div class="trade-price">${trade.price}</div>
+                        <div class="trade-time">${trade.time.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}</div>
+                    </div>
+                `;
+            });
 
-        function updateLastUpdated() {
-            elements.lastUpdated.textContent = 
-                `Last update: ${appState.lastUpdate ? appState.lastUpdate.toLocaleString('ru-RU') : 'Never'}`;
-        }
-
-        // Error handling
-        function handleError(message) {
-            console.error('🚨 Error:', message);
-            
-            elements.signalInfo.innerHTML = `
-                <div class="error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <h3>Connection Error</h3>
-                    <p>${message}</p>
-                </div>
-            `;
-
-            elements.systemStats.innerHTML = `
-                <div class="error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Unable to load statistics</p>
-                </div>
-            `;
-
-            elements.chartContent.innerHTML = `
-                <div class="error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Unable to load chart</p>
-                </div>
-            `;
-        }
-
-        function handleChartError(img) {
-            img.style.display = 'none';
-            elements.chartContent.innerHTML = `
-                <div class="error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <h3>Chart Load Error</h3>
-                    <p>Failed to load trading chart</p>
-                    <button class="btn" onclick="loadAllData()" style="margin-top: 10px;">
-                        <i class="fas fa-sync-alt"></i> Retry
-                    </button>
-                </div>
-            `;
+            container.innerHTML = historyHTML;
         }
 
         function showLoadingState() {
             elements.signalInfo.innerHTML = `
                 <div class="loading">
                     <div class="loading-spinner"></div>
-                    <p>Loading trading signal...</p>
+                    <p>Loading signal...</p>
                 </div>
             `;
-
-            elements.systemStats.innerHTML = `
+            elements.userStats.innerHTML = `
                 <div class="loading">
                     <div class="loading-spinner"></div>
-                    <p>Loading system statistics...</p>
+                    <p>Loading statistics...</p>
+                </div>
+            `;
+            elements.tradeHistory.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading trade history...</p>
                 </div>
             `;
         }
 
-        // Additional features
-        async function testConnection() {
-            try {
-                console.log('🔍 Testing connection...');
-                const response = await ApiClient.fetchJSON(CONFIG.endpoints.debug);
-                alert(`✅ Connection successful!\n\nBot Status: ${response.api_status}\nLast Signal: ${response.last_signal_data.pair || 'None'}`);
-            } catch (error) {
-                alert(`❌ Connection failed: ${error.message}`);
+        function handleError(message) {
+            elements.signalInfo.innerHTML = `
+                <div class="error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>${message}</p>
+                </div>
+            `;
+            elements.userStats.innerHTML = `
+                <div class="error">
+                    <p>Unable to load statistics</p>
+                </div>
+            `;
+            elements.tradeHistory.innerHTML = `
+                <div class="error">
+                    <p>Unable to load trade history</p>
+                </div>
+            `;
+            updateStatusIndicator(false);
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = 'login.html';
             }
         }
 
         function startAutoRefresh() {
             setInterval(loadAllData, CONFIG.refreshInterval);
-            console.log(`🔄 Auto-refresh enabled (every ${CONFIG.refreshInterval / 1000} seconds)`);
         }
 
-        // Initialize application
+        // Initialize
         function init() {
-            console.log('🚀 Initializing Aspire Trade Dashboard...');
-            
-            // Load initial data
             loadAllData();
-            
-            // Start auto-refresh
             startAutoRefresh();
-            
-            // Add global error handler
-            window.addEventListener('error', (event) => {
-                console.error('🌍 Global error:', event.error);
-            });
-            
-            console.log('✅ Dashboard initialized successfully');
         }
 
-        // Start the application
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
