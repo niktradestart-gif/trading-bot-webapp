@@ -2592,6 +2592,9 @@ def analyze_pair(pair: str):
         if final_signal:
             logging.info(f"🚀 {pair}: Окончательный сигнал = {final_signal} ({final_source}, conf={final_confidence})")
             
+            # ✅ ДОБАВИТЬ ЗДЕСЬ: Обновляем веб-JSON при нахождении сигнала
+            update_web_jsons()
+            
             # 🔥 ДОБАВЛЕНО: ОБНОВЛЕНИЕ WEB API
             try:
                 update_signal_data(
@@ -2832,7 +2835,7 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logging.error(f"💥 Критическая ошибка авто-трейдинга: {e}", exc_info=True)
-
+        
 # ===================== TRADE RESULT CHECKER =====================
 async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
     """Проверяет результат сделки и закрывает её с обновлением истории и статистики"""
@@ -2861,7 +2864,7 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
         # Получаем текущую цену
         df = get_mt5_data(pair, 2, mt5.TIMEFRAME_M1)
         if df is None or len(df) < 1:
-            logging.error(f"❌ Не удалось получить данные для {pair}")
+            logging.error(f"❌ Не удалось получить данных для {pair}")
             return
 
         current_price = df['close'].iloc[-1]
@@ -2910,7 +2913,14 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
         # ✅ Сохраняем обновлённые данные пользователя
         save_users_data()
 
-        # ✅ Логируем сделку в файл истории (если функция есть)
+        # ✅ ОБНОВЛЯЕМ ВЕБ-JSON ФАЙЛЫ ПОСЛЕ ЗАКРЫТИЯ СДЕЛКИ
+        try:
+            update_web_jsons()
+            logging.info("🌐 Web JSON файлы обновлены после закрытия сделки")
+        except Exception as e:
+            logging.error(f"❌ Ошибка обновления web JSON: {e}")
+
+        # ✅ Логируем сделку в файл истории
         try:
             log_trade_to_file(closed_trade, result)
         except Exception as e:
@@ -2950,6 +2960,7 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logging.error(f"💥 Критическая ошибка в check_trade_result: {e}", exc_info=True)
+        
 # ===================== 🤖 PROCESS AUTO TRADE =====================
 async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE):
     """Авто-трейдинг: анализ, открытие сделки и отложенная запись после закрытия"""
@@ -4344,13 +4355,15 @@ print("   • http://0.0.0.0:8080/api/test_result - Тест результат�
 def update_web_jsons():
     """Создаёт/обновляет JSON-файлы для веб-панели"""
     try:
-        # Импортируем users из основного скрипта
-        from botaspireFINNAL import users
-        
+        print("🔄 ОБНОВЛЕНИЕ WEB JSON...")
+     
         # Основная статистика системы
         total_trades = sum(len(u.get("trade_history", [])) for u in users.values())
         wins = sum(1 for u in users.values() for t in u.get("trade_history", []) if t.get("result") == "WIN")
         win_rate = round(wins / max(1, total_trades) * 100, 2) if total_trades > 0 else 0
+        
+        print(f"📊 Статистика: {total_trades} сделок, {wins} побед, winrate {win_rate}%")
+        print(f"👥 Пользователей: {len(users)}")
         
         system_data = {
             "total_trades": total_trades,
@@ -4382,8 +4395,6 @@ def update_web_jsons():
         print("[WEB_API] ✅ Обновлён last_result.json")
     except Exception as e:
         print(f"[WEB_API] ⚠ Ошибка last_result.json: {e}")
-
-
 if __name__ == "__main__":
     main()
 
