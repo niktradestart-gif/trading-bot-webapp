@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>ASPIRE TRADE — Live Signals</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="theme-color" content="#0b0f19" />
+  <style>
+    :root{
+      --bg:#0b0f19;
+      --card:#111629;
+      --muted:#8d95af;
+      --text:#e9ecf5;
+      --good:#27e0a1;
+      --bad:#ff5c7a;
+      --warn:#ffd166;
+      --accent:#5aa6ff;
+      --accent-2:#7b5bff;
+      --border:rgba(255,255,255,0.06);
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:radial-gradient(1200px 600px at 50% -10%, rgba(90,166,255,.08), transparent 60%) , var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";}
+
+    /* Контейнер страницы */
+    .wrap{
+      min-height:100dvh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:18px 14px 24px;
+      gap:14px;
+    }
+
+    /* Заголовок */
+    .head{
+      width:100%;
+      max-width:900px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .brand{
+      display:flex;align-items:center;gap:10px;
+      font-weight:700;letter-spacing:.5px
+    }
+    .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 0 18px rgba(122,139,255,.6)}
+    .brand span{opacity:.9}
+    .status{
+      font-size:12px;color:var(--muted);
+      padding:4px 8px;border:1px solid var(--border);border-radius:999px;
+      backdrop-filter: blur(6px);
+    }
+
+    /* Главная сетка: центр — большой блок; боковые — инфо карточки (мобильные — снизу) */
+    .grid{
+      width:100%;
+      max-width:900px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:14px;
+    }
+    @media (min-width: 860px){
+      .grid{
+        grid-template-columns: 1.15fr .85fr;
+        align-items:start;
+      }
+    }
+
+    /* Главная карточка (график + сигнал + таймер) */
+    .card{
+      background:linear-gradient(180deg, rgba(20,26,48,.68), rgba(15,19,34,.85));
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .card__inner{
+      padding:14px;
+    }
+    .center-block{
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;
+    }
+    .title{
+      font-size:18px;font-weight:700; letter-spacing:.3px;
+      display:flex;gap:8px;align-items:center
+    }
+    .badge{
+      font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted)
+    }
+
+    /* График */
+    .chart-wrap{
+      width:100%;
+      max-width:760px;
+      aspect-ratio: 16/10;
+      border-radius:12px;
+      overflow:hidden;
+      background:#0b0f19;
+      border:1px solid var(--border);
+      position:relative;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    }
+    .chart{
+      width:100%;height:100%;display:block;object-fit:cover
+    }
+    .chart--hidden{display:none}
+
+    /* Информация по активному сигналу */
+    .signal{
+      width:100%;
+      display:grid; gap:8px;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+    .signal .item{
+      background: rgba(255,255,255,.02);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px 12px;
+      display:flex;flex-direction:column;gap:4px
+    }
+    .label{font-size:12px;color:var(--muted)}
+    .val{font-size:16px;font-weight:700}
+    .val.buy{color:var(--good)}
+    .val.sell{color:var(--bad)}
+    .val.em{color:var(--accent)}
+
+    /* Таймер */
+    .timer{
+      margin-top:4px;
+      font-variant-numeric: tabular-nums;
+      font-size:20px;font-weight:800;letter-spacing:.5px
+    }
+
+    /* Карточка завершённой сделки */
+    .deal{
+      width:100%;
+      max-width:760px;
+      background:linear-gradient(180deg, rgba(25,13,20,.75), rgba(20,12,18,.9));
+      border:1px solid rgba(255,92,122,.35);
+      border-radius:14px;
+      padding:16px;
+      display:none;
+      animation:.35s ease fadeIn;
+      box-shadow:0 10px 30px rgba(255,92,122,.18);
+    }
+    .deal.win{
+      background:linear-gradient(180deg, rgba(17,33,28,.75), rgba(14,26,23,.9));
+      border:1px solid rgba(39,224,161,.35);
+      box-shadow:0 10px 30px rgba(39,224,161,.18);
+    }
+    .deal .h{
+      display:flex;align-items:center;gap:8px;
+      font-weight:800;letter-spacing:.4px
+    }
+    .deal .h .dot{width:10px;height:10px;background:var(--bad)}
+    .deal.win .h .dot{background:var(--good)}
+    .deal .rows{
+      margin-top:10px;display:grid;gap:8px;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+    .deal .rows .r{
+      background: rgba(255,255,255,.02);
+      border:1px solid var(--border);
+      border-radius:10px;padding:10px 12px
+    }
+    .deal .rows .r .label{font-size:12px;color:var(--muted)}
+    .deal .rows .r .val{font-weight:700;font-size:16px}
+
+    /* Боковая колонка с компактными инфо-карточками */
+    .side{
+      display:grid;gap:12px
+    }
+    .mini{
+      background:linear-gradient(180deg, rgba(20,26,48,.65), rgba(15,19,34,.82));
+      border:1px solid var(--border);
+      border-radius:14px;padding:12px;
+    }
+    .mini h4{margin:0 0 6px 0;font-size:14px;opacity:.9}
+    .mini .kv{display:flex;justify-content:space-between; font-size:13px;color:var(--muted)}
+    .mini .kv .v{color:var(--text);font-weight:700}
+
+    /* Анимации и состояния */
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+    .fade-in{animation:.3s ease fadeIn}
+    .hide{display:none!important}
+
+    /* Мобильные правки */
+    @media (max-width: 480px){
+      .title{font-size:16px}
+      .signal{grid-template-columns: 1fr 1fr}
+      .deal .rows{grid-template-columns: 1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+  <!-- CONFIG -->
+  <script>
+    const CONFIG = {
+      apiBase: "https://nonurban-joella-unvagrantly.ngrok-free.dev",
+      endpoints: {
+        latest:   "/api/latest_full.json",
+        system:   "/api/system_status.json",
+        chart:    "/api/chart.png",           // PNG графика
+        lastSig:  "/api/last_signal.json",    // запасной вариант
+        lastRes:  "/api/last_result.json"     // завершённая сделка
+      },
+      refreshMs: 5000,   // автообновление каждые 5 сек
+      chartBust: true    // добавлять ?ts= для обновления картинки
+    };
+  </script>
+
+  <div class="wrap">
+    <!-- Шапка -->
+    <div class="head">
+      <div class="brand"><span class="dot"></span><span>ASPIRE TRADE</span></div>
+      <div id="sysStatus" class="status">Инициализация…</div>
+    </div>
+
+    <div class="grid">
+      <!-- Центр: график + сигнал + таймер / либо карточка завершения -->
+      <div class="card">
+        <div class="card__inner center-block" id="centerBlock">
+
+          <div class="title"><span>ТЕКУЩИЙ СИГНАЛ</span> <span id="sigSource" class="badge">—</span></div>
+
+          <!-- График -->
+          <div class="chart-wrap">
+            <img id="chartImg" class="chart" alt="chart">
+          </div>
+
+          <!-- Информация по сигналу -->
+          <div class="signal">
+            <div class="item">
+              <div class="label">Пара</div>
+              <div id="pair" class="val em">—</div>
+            </div>
+            <div class="item">
+              <div class="label">Направление</div>
+              <div id="direction" class="val">—</div>
+            </div>
+            <div class="item">
+              <div class="label">Вход</div>
+              <div id="entry" class="val">—</div>
+            </div>
+            <div class="item">
+              <div class="label">Экспирация</div>
+              <div id="expiry" class="val">—</div>
+            </div>
+          </div>
+
+          <!-- Таймер -->
+          <div class="timer" id="countdown">⏳ —:—</div>
+
+          <!-- Карточка завершённой сделки (по умолчанию скрыта) -->
+          <div id="dealCard" class="deal">
+            <div class="h"><span class="dot"></span><span id="dealTitle">СДЕЛКА ЗАВЕРШЕНА</span></div>
+            <div class="rows">
+              <div class="r"><div class="label">Пара</div><div id="d_pair" class="val">—</div></div>
+              <div class="r"><div class="label">Направление</div><div id="d_dir" class="val">—</div></div>
+              <div class="r"><div class="label">Вход</div><div id="d_entry" class="val">—</div></div>
+              <div class="r"><div class="label">Выход</div><div id="d_exit" class="val">—</div></div>
+              <div class="r" style="grid-column:1 / -1"><div class="label">Результат</div><div id="d_res" class="val">—</div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Боковая колонка: компактные инфо блоки -->
+      <div class="side">
+        <div class="mini">
+          <h4>Система</h4>
+          <div class="kv"><span>MT5</span><span id="mt5" class="v">—</span></div>
+          <div class="kv"><span>ML</span><span id="ml" class="v">—</span></div>
+          <div class="kv"><span>Активные пользователи</span><span id="users" class="v">—</span></div>
+        </div>
+        <div class="mini">
+          <h4>Статистика</h4>
+          <div class="kv"><span>Сделок</span><span id="total" class="v">—</span></div>
+          <div class="kv"><span>Побед</span><span id="wins" class="v">—</span></div>
+          <div class="kv"><span>Win Rate</span><span id="winrate" class="v">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --------- Утилиты
+    const qs = s => document.querySelector(s);
+    const fmt = n => (n===null||n===undefined) ? "—" : (typeof n==="number" ? (Math.abs(n) >= 1 ? n.toFixed(5) : n.toPrecision(6)) : n);
+    const pad = x => String(x).padStart(2,'0');
+
+    let countdownTimer = null;
+    let lastTradeIdShown = null;
+    let lastSignalTs = 0;
+
+    function setSystemStatus(text){
+      qs('#sysStatus').textContent = text;
+    }
+
+    function setChartVisible(v){
+      const img = qs('#chartImg');
+      if(v){
+        img.classList.remove('chart--hidden');
+      }else{
+        img.classList.add('chart--hidden');
+      }
+    }
+
+    function setDealVisible(v, win=false){
+      const card = qs('#dealCard');
+      if(v){
+        card.classList.remove('hide');
+        card.classList.add('fade-in');
+        if(win){ card.classList.add('win'); } else { card.classList.remove('win'); }
+      }else{
+        card.classList.add('hide');
+        card.classList.remove('win');
+      }
+    }
+
+    function startCountdown(expiryIso){
+      clearInterval(countdownTimer);
+      const el = qs('#countdown');
+      if(!expiryIso){ el.textContent = '⏳ —:—'; return; }
+      const target = new Date(expiryIso).getTime();
+      countdownTimer = setInterval(()=>{
+        const now = Date.now();
+        let diff = Math.max(0, target - now);
+        const sec = Math.floor(diff/1000);
+        const m = Math.floor(sec/60);
+        const s = sec % 60;
+        el.textContent = `⏳ Осталось: ${pad(m)}:${pad(s)}`;
+        if(diff<=0){
+          clearInterval(countdownTimer);
+        }
+      }, 250);
+    }
+
+    function cacheBust(url){
+      return CONFIG.chartBust ? `${url}?ts=${Date.now()}` : url;
+    }
+
+    // --------- Рендеры
+    function renderSystem(sys){
+      try{
+        const mt5 = sys?.mt5===true || sys?.mt5==="OK";
+        const ml  = !!sys?.ml_loaded || (sys?.ml_accuracy>0);
+        qs('#mt5').textContent = mt5 ? 'OK' : '—';
+        qs('#ml').textContent  = ml ? 'OK' : '—';
+        qs('#users').textContent = sys?.active_users ?? sys?.users_count ?? '—';
+      }catch(e){}
+    }
+
+    function renderStats(stats){
+      try{
+        qs('#total').textContent   = stats?.total ?? '—';
+        qs('#wins').textContent    = stats?.wins ?? '—';
+        const wr = stats?.win_rate ?? stats?.winrate;
+        qs('#winrate').textContent = (wr!=null) ? `${wr}%` : '—';
+      }catch(e){}
+    }
+
+    function renderActiveSignal(sig){
+      // ожидаемый формат: { trade_id?, pair, direction, entry, expiry_at?, expiry_minutes?, created_at?, source, confidence }
+      qs('#sigSource').textContent = sig?.source ?? '—';
+      qs('#pair').textContent      = sig?.pair ?? '—';
+      const dir = String(sig?.direction||'—').toUpperCase();
+      const dirEl = qs('#direction');
+      dirEl.textContent = dir;
+      dirEl.classList.remove('buy','sell');
+      if(dir==='BUY') dirEl.classList.add('buy');
+      if(dir==='SELL') dirEl.classList.add('sell');
+      qs('#entry').textContent     = fmt(sig?.entry);
+
+      // Экспирация
+      let expiryLabel = '—';
+      let expiryIso = sig?.expiry_at;
+      const created = sig?.created_at ? new Date(sig.created_at).getTime() : null;
+      if(!expiryIso && sig?.expiry_minutes && created){
+        expiryIso = new Date(created + sig.expiry_minutes*60*1000).toISOString();
+      }
+      if(expiryIso){
+        const d = new Date(expiryIso);
+        expiryLabel = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      }
+      qs('#expiry').textContent = expiryLabel;
+
+      // Показать график и спрятать карточку сделки
+      setDealVisible(false);
+      setChartVisible(true);
+
+      // Обновить картинку графика
+      qs('#chartImg').src = cacheBust(`${CONFIG.apiBase}${CONFIG.endpoints.chart}`);
+
+      // Запустить таймер
+      startCountdown(expiryIso);
+    }
+
+    function renderCompletedTrade(res){
+      // формат: { trade_id, pair, direction, entry_price?, exit_price?, result, completed_at }
+      const id = res?.trade_id ?? '—';
+      const pair = res?.pair ?? '—';
+      const dir = res?.direction ? String(res.direction).toUpperCase() : '—';
+      const entry = res?.entry_price ?? res?.entry ?? '—';
+      const exit =  res?.exit_price ?? res?.exit ?? '—';
+      const result = (res?.result||'—').toUpperCase();
+
+      lastTradeIdShown = res?.trade_id || null;
+
+      // Заголовок: 🔴/🟢 СДЕЛКА #ID ЗАВЕРШЕНА
+      const h = (result==='WIN') ? '🟢 СДЕЛКА #' : '🔴 СДЕЛКА #';
+      qs('#dealTitle').textContent = `${h}${id} ЗАВЕРШЕНА`;
+
+      qs('#d_pair').textContent  = pair;
+      qs('#d_dir').textContent   = dir;
+      qs('#d_entry').textContent = fmt(entry);
+      qs('#d_exit').textContent  = fmt(exit);
+      qs('#d_res').textContent   = result;
+
+      // Скрыть график и показать карточку сделки (без денег, как просил)
+      setChartVisible(false);
+      setDealVisible(true, result==='WIN');
+
+      // Остановить таймер
+      clearInterval(countdownTimer);
+      qs('#countdown').textContent = '⏳ —:—';
+    }
+
+    // --------- Загрузка данных
+    async function loadLatest(){
+      try{
+        const latestUrl = `${CONFIG.apiBase}${CONFIG.endpoints.latest}`;
+        const r = await fetch(latestUrl, {cache:'no-store'});
+        if(!r.ok) throw new Error('bad latest_full');
+        const data = await r.json();
+
+        // системная часть
+        if(data?.system) renderSystem(data.system);
+        else {
+          // fallback — отдельный запрос
+          fetch(`${CONFIG.apiBase}${CONFIG.endpoints.system}`).then(r=>r.json()).then(renderSystem).catch(()=>{});
+        }
+        if(data?.stats) renderStats(data.stats);
+
+        // логика отображения
+        const sig = data?.signal;
+        const res = data?.result;
+
+        // решение: если есть активный сигнал (expiry в будущем) — показываем его.
+        // если сигнала нет или он истёк — показываем последнюю завершённую сделку (если есть).
+        let showSignal = false;
+
+        if(sig){
+          let expIso = sig.expiry_at;
+          const created = sig?.created_at ? new Date(sig.created_at).getTime() : null;
+          if(!expIso && sig?.expiry_minutes && created){
+            expIso = new Date(created + sig.expiry_minutes*60*1000).toISOString();
+          }
+          if(expIso){
+            const expMs = new Date(expIso).getTime();
+            showSignal = expMs > Date.now();
+          }
+        }
+
+        if(showSignal){
+          // если пришёл новый сигнал — сразу обновим
+          const sigStamp = new Date(sig?.created_at || Date.now()).getTime();
+          if(sigStamp !== lastSignalTs){
+            lastSignalTs = sigStamp;
+            renderActiveSignal(sig);
+          }else{
+            // просто обновим таймер/картинку реже
+            startCountdown(sig?.expiry_at);
+          }
+        }else if(res){
+          // если есть результат — покажем карточку завершения
+          if(res.trade_id !== lastTradeIdShown){
+            renderCompletedTrade(res);
+          }
+        }else{
+          // нет ни активного, ни результата — просто ждём
+          setSystemStatus('Ожидание сигнала…');
+        }
+
+        // статус в шапке
+        const acc = data?.system?.ml_accuracy;
+        if(acc!=null){
+          setSystemStatus(`ML: ${acc}% • OK`);
+        }else{
+          setSystemStatus('Система активна');
+        }
+      }catch(err){
+        setSystemStatus('Сервер недоступен');
+        console.error(err);
+      }
+    }
+
+    // старт + автообновление
+    window.addEventListener('load', ()=>{
+      loadLatest();
+      setInterval(loadLatest, CONFIG.refreshMs);
+    });
+  </script>
+</body>
+</html>
