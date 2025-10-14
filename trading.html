@@ -161,7 +161,7 @@
 <script>
 (() => {
   const state = {
-    apiBase: window.location.origin,      // сохраняем твою логику, но делаем универсально (ngrok/localhost)
+    apiBase: 'https://nonurban-joella-unvagrantly.ngrok-free.dev', // ФИКСИРОВАННЫЙ URL
     pollMs: 5000,
     lastSignalTs: 0,
     lastTradeIdShown: null,
@@ -179,7 +179,6 @@
     let uid = localStorage.getItem('user_id') || localStorage.getItem('uid') || null;
 
     if(!uid){
-      // пытаемся прочитать pocket_users.json (сначала /api/, потом корень)
       try{
         let r = await fetch(`${state.apiBase}/api/pocket_users.json`, {cache:'no-store'});
         if(!r.ok) throw 0;
@@ -204,10 +203,8 @@
   }
 
   function extractUserIdFromPocket(obj){
-    // ожидается структура вида: { users: [{id: ... , ...}, ...] } или { "5129282647": {...}, ... }
     try{
       if(Array.isArray(obj?.users) && obj.users.length){
-        // если есть флаг "current" — берём его, иначе первого
         const current = obj.users.find(u => u.current || u.active);
         return String((current || obj.users[0]).id || '');
       }
@@ -269,9 +266,8 @@
     state.timerInt = setInterval(tick, 250);
   }
 
-  // -------- renderers (сохраняем твою структуру latest_full.json)
+  // -------- renderers
   function renderSignal(sig, chartBase64){
-    // показать график, скрыть завершенную сделку
     setDealVisible(false);
     setChartVisible(true);
 
@@ -285,10 +281,8 @@
     if(dir==='BUY')  dirEl.classList.add('buy');
     if(dir==='SELL') dirEl.classList.add('sell');
 
-    // у тебя приходит entry_price
     el('#entry').textContent = fmt(sig?.entry_price ?? sig?.entry);
 
-    // expiry — это минуты; метка времени — timestamp (ISO/число)
     const createdTs = sig?.timestamp ?? sig?.created_at ?? Date.now();
     const expMin    = sig?.expiry ?? sig?.expiry_minutes ?? null;
     if(createdTs && expMin){
@@ -300,7 +294,6 @@
       startTimer(null, null);
     }
 
-    // график — из chart_base64
     if(chartBase64){
       el('#chartImg').src = chartBase64.startsWith("data:image") 
         ? chartBase64 
@@ -325,11 +318,9 @@
     el('#d_exit').textContent  = fmt(exit);
     el('#d_res').textContent   = result;
 
-    // скрыть график, показать карточку
     setChartVisible(false);
     setDealVisible(true, result==='WIN');
 
-    // остановить таймер
     clearInterval(state.timerInt);
     el('#timerText').textContent = '⏳ —:—';
     el('#barFill').style.width = '0%';
@@ -338,17 +329,22 @@
   // -------- fetch & decide
   async function loadLatest(){
     try{
-      const r = await fetch(`${state.apiBase}/api/latest_full.json`, {cache:'no-store'});
-      if(!r.ok) throw new Error('bad latest_full');
+      console.log('🔄 Загрузка данных...');
+      const r = await fetch(`${state.apiBase}/api/latest_full.json?_t=${Date.now()}`, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store'
+      });
+      
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      
       const data = await r.json();
+      console.log('✅ Данные получены:', data);
 
-      // ожидается твоя структура:
-      // { signal: { pair, direction, entry_price, expiry, timestamp, ... }, result: {...}, chart_base64: "..." }
       const sig = data?.signal || null;
       const res = data?.result || null;
       const chartB64 = data?.chart_base64 || null;
 
-      // если есть активный сигнал — показываем его; иначе — результат, если есть
       let showSignal = false;
       if(sig){
         const created = sig?.timestamp ?? sig?.created_at ?? null;
@@ -361,14 +357,12 @@
       }
 
       if(showSignal){
-        // ререндер только если новый штамп
         const stamp = sig?.timestamp ? (typeof sig.timestamp==='number' ? sig.timestamp : new Date(sig.timestamp).getTime())
                                      : (sig?.created_at ? new Date(sig.created_at).getTime() : Date.now());
         if (stamp !== state.lastSignalTs){
           state.lastSignalTs = stamp;
           renderSignal(sig, chartB64);
         } else {
-          // обновим таймер без перерисовки
           startTimer(sig?.timestamp ?? sig?.created_at ?? null, sig?.expiry ?? sig?.expiry_minutes ?? null);
         }
       }else if(res){
@@ -377,10 +371,10 @@
           renderCompleted(res);
         }
       }else{
-        // ни сигнала, ни результата — просто ждём
+        console.log('ℹ️ Нет активных данных');
       }
     }catch(e){
-      console.warn(e);
+      console.warn('❌ Ошибка:', e);
     }
   }
 
@@ -392,6 +386,44 @@
 
   window.addEventListener('load', boot);
 })();
+
+// === ДИАГНОСТИКА ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ===
+console.log('=== ДИАГНОСТИКА ВКЛЮЧЕНА ===');
+
+// Статус панель
+const statusEl = document.createElement('div');
+statusEl.style.cssText = `
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: #ff4444;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    z-index: 9999;
+    font-family: system-ui;
+    font-size: 12px;
+    font-weight: 600;
+    border: 2px solid white;
+`;
+statusEl.innerHTML = '🔧 ДИАГНОСТИКА';
+document.body.appendChild(statusEl);
+
+// Мониторинг соединения
+let errorCount = 0;
+setInterval(() => {
+    const now = new Date().toLocaleTimeString();
+    statusEl.innerHTML = `🔧 ${now}<br>Ошибок: ${errorCount}`;
+    statusEl.style.background = errorCount > 0 ? '#ff4444' : '#10b981';
+}, 1000);
+
+// Глобальный обработчик ошибок
+window.addEventListener('error', (e) => {
+    errorCount++;
+    console.error('🚨 Глобальная ошибка:', e.error);
+});
+
+console.log('✅ Диагностика активирована');
 </script>
 </body>
 </html>
