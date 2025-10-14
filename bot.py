@@ -658,9 +658,8 @@ def run_web_api():
         serve(app_web, host="0.0.0.0", port=8080, threads=6)
     except Exception as e:
         logging.error(f"❌ Ошибка запуска Flask API через Waitress: {e}")
-        # fallback на обычный dev-server (на случай если waitress не установлена)
         app_web.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
-
+        
 # Запускаем API как отдельный поток (чтобы не блокировал Telegram-бота)
 threading.Thread(target=run_web_api, daemon=True).start()
 
