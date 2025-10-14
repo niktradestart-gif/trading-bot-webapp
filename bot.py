@@ -49,6 +49,45 @@ def is_trading_time() -> bool:
     """⏰ ВРЕМЕННО ОТКЛЮЧЕНО - всегда разрешено торговать для теста"""
     return True
 
+# ==================== TIME FILTERS (TRADE HOURS) ====================
+import json
+from datetime import datetime
+
+def load_time_filters():
+    """Загружает файл time_filters.json"""
+    try:
+        with open("time_filters.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+            print(f"✅ Загружено {len(data)} фильтров по парам.")
+            return data
+    except Exception as e:
+        print(f"⚠️ Не удалось загрузить time_filters.json: {e}")
+        return {}
+
+TIME_FILTERS = load_time_filters()
+TIME_FILTERS_LAST_UPDATE = datetime.now()
+
+def auto_reload_filters():
+    """Автоматически перезагружает фильтр при изменении файла (без рестарта)"""
+    global TIME_FILTERS, TIME_FILTERS_LAST_UPDATE
+    try:
+        import os
+        mtime = datetime.fromtimestamp(os.path.getmtime("time_filters.json"))
+        if mtime > TIME_FILTERS_LAST_UPDATE:
+            TIME_FILTERS = load_time_filters()
+            TIME_FILTERS_LAST_UPDATE = datetime.now()
+            print("♻️ Файл фильтров обновлён на лету.")
+    except Exception:
+        pass
+
+def is_trade_allowed(pair: str, ts: datetime = None) -> bool:
+    """Проверяет, можно ли торговать выбранную пару в данный момент"""
+    ts = ts or datetime.utcnow()
+    hour = ts.hour
+    auto_reload_filters()  # 🔄 Проверяем актуальность фильтра
+    allowed_hours = TIME_FILTERS.get(pair, TIME_FILTERS.get("DEFAULT", list(range(24))))
+    return hour in allowed_hours
+
 # ================== ML MODEL LOAD ==================
 import joblib
 
@@ -3287,6 +3326,12 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
         random.shuffle(PAIRS)
 
         for pair in PAIRS:
+            # Проверяем фильтр по времени для пары
+            if not is_trade_allowed(pair):
+                logging.info(f"⏰ Пропуск {pair} — неразрешённое время торговли.")
+                continue
+
+            
             start_time = datetime.now()
             result = analyze_pair(pair)
             if not result or len(result) < 4:
@@ -3608,6 +3653,12 @@ async def next_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     random.shuffle(PAIRS)
 
     for pair in PAIRS:
+
+        # ⏰ Проверяем фильтр по разрешённым часам из time_filters.json
+        if not is_trade_allowed(pair):
+            logging.info(f"⏰ Пропуск {pair} — неразрешённое время торговли (ручной поиск сигнала).")
+            continue
+        
         # ИСПРАВЛЕНИЕ: убрали user_id из вызова
         result = analyze_pair(pair)
         if len(result) >= 4:
@@ -4174,7 +4225,7 @@ async def force_enable_ml_command(update: Update, context: ContextTypes.DEFAULT_
 from telegram import Update
 from telegram.ext import ContextTypes
 
-ADMIN_IDS = [5129282647]  # 🛠️ Замени на свой Telegram user_id, если другой
+ADMIN_IDS = [5129282647]  
 
 async def clear_all_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Принудительно очищает все открытые сделки у всех пользователей (только для админа)"""
