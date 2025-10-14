@@ -386,7 +386,165 @@
 
   window.addEventListener('load', boot);
 })();
+<script>
+// === ПАНЕЛЬ ОШИБОК ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ===
+console.log('=== ПАНЕЛЬ ОШИБОК АКТИВИРОВАНА ===');
 
+// Создаем панель ошибок
+const errorPanel = document.createElement('div');
+errorPanel.style.cssText = `
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.95);
+    color: white;
+    padding: 15px;
+    border-radius: 10px;
+    z-index: 10000;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    max-width: 400px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 2px solid #ff4444;
+    display: none;
+`;
+errorPanel.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <strong>🚨 ПАНЕЛЬ ОШИБОК</strong>
+        <button onclick="document.getElementById('errorPanel').style.display='none'" 
+                style="background: #ff4444; border: none; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer;">
+            ✕
+        </button>
+    </div>
+    <div id="errorLogs" style="color: #ff6b6b;"></div>
+`;
+errorPanel.id = 'errorPanel';
+document.body.appendChild(errorPanel);
+
+// Кнопка для показа ошибок
+const errorButton = document.createElement('button');
+errorButton.style.cssText = `
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: #ff4444;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 20px;
+    z-index: 10000;
+    font-family: system-ui;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(255,0,0,0.3);
+`;
+errorButton.innerHTML = '🚨 Ошибки';
+errorButton.onclick = () => {
+    document.getElementById('errorPanel').style.display = 
+        document.getElementById('errorPanel').style.display === 'none' ? 'block' : 'none';
+};
+document.body.appendChild(errorButton);
+
+// Коллектор ошибок
+const errorLogs = [];
+const maxLogs = 20;
+
+function addErrorLog(message, type = 'error') {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = {
+        time: timestamp,
+        message: message,
+        type: type
+    };
+    
+    errorLogs.unshift(logEntry); // Добавляем в начало
+    if (errorLogs.length > maxLogs) {
+        errorLogs.pop(); // Удаляем старые логи
+    }
+    
+    updateErrorDisplay();
+    
+    // Показываем панель при новой ошибке
+    if (type === 'error') {
+        document.getElementById('errorPanel').style.display = 'block';
+    }
+}
+
+function updateErrorDisplay() {
+    const errorLogsElement = document.getElementById('errorLogs');
+    errorLogsElement.innerHTML = errorLogs.map(log => `
+        <div style="margin: 5px 0; padding: 5px; background: rgba(255,0,0,0.1); border-radius: 3px;">
+            <span style="color: #ccc;">[${log.time}]</span>
+            <span style="color: ${log.type === 'error' ? '#ff6b6b' : '#51cf66'};">${log.message}</span>
+        </div>
+    `).join('');
+}
+
+// Перехватываем console.error
+const originalConsoleError = console.error;
+console.error = function(...args) {
+    originalConsoleError.apply(console, args);
+    addErrorLog(args.join(' '), 'error');
+};
+
+// Перехватываем console.warn
+const originalConsoleWarn = console.warn;
+console.warn = function(...args) {
+    originalConsoleWarn.apply(console, args);
+    addErrorLog(args.join(' '), 'warning');
+};
+
+// Перехватываем fetch ошибки
+const originalFetch = window.fetch;
+window.fetch = function(...args) {
+    return originalFetch.apply(this, args)
+        .then(response => {
+            if (!response.ok) {
+                addErrorLog(`HTTP ${response.status}: ${args[0]}`, 'error');
+            }
+            return response;
+        })
+        .catch(error => {
+            addErrorLog(`Fetch error: ${error.message} - ${args[0]}`, 'error');
+            throw error;
+        });
+};
+
+// Глобальный обработчик ошибок
+window.addEventListener('error', (e) => {
+    addErrorLog(`Global error: ${e.error || e.message}`, 'error');
+});
+
+// Обработчик Promise rejections
+window.addEventListener('unhandledrejection', (e) => {
+    addErrorLog(`Promise rejection: ${e.reason}`, 'error');
+});
+
+// Мониторинг состояния сети
+window.addEventListener('online', () => {
+    addErrorLog('Сеть: онлайн', 'info');
+});
+
+window.addEventListener('offline', () => {
+    addErrorLog('Сеть: офлайн', 'error');
+});
+
+// Тестовые ошибки для проверки (можно удалить)
+setTimeout(() => {
+    addErrorLog('Система диагностики активирована', 'info');
+    console.log('✅ Панель ошибок готова');
+}, 1000);
+
+// Авто-очистка старых логов
+setInterval(() => {
+    const now = Date.now();
+    // Оставляем только логи за последние 5 минут
+    // (если нужно будет добавить timestamp к логам)
+}, 300000);
+
+</script>
 // === ДИАГНОСТИКА ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ===
 console.log('=== ДИАГНОСТИКА ВКЛЮЧЕНА ===');
 
