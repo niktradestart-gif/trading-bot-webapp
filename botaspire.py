@@ -21,8 +21,6 @@ import mplfinance as mpf
 from matplotlib.patches import Rectangle
 from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 
-WEB_ENABLED = False
-
 # ===================== JOB QUEUE LISTENER =====================
 def job_listener(event):
     """Обработчик событий job queue"""
@@ -2551,23 +2549,6 @@ def analyze_pair(pair: str):
         if final_signal:
             logging.info(f"🚀 {pair}: Окончательный сигнал = {final_signal} ({final_source}, conf={final_confidence})")
             
-            # ✅ ДОБАВИТЬ ЗДЕСЬ: Обновляем веб-JSON при нахождении сигнала
-            update_web_jsons()
-            
-            # 🔥 ДОБАВЛЕНО: ОБНОВЛЕНИЕ WEB API
-            try:
-                update_signal_data(
-                    pair=pair,
-                    direction=final_signal,
-                    confidence=final_confidence,
-                    expiry=final_expiry,
-                    source=final_source,
-                    entry_price=current_price
-                )
-                logging.info(f"📡 Web API: Сигнал обновлен для {pair}")
-            except Exception as e:
-                logging.error(f"⚠️ Ошибка обновления сигнала для Web API: {e}")
-            
             return final_signal, final_expiry, final_confidence, final_source, ml_features_data
 
         logging.info(f"❌ {pair}: сигналов нет или они отфильтрованы")
@@ -2583,31 +2564,26 @@ import plotly.io as pio
 import pandas as pd
 import logging, os
 from datetime import datetime
-from io import BytesIO
 from PIL import Image
 from plotly.subplots import make_subplots
 
 pio.defaults.default_format = "png"
-pio.defaults.width = 1200
-pio.defaults.height = 900
-pio.defaults.scale = 2
+pio.defaults.width = 1000  # ⬅️ УМЕНЬШИЛИ
+pio.defaults.height = 700  # ⬅️ УМЕНЬШИЛИ
+pio.defaults.scale = 1     # ⬅️ УМЕНЬШИЛИ качество для скорости
 
 def enhanced_plot_chart(df, pair, entry_price, direction):
-    """TradingView-стиль графика с УПРОЩЕННЫМИ элементами но с отступом"""
+    """TradingView-стиль графика для ЛЕГКОЙ ВЕРСИИ (без веба)"""
     
-    # 🔧 ОБЪЯВЛЯЕМ ГЛОБАЛЬНУЮ ПЕРЕМЕННУЮ В САМОМ НАЧАЛЕ
-    global latest_chart_bytes
+    # 🔥 УДАЛИЛИ глобальную переменную latest_chart_bytes
+    # global latest_chart_bytes
     
-    # 🔥 КЭШИРОВАНИЕ - проверяем есть ли свежий график
+    # 🔥 УПРОЩЕННОЕ КЭШИРОВАНИЕ - только для текущего запуска
     web_path = f"smc_chart_{pair}_latest.png"
     if os.path.exists(web_path):
         file_time = datetime.fromtimestamp(os.path.getmtime(web_path))
         if (datetime.now() - file_time).total_seconds() < 300:  # 5 минут
             logging.info(f"📊 Используем кэшированный график для {pair}")
-            
-            # Обновляем веб-API
-            with open(web_path, 'rb') as f:
-                latest_chart_bytes = f.read()
             return web_path
     
     try:
@@ -2615,33 +2591,9 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             return None
 
         # ✅ СОХРАНЯЕМ отступ в 20 свечей
-        df_plot = df.tail(150).copy()  # 130 реальных + 20 отступ
-        if 'tick_volume' in df_plot.columns and 'volume' not in df_plot.columns:
-            df_plot = df_plot.rename(columns={'tick_volume': 'volume'})
-
-        # ======== СОХРАНЯЕМ 20 СВЕЧЕЙ ОТСТУПА ========
-        last_index = None
-        if len(df_plot) > 0:
-            last_index = df_plot.index[-1]
-            last_close = df_plot['close'].iloc[-1]
-            
-            # Создаем пустые индексы для отступа
-            if isinstance(last_index, pd.Timestamp):
-                empty_indices = [last_index + pd.Timedelta(minutes=i+1) for i in range(20)]
-            else:
-                empty_indices = [last_index + i + 1 for i in range(20)]
-            
-            # Создаем DataFrame с пустыми свечами
-            empty_df = pd.DataFrame(index=empty_indices)
-            for col in ['open', 'high', 'low', 'close']:
-                empty_df[col] = last_close
-            empty_df['volume'] = 0
-            
-            # Объединяем с основными данными
-            df_plot = pd.concat([df_plot, empty_df])
+        df_plot = df.tail(130).copy()  # ⬅️ УМЕНЬШИЛИ с 150 до 130
         
         # ======== УПРОЩЕННАЯ АНАЛИТИКА ========
-        # ❌ УДАЛЕНО: сложные расчеты зон и ордер-блоков
         trend_analysis = enhanced_trend_analysis(df)
         current_price = df_plot['close'].iloc[-1]
 
@@ -2660,109 +2612,58 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             ]
         )
 
-        # ======== УПРОЩЕННЫЕ СВЕЧИ С ОТСТУПОМ ========
-        if last_index is not None:
-            real_data_mask = df_plot.index <= last_index
-            empty_data_mask = df_plot.index > last_index
-        else:
-            real_data_mask = [True] * len(df_plot)
-            empty_data_mask = [False] * len(df_plot)
-        
-        # Реальные свечи
-        real_indices = df_plot.index[real_data_mask]
+        # ======== ПРОСТЫЕ СВЕЧИ ========
         fig.add_trace(go.Candlestick(
-            x=real_indices,
-            open=df_plot.loc[real_data_mask, "open"], 
-            high=df_plot.loc[real_data_mask, "high"],
-            low=df_plot.loc[real_data_mask, "low"], 
-            close=df_plot.loc[real_data_mask, "close"],
+            x=df_plot.index,
+            open=df_plot["open"], 
+            high=df_plot["high"],
+            low=df_plot["low"], 
+            close=df_plot["close"],
             name="Price",
             increasing_line_color="#00ff88",
             decreasing_line_color="#ff4444",
             increasing_fillcolor="rgba(0,255,136,0.8)",
             decreasing_fillcolor="rgba(255,68,68,0.8)",
-            line=dict(width=1.5),
+            line=dict(width=1),
             whiskerwidth=0.8,
         ), row=1, col=1)
 
-        # Пустые свечи (прозрачные)
-        if any(empty_data_mask):
-            empty_indices = df_plot.index[empty_data_mask]
-            fig.add_trace(go.Candlestick(
-                x=empty_indices,
-                open=df_plot.loc[empty_data_mask, "open"], 
-                high=df_plot.loc[empty_data_mask, "high"],
-                low=df_plot.loc[empty_data_mask, "low"], 
-                close=df_plot.loc[empty_data_mask, "close"],
-                name="Future",
-                increasing_line_color="rgba(200,200,200,0.3)",
-                decreasing_line_color="rgba(200,200,200,0.3)",
-                increasing_fillcolor="rgba(200,200,200,0.1)",
-                decreasing_fillcolor="rgba(200,200,200,0.1)",
-                line=dict(width=1),
-                whiskerwidth=0.5,
-                showlegend=False
-            ), row=1, col=1)
-
-        # ======== SMA С ОТСТУПОМ ========
+        # ======== SMA ========
         fig.add_trace(go.Scatter(
-            x=real_indices, 
-            y=df_plot.loc[real_data_mask, "SMA20"],
-            line=dict(color="#ffaa00", width=3),
+            x=df_plot.index, 
+            y=df_plot["SMA20"],
+            line=dict(color="#ffaa00", width=2),
             name="SMA 20",
             opacity=0.9
         ), row=1, col=1)
-        
-        # Продолжаем SMA в область отступа
-        if any(empty_data_mask):
-            empty_indices = df_plot.index[empty_data_mask]
-            fig.add_trace(go.Scatter(
-                x=empty_indices, 
-                y=df_plot.loc[empty_data_mask, "SMA20"],
-                line=dict(color="#ffaa00", width=2, dash='dot'),
-                name="SMA 20 (proj)",
-                opacity=0.5,
-                showlegend=False
-            ), row=1, col=1)
 
         # ======== ОБЪЕМЫ ========
-        colors_volume_real = []
-        for idx in real_indices:
+        colors_volume = []
+        for idx in df_plot.index:
             close_val = df_plot.loc[idx, 'close']
             open_val = df_plot.loc[idx, 'open']
             color = 'rgba(255,68,68,0.7)' if close_val < open_val else 'rgba(0,255,136,0.7)'
-            colors_volume_real.append(color)
+            colors_volume.append(color)
         
         fig.add_trace(go.Bar(
-            x=real_indices, 
-            y=df_plot.loc[real_data_mask, "volume"],
+            x=df_plot.index, 
+            y=df_plot["volume"] if "volume" in df_plot.columns else df_plot.get("tick_volume", 0),
             name="Volume",
-            marker_color=colors_volume_real,
+            marker_color=colors_volume,
             marker_line_width=0,
             opacity=0.8
         ), row=2, col=1)
 
-        # ======== СОХРАНЯЕМ КЛЮЧЕВЫЕ ЛИНИИ ========
+        # ======== КЛЮЧЕВЫЕ ЛИНИИ ========
         # Линия входа
         entry_color = "#ffffff"
         fig.add_hline(
             y=entry_price,
-            line=dict(color=entry_color, width=3, dash='dash'),
+            line=dict(color=entry_color, width=2, dash='dash'),
             annotation_text=f"ENTRY: {entry_price:.5f}",
             annotation_position="right",
             annotation_font_color="#fff",
-            annotation_font_size=12,
-            row=1, col=1
-        )
-
-        # Текущая цена
-        fig.add_hline(
-            y=current_price,
-            line=dict(color="#00ffff", width=2, dash='dot'),
-            annotation_text=f"CURRENT: {current_price:.5f}",
-            annotation_position="right",
-            annotation_font_color="#00ffff",
-            annotation_font_size=11,
+            annotation_font_size=10,
             row=1, col=1
         )
 
@@ -2771,9 +2672,7 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
         info_text = (
             f"<b>PRICE:</b> {current_price:.5f}<br>"
             f"<b>TREND:</b> {trend_analysis['direction']}<br>"
-            f"<b>STRENGTH:</b> {trend_analysis['strength']}<br>"
-            f"<b>RSI:</b> {trend_analysis['rsi_state']}<br>"
-            f"<b>CHART:</b> 130+20 candles"
+            f"<b>SIGNAL:</b> {direction}"
         )
         
         fig.add_annotation(
@@ -2782,19 +2681,19 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             x=0.02, y=0.98,
             showarrow=False,
             align="left",
-            font=dict(color="white", size=12, family="Arial Black"),
+            font=dict(color="white", size=10, family="Arial"),
             bordercolor="white",
-            borderwidth=2,
-            borderpad=4,
+            borderwidth=1,
+            borderpad=3,
             bgcolor=info_bg,
-            opacity=0.95
+            opacity=0.9
         )
 
         # ======== УПРОЩЕННЫЙ ЛАЙАУТ ========
         fig.update_layout(
             title=dict(
-                text=f"🎯 {pair} - SMART MONEY - {direction} 🎯",
-                font=dict(color="white", size=20, family="Arial Black"),
+                text=f"{pair} - {direction}",
+                font=dict(color="white", size=16, family="Arial"),
                 x=0.5,
                 y=0.98
             ),
@@ -2807,40 +2706,33 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             yaxis2=dict(showgrid=False, side="right"),
             font=dict(color="white", family="Arial"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=50, r=120, t=80, b=60),
+            margin=dict(l=40, r=80, t=60, b=40),  # ⬅️ УМЕНЬШИЛИ отступы
             showlegend=True
         )
 
-        # ======== УМЕНЬШАЕМ КАЧЕСТВО ДЛЯ СКОРОСТИ ========
+        # ======== СОХРАНЕНИЕ ========
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         path = f"smc_chart_{pair}_{timestamp}.png"
         
         fig.write_image(
             path, 
-            scale=1,  # ⬅️ УМЕНЬШИЛИ с 2 до 1
-            width=1000, # ⬅️ УМЕНЬШИЛИ размер
-            height=800
+            scale=1,    # ⬅️ НИЗКОЕ КАЧЕСТВО ДЛЯ СКОРОСТИ
+            width=800,  # ⬅️ МЕНЬШИЙ РАЗМЕР
+            height=600
         )
 
+        # 🔥 СОХРАНЯЕМ ТОЛЬКО ДЛЯ TELEGRAM, НЕ ДЛЯ ВЕБА
         web_path = f"smc_chart_{pair}_latest.png"
-        fig.write_image(
-            web_path,
-            scale=1,  # ⬅️ УМЕНЬШИЛИ
-            width=1000,
-            height=800
-        )
+        fig.write_image(web_path, scale=1, width=800, height=600)
 
-        # Обновляем веб-API
-        with open(web_path, 'rb') as f:
-            latest_chart_bytes = f.read()
-
-        logging.info(f"📊 УПРОЩЕННЫЙ график сохранен: {web_path} (130+20 свечей)")
+        logging.info(f"📊 ЛЕГКИЙ график создан: {web_path}")
 
         return path
 
     except Exception as e:
-        logging.error(f"❌ Ошибка создания упрощенного графика: {e}")
+        logging.error(f"❌ Ошибка создания легкого графика: {e}")
         return None
+
 # ===================== GLOBAL SIGNAL VARIABLES =====================
 CURRENT_SIGNAL = None
 CURRENT_SIGNAL_TIMESTAMP = None
