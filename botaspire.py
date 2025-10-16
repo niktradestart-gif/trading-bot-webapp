@@ -9,6 +9,7 @@ import json
 import random
 from datetime import datetime, timedelta,  time
 from typing import Optional, Dict, List
+from functools import wraps
 
 # Market & math
 import MetaTrader5 as mt5
@@ -18,6 +19,19 @@ import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
 import mplfinance as mpf
 from matplotlib.patches import Rectangle
+from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+# ===================== JOB QUEUE LISTENER =====================
+def job_listener(event):
+    """Обработчик событий job queue"""
+    if event.code == EVENT_JOB_MISSED:
+        logging.warning(f"⏰ Job {event.job_id} был пропущен!")
+    elif event.code == EVENT_JOB_ERROR:
+        logging.error(f"❌ Job {event.job_id} завершился ошибкой: {event.exception}")
+    elif event.code == EVENT_JOB_EXECUTED:
+        logging.debug(f"✅ Job {event.job_id} выполнен успешно")
+
+# ===================== FIXED BOT WORKING HOURS =====================
+from datetime import datetime, time, timedelta
 
 # Telegram
 from telegram import Update, ReplyKeyboardMarkup
@@ -135,12 +149,49 @@ def is_trade_allowed(pair: str, ts: datetime = None) -> bool:
 
 # ================== ML MODEL LOAD ==================
 import joblib
+import json
+import logging
+import os
 
+def load_latest_ml_info():
+    """Загружает последний объект из ml_info.json (поддерживает список и dict)"""
+    try:
+        if not os.path.exists("ml_info.json"):
+            logging.warning("⚠️ Файл ml_info.json не найден")
+            return {}
+
+        with open("ml_info.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if isinstance(data, list):
+            if data:
+                latest = data[-1]
+                logging.info(f"📚 Найдено {len(data)} записей обучения, используем последнюю ({latest.get('trained_at', 'N/A')})")
+                return latest
+            else:
+                logging.warning("⚠️ ml_info.json пуст (список без записей)")
+                return {}
+        elif isinstance(data, dict):
+            return data
+        else:
+            logging.warning(f"⚠️ Неподдерживаемый формат ml_info.json: {type(data)}")
+            return {}
+
+    except Exception as e:
+        logging.error(f"Ошибка чтения ml_info.json: {e}", exc_info=True)
+        return {}
+
+# Загрузка модели, скейлера и информации
 try:
     ml_model = joblib.load("ml_model.pkl")
-    ml_scaler = joblib.load("ml_scaler.pkl")  # ДОБАВИТЬ ЭТУ СТРОКУ
-    with open("ml_info.json", "r", encoding="utf-8") as f:
-        model_info = json.load(f)
+    ml_scaler = joblib.load("ml_scaler.pkl")  # обязательная строка для нормализации входных данных
+    model_info = load_latest_ml_info()
+
+    if model_info:
+        logging.info(f"✅ ML модель загружена ({model_info.get('trained_at', 'N/A')})")
+    else:
+        logging.warning("⚠️ ML модель загружена, но информация о ней отсутствует или повреждена")
+
 except Exception as e:
     logging.warning(f"Не удалось загрузить ML модель: {e}")
     ml_model, ml_scaler, model_info = None, None, {}
@@ -517,26 +568,38 @@ def update_web_jsons():
         print(f"[WEB_API] ⚠ Ошибка last_result.json: {e}")
 
 def get_current_ml_accuracy():
-    """Получает актуальную точность ML модели из файла"""
+    """Возвращает актуальную точность ML модели из ml_info.json (с поддержкой списка историй)"""
     try:
-        if os.path.exists("ml_info.json"):
-            with open("ml_info.json", "r", encoding="utf-8") as f:
-                ml_info = json.load(f)
-                # Получаем точность и правильно преобразуем
-                test_accuracy = ml_info.get("test_accuracy", 0)
-                
-                # Если точность в формате 0.5606 (56.06%), преобразуем в проценты
-                if test_accuracy < 1:  # Если значение меньше 1, значит в долях
-                    return round(test_accuracy * 100, 2)
-                else:  # Если уже в процентах
-                    return round(test_accuracy, 2)
-                    
-        # Если файла нет, используем глобальную переменную
-        return last_ml_accuracy if last_ml_accuracy else 0
-        
+        if not os.path.exists("ml_info.json"):
+            # если файла нет — вернуть кэшированное значение
+            return round(last_ml_accuracy, 2) if 'last_ml_accuracy' in globals() else 0
+
+        with open("ml_info.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Если в файле список — берём последний элемент
+        if isinstance(data, list):
+            if not data:
+                return round(last_ml_accuracy, 2) if 'last_ml_accuracy' in globals() else 0
+            ml_info = data[-1]
+        elif isinstance(data, dict):
+            ml_info = data
+        else:
+            print(f"⚠️ Неподдерживаемый формат ml_info.json: {type(data)}")
+            return 0
+
+        test_accuracy = ml_info.get("test_accuracy", 0)
+
+        # Если точность в формате 0.5606 (доля), преобразуем в проценты
+        if test_accuracy < 1:
+            test_accuracy *= 100
+
+        return round(test_accuracy, 2)
+
     except Exception as e:
         print(f"⚠️ Ошибка чтения ml_info.json: {e}")
-        return last_ml_accuracy if last_ml_accuracy else 0
+        return round(last_ml_accuracy, 2) if 'last_ml_accuracy' in globals() else 0
+
 # Функции для обновления данных из Telegram бота
 def update_signal_data(pair, direction, confidence, expiry, source, entry_price, chart_bytes=None):
     """Обновляет данные сигнала для веб-API"""
@@ -583,8 +646,22 @@ def update_ml_accuracy(accuracy):
     print(f"📡 Web API: ML accuracy updated - {accuracy}%")
     update_web_jsons()  # Автоматически обновляем JSON
 
+# ======= ADMIN SECURITY MIDDLEWARE =======
+def require_admin_auth(f):
+    """Декоратор для проверки прав админа"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Простая проверка - в реальном приложении нужно добавить нормальную аутентификацию
+        # Сейчас проверяем только что запрос идет с localhost
+        if request.remote_addr not in ['127.0.0.1', 'localhost']:
+            logging.warning(f"⚠️ Попытка доступа к админ-панели с IP: {request.remote_addr}")
+            return jsonify({'error': 'Access denied'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
 # ======= ADMIN API ENDPOINTS =======
 @app_web.route("/api/admin/users.json")
+@require_admin_auth
 def api_admin_users():
     """API для получения списка пользователей (админ)"""
     try:
@@ -624,6 +701,7 @@ def api_admin_users():
         return jsonify({'error': str(e)}), 500
 
 @app_web.route("/api/admin/trades.json")
+@require_admin_auth
 def api_admin_trades():
     """API для получения всех сделок (админ)"""
     try:
@@ -650,55 +728,95 @@ def api_admin_trades():
         return jsonify({'error': str(e)}), 500
 
 @app_web.route("/api/admin/system.json")
+@require_admin_auth
 def api_admin_system():
     """API для системной статистики (админ)"""
     try:
-        # Общая статистика
+        # 📊 Общая статистика по всем пользователям
         total_trades = 0
         total_wins = 0
         active_trades = 0
-        
+
         for user_data in users.values():
-            trades = user_data.get('trade_history', [])
+            trades = user_data.get("trade_history", [])
             total_trades += len(trades)
-            total_wins += len([t for t in trades if t.get('result') == 'WIN'])
-            if user_data.get('current_trade'):
+            total_wins += sum(1 for t in trades if t.get("result") == "WIN")
+            if user_data.get("current_trade"):
                 active_trades += 1
-        
-        win_rate = round((total_wins / total_trades * 100), 1) if total_trades > 0 else 0
-        
-        # Статус ML модели
+
+        win_rate = round((total_wins / total_trades * 100), 2) if total_trades > 0 else 0
+
+        # 🧠 Загрузка информации о ML-модели (поддержка истории обучений)
+        ml_info = {}
+        if os.path.exists("ml_info.json"):
+            try:
+                with open("ml_info.json", "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        ml_info = data[-1] if data else {}
+                    elif isinstance(data, dict):
+                        ml_info = data
+                    else:
+                        logging.warning(f"⚠️ Неподдерживаемый формат ml_info.json: {type(data)}")
+            except Exception as e:
+                logging.warning(f"⚠️ Ошибка чтения ml_info.json: {e}")
+                ml_info = {}
+        else:
+            ml_info = model_info or {}
+
+        # 🎯 Извлекаем актуальные ML-метрики
+        test_acc = ml_info.get("test_accuracy", 0)
+        train_acc = ml_info.get("train_accuracy", 0)
+        trades_used = ml_info.get("trades_used", 0)
+        trained_at = ml_info.get("trained_at", "Never")
+
+        # Конвертация в проценты, если значение в долях
+        if test_acc < 1:
+            test_acc *= 100
+        if train_acc < 1:
+            train_acc *= 100
+
+        overfit_ratio = round(train_acc / test_acc, 2) if test_acc > 0 else 1.0
+
         ml_status = {
-            'trained': ml_model is not None,
-            'accuracy': model_info.get('test_accuracy', 0) * 100 if model_info else 0,
-            'trades_used': model_info.get('trades_used', 0) if model_info else 0,
-            'last_trained': model_info.get('trained_at', 'Never') if model_info else 'Never'
+            "trained": ml_model is not None,
+            "accuracy": round(test_acc, 2),
+            "train_accuracy": round(train_acc, 2),
+            "overfitting_ratio": overfit_ratio,
+            "trades_used": trades_used,
+            "last_trained": trained_at,
+            "features": ml_info.get("n_features", 0),
         }
-        
-        # Статус бота
+
+        # ⚙️ Статус бота
         bot_status = {
-            'running': IS_RUNNING,
-            'trading_hours': is_trading_time(),
-            'auto_trading_users': sum(1 for u in users.values() if u.get('auto_trading', False)),
-            'total_users': len(users)
+            "running": IS_RUNNING,
+            "trading_hours": is_trading_time(),
+            "auto_trading_users": sum(1 for u in users.values() if u.get("auto_trading", False)),
+            "total_users": len(users),
         }
-        
+
+        # 🧾 Итоговый JSON-ответ
         return jsonify({
-            'statistics': {
-                'total_users': len(users),
-                'total_trades': total_trades,
-                'total_wins': total_wins,
-                'win_rate': win_rate,
-                'active_trades': active_trades
+            "statistics": {
+                "total_users": len(users),
+                "total_trades": total_trades,
+                "total_wins": total_wins,
+                "win_rate": win_rate,
+                "active_trades": active_trades,
             },
-            'ml_model': ml_status,
-            'bot_status': bot_status,
-            'updated_at': datetime.now().isoformat()
+            "ml_model": ml_status,
+            "bot_status": bot_status,
+            "updated_at": datetime.now().isoformat(),
         })
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logging.error(f"❌ Ошибка в api_admin_system: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
 
 @app_web.route("/api/admin/whitelist.json")
+@require_admin_auth
 def api_admin_whitelist():
     """API для управления белым списком (админ)"""
     try:
@@ -714,34 +832,75 @@ def api_admin_whitelist():
         return jsonify({'error': str(e)}), 500
 
 @app_web.route("/api/admin/ml_status.json")
+@require_admin_auth
 def api_admin_ml_status():
-    """API для статуса ML модели (админ)"""
+    """API для получения статуса ML модели (админ)"""
     try:
-        if not model_info:
-            return jsonify({'error': 'ML модель не обучена'})
-        
-        # Получаем актуальные данные из файла
-        current_ml_accuracy = get_current_ml_accuracy()
-        
+        # 🧠 Загружаем ml_info.json (учитываем список обучений)
+        ml_info = {}
+        if os.path.exists("ml_info.json"):
+            try:
+                with open("ml_info.json", "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        ml_info = data[-1] if data else {}
+                    elif isinstance(data, dict):
+                        ml_info = data
+                    else:
+                        logging.warning(f"⚠️ Неподдерживаемый формат ml_info.json: {type(data)}")
+                        ml_info = {}
+            except Exception as e:
+                logging.warning(f"⚠️ Ошибка чтения ml_info.json: {e}")
+                ml_info = {}
+        else:
+            ml_info = model_info or {}
+
+        # Если ничего нет — возвращаем сообщение об отсутствии модели
+        if not ml_info:
+            return jsonify({'error': 'ML модель не обучена или повреждена'}), 400
+
+        # 🧮 Извлекаем актуальные метрики
+        test_acc = ml_info.get("test_accuracy", 0)
+        train_acc = ml_info.get("train_accuracy", 0)
+        cv_acc = ml_info.get("cv_accuracy", 0)
+        win_rate = ml_info.get("win_rate", 0)
+
+        # Преобразуем из долей в проценты при необходимости
+        if test_acc < 1: test_acc *= 100
+        if train_acc < 1: train_acc *= 100
+        if cv_acc < 1: cv_acc *= 100
+        if win_rate < 1: win_rate *= 100
+
+        # Коэффициент переобучения
+        overfit_ratio = 1.0
+        if test_acc > 0:
+            overfit_ratio = round(train_acc / test_acc, 2)
+
+        # Итоговые данные для ответа
         ml_data = {
-            'trained_at': model_info.get('trained_at', 'Unknown'),
-            'trades_used': model_info.get('trades_used', 0),
-            'n_features': model_info.get('n_features', 0),
-            'test_accuracy': current_ml_accuracy,
-            'train_accuracy': model_info.get('train_accuracy', 0),
-            'cv_accuracy': model_info.get('cv_accuracy', 0),
-            'win_rate': model_info.get('win_rate', 0),
-            'overfitting_ratio': model_info.get('overfitting_ratio', 0),
-            'feature_names': model_info.get('feature_names', []),
+            'trained_at': ml_info.get('trained_at', 'Unknown'),
+            'trades_used': ml_info.get('trades_used', 0),
+            'n_features': ml_info.get('n_features', 0),
+            'test_accuracy': round(test_acc, 2),
+            'train_accuracy': round(train_acc, 2),
+            'cv_accuracy': round(cv_acc, 2),
+            'win_rate': round(win_rate, 2),
+            'overfitting_ratio': overfit_ratio,
+            'train_samples': ml_info.get('train_samples', 0),
+            'test_samples': ml_info.get('test_samples', 0),
+            'feature_names': ml_info.get('feature_names', []),
             'model_loaded': ml_model is not None
         }
-        
+
         return jsonify(ml_data)
+
     except Exception as e:
+        logging.error(f"❌ Ошибка в api_admin_ml_status: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 # ======= ADMIN ACTION ENDPOINTS =======
 @app_web.route("/admin/users/block", methods=['POST'])
+@require_admin_auth
 def admin_block_user():
     """Блокировка пользователя"""
     try:
@@ -764,6 +923,7 @@ def admin_block_user():
         return jsonify({'error': str(e)}), 500
 
 @app_web.route("/admin/users/unblock", methods=['POST'])
+@require_admin_auth
 def admin_unblock_user():
     """Разблокировка пользователя"""
     try:
@@ -786,6 +946,7 @@ def admin_unblock_user():
         return jsonify({'error': str(e)}), 500
 
 @app_web.route("/admin/trades/close", methods=['POST'])
+@require_admin_auth
 def admin_close_trade():
     """Принудительное закрытие сделки"""
     try:
@@ -837,6 +998,7 @@ def admin_close_trade():
         return jsonify({'error': str(e)}), 500
 
 @app_web.route("/admin/whitelist/add", methods=['POST'])
+@require_admin_auth
 def admin_whitelist_add():
     """Добавление пользователя в белый список"""
     try:
@@ -859,6 +1021,7 @@ def admin_whitelist_add():
         return jsonify({'error': str(e)}), 500
 
 @app_web.route("/admin/whitelist/remove", methods=['POST'])
+@require_admin_auth
 def admin_whitelist_remove():
     """Удаление пользователя из белого списка"""
     try:
@@ -877,28 +1040,6 @@ def admin_whitelist_remove():
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-# ======= ADMIN SECURITY MIDDLEWARE =======
-def require_admin_auth(f):
-    """Декоратор для проверки прав админа"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Простая проверка - в реальном приложении нужно добавить нормальную аутентификацию
-        # Сейчас проверяем только что запрос идет с localhost
-        if request.remote_addr not in ['127.0.0.1', 'localhost']:
-            logging.warning(f"⚠️ Попытка доступа к админ-панели с IP: {request.remote_addr}")
-            return jsonify({'error': 'Access denied'}), 403
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Применяем защиту ко всем админским endpoint'ам
-for endpoint in [
-    api_admin_users, api_admin_trades, api_admin_system, 
-    api_admin_whitelist, api_admin_ml_status,
-    admin_block_user, admin_unblock_user, admin_close_trade,
-    admin_whitelist_add, admin_whitelist_remove
-]:
-    app_web.route(endpoint.__name__)(require_admin_auth(endpoint))
 
 # ======= FRONTEND ROUTES (STATIC WEBAPP) =======
 @app_web.route("/")
@@ -945,22 +1086,43 @@ def api_system_status():
     """Статистика системы (live)"""
     try:
         global users
-        
+
+        # 📊 Подсчёт общей статистики по пользователям
         total_trades = sum(len(u.get("trade_history", [])) for u in users.values())
         wins = sum(1 for u in users.values() for t in u.get("trade_history", []) if t.get("result") == "WIN")
         win_rate = round(wins / max(1, total_trades) * 100, 2) if total_trades > 0 else 0
-        
-        # Используем актуальную точность ML
-        current_ml_accuracy = get_current_ml_accuracy()
-        
+
+        # 🧠 Загружаем актуальную информацию о ML
+        ml_info = {}
+        if os.path.exists("ml_info.json"):
+            try:
+                with open("ml_info.json", "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    # поддержка списков (история обучений)
+                    if isinstance(data, list):
+                        ml_info = data[-1] if data else {}
+                    elif isinstance(data, dict):
+                        ml_info = data
+            except Exception as e:
+                logging.warning(f"⚠️ Ошибка чтения ml_info.json в system_status: {e}")
+
+        # Извлекаем актуальную точность ML
+        current_ml_accuracy = ml_info.get("test_accuracy", 0)
+        if current_ml_accuracy < 1:
+            current_ml_accuracy *= 100  # конвертируем из долей
+
+        # 🔧 Формируем ответ JSON
         return jsonify({
             "active_users": len(users),
             "total_trades": total_trades,
             "win_rate": win_rate,
             "ml_accuracy": round(current_ml_accuracy, 2)
         })
+
     except Exception as e:
+        logging.error(f"❌ Ошибка в api_system_status: {e}", exc_info=True)
         return jsonify({"error": str(e)})
+
 
 @app_web.route("/api/chart.png")
 def api_chart():
@@ -2681,15 +2843,35 @@ def train_ml_model():
             "model_params": model_params
         })
 
-        # 💾 Сохраняем в файл
-        with open("ml_info.json", "w", encoding="utf-8") as f:
-            json.dump(model_info, f, ensure_ascii=False, indent=2)
+        # 💾 Сохраняем историю всех переобучений в ml_info.json
+        try:
+            old_data = []
+            if os.path.exists("ml_info.json"):
+                with open("ml_info.json", "r", encoding="utf-8") as f:
+                    try:
+                        old_data = json.load(f)
+                        # если раньше был один объект, превращаем в список
+                        if isinstance(old_data, dict):
+                            old_data = [old_data]
+                    except json.JSONDecodeError:
+                        old_data = []
 
-        logging.info(f"✅ ML модель успешно обучена на {len(feature_names)} признаках ({len(X)} сделок)")
+            # Добавляем новое обучение
+            old_data.append(model_info)
+
+            # Перезаписываем обновлённый список
+            with open("ml_info.json", "w", encoding="utf-8") as f:
+                json.dump(old_data, f, ensure_ascii=False, indent=2)
+
+            logging.info(f"💾 ML история обновлена: всего записей {len(old_data)}")
+            logging.info(f"✅ ML модель успешно обучена на {len(feature_names)} признаках ({len(X)} сделок)")
+
+        except Exception as e:
+            logging.error(f"❌ Ошибка сохранения истории ML: {e}", exc_info=True)
 
     except Exception as e:
         logging.error(f"❌ Ошибка обучения ML: {e}", exc_info=True)
-        model_info["error"] = str(e)
+        model_info["error"] = str(e)        
 # ===================== WEB APP INTEGRATION =====================
 async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает данные от Telegram Web App с реальными данными"""
@@ -3378,17 +3560,33 @@ pio.defaults.height = 900
 pio.defaults.scale = 2
 
 def enhanced_plot_chart(df, pair, entry_price, direction):
-    """TradingView-стиль графика с улучшенной читаемостью"""
+    """TradingView-стиль графика с УПРОЩЕННЫМИ элементами но с отступом"""
+    
+    # 🔧 ОБЪЯВЛЯЕМ ГЛОБАЛЬНУЮ ПЕРЕМЕННУЮ В САМОМ НАЧАЛЕ
+    global latest_chart_bytes
+    
+    # 🔥 КЭШИРОВАНИЕ - проверяем есть ли свежий график
+    web_path = f"smc_chart_{pair}_latest.png"
+    if os.path.exists(web_path):
+        file_time = datetime.fromtimestamp(os.path.getmtime(web_path))
+        if (datetime.now() - file_time).total_seconds() < 300:  # 5 минут
+            logging.info(f"📊 Используем кэшированный график для {pair}")
+            
+            # Обновляем веб-API
+            with open(web_path, 'rb') as f:
+                latest_chart_bytes = f.read()
+            return web_path
+    
     try:
         if df is None or len(df) < 100:
             return None
 
-        # Увеличиваем количество свечей до 150 + 20 отступ
-        df_plot = df.tail(150).copy()
+        # ✅ СОХРАНЯЕМ отступ в 20 свечей
+        df_plot = df.tail(150).copy()  # 130 реальных + 20 отступ
         if 'tick_volume' in df_plot.columns and 'volume' not in df_plot.columns:
             df_plot = df_plot.rename(columns={'tick_volume': 'volume'})
 
-        # ======== ДОБАВЛЯЕМ 20 СВЕЧЕЙ ОТСТУПА СПРАВА ========
+        # ======== СОХРАНЯЕМ 20 СВЕЧЕЙ ОТСТУПА ========
         last_index = None
         if len(df_plot) > 0:
             last_index = df_plot.index[-1]
@@ -3396,10 +3594,8 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             
             # Создаем пустые индексы для отступа
             if isinstance(last_index, pd.Timestamp):
-                # Для временных индексов
                 empty_indices = [last_index + pd.Timedelta(minutes=i+1) for i in range(20)]
             else:
-                # Для числовых индексов
                 empty_indices = [last_index + i + 1 for i in range(20)]
             
             # Создаем DataFrame с пустыми свечами
@@ -3411,17 +3607,13 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             # Объединяем с основными данными
             df_plot = pd.concat([df_plot, empty_df])
         
-        # ======== Аналитика ========
-        supply_demand_zones = find_supply_demand_zones(df)
-        order_blocks = calculate_order_blocks_advanced(df)
-        fibonacci = calculate_fibonacci_levels(df)
+        # ======== УПРОЩЕННАЯ АНАЛИТИКА ========
+        # ❌ УДАЛЕНО: сложные расчеты зон и ордер-блоков
         trend_analysis = enhanced_trend_analysis(df)
-        pa_patterns = price_action_patterns(df)
         current_price = df_plot['close'].iloc[-1]
 
-        # ======== SMA линии ========
+        # ======== ТОЛЬКО ОСНОВНЫЕ ИНДИКАТОРЫ ========
         df_plot["SMA20"] = df_plot["close"].rolling(20).mean()
-        df_plot["SMA50"] = df_plot["close"].rolling(50).mean()
 
         # ======== СОЗДАНИЕ СУБПЛОТОВ ========
         fig = make_subplots(
@@ -3435,14 +3627,11 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             ]
         )
 
-        # ======== УЛУЧШЕННЫЕ СВЕЧИ ========
-        # ФИКС: Правильное создание масок для реальных и пустых данных
+        # ======== УПРОЩЕННЫЕ СВЕЧИ С ОТСТУПОМ ========
         if last_index is not None:
-            # Создаем булевы маски
             real_data_mask = df_plot.index <= last_index
             empty_data_mask = df_plot.index > last_index
         else:
-            # Если last_index не определен, все данные реальные
             real_data_mask = [True] * len(df_plot)
             empty_data_mask = [False] * len(df_plot)
         
@@ -3482,7 +3671,7 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
                 showlegend=False
             ), row=1, col=1)
 
-        # ======== SMA С БОЛЕЕ ЯРКИМИ ЛИНИЯМИ ========
+        # ======== SMA С ОТСТУПОМ ========
         fig.add_trace(go.Scatter(
             x=real_indices, 
             y=df_plot.loc[real_data_mask, "SMA20"],
@@ -3502,29 +3691,8 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
                 opacity=0.5,
                 showlegend=False
             ), row=1, col=1)
-        
-        fig.add_trace(go.Scatter(
-            x=real_indices, 
-            y=df_plot.loc[real_data_mask, "SMA50"],
-            line=dict(color="#ff6600", width=3),
-            name="SMA 50",
-            opacity=0.9
-        ), row=1, col=1)
-        
-        # Продолжаем SMA50 в область отступа
-        if any(empty_data_mask):
-            empty_indices = df_plot.index[empty_data_mask]
-            fig.add_trace(go.Scatter(
-                x=empty_indices, 
-                y=df_plot.loc[empty_data_mask, "SMA50"],
-                line=dict(color="#ff6600", width=2, dash='dot'),
-                name="SMA 50 (proj)",
-                opacity=0.5,
-                showlegend=False
-            ), row=1, col=1)
 
-        # ======== ОБЪЕМЫ С УЛУЧШЕННОЙ ВИЗУАЛИЗАЦИЕЙ ========
-        # ФИКС: создаем colors_volume только для реальных данных
+        # ======== ОБЪЕМЫ ========
         colors_volume_real = []
         for idx in real_indices:
             close_val = df_plot.loc[idx, 'close']
@@ -3532,7 +3700,6 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             color = 'rgba(255,68,68,0.7)' if close_val < open_val else 'rgba(0,255,136,0.7)'
             colors_volume_real.append(color)
         
-        # Только реальные объемы
         fig.add_trace(go.Bar(
             x=real_indices, 
             y=df_plot.loc[real_data_mask, "volume"],
@@ -3542,61 +3709,8 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             opacity=0.8
         ), row=2, col=1)
 
-        # ======== SUPPLY/DEMAND ЗОНЫ ========
-        strong_zones = [z for z in supply_demand_zones if z.get('volume_ratio', 0) > 2.0]
-        for zone in strong_zones[:4]:
-            color = 'rgba(255,107,107,0.4)' if zone['type'] == 'SUPPLY' else 'rgba(78,205,196,0.4)'
-            border_color = 'rgba(255,50,50,0.8)' if zone['type'] == 'SUPPLY' else 'rgba(50,205,150,0.8)'
-            
-            fig.add_shape(
-                type="rect",
-                x0=df_plot.index[0],
-                x1=df_plot.index[-1],
-                y0=zone["bottom"], 
-                y1=zone["top"],
-                fillcolor=color, 
-                line=dict(color=border_color, width=2, dash='dot'),
-                row=1, col=1
-            )
-
-        # ======== ОРДЕР-БЛОКИ ========
-        recent_obs = order_blocks[-3:] if len(order_blocks) >= 3 else order_blocks
-        for ob in recent_obs:
-            color = "rgba(255,68,68,0.5)" if "BEARISH" in ob["type"] else "rgba(0,255,136,0.5)"
-            border_color = "rgba(255,0,0,0.8)" if "BEARISH" in ob["type"] else "rgba(0,255,0,0.8)"
-            
-            # ФИКС: Проверяем границы индексов
-            ob_index = min(ob["index"], len(df_plot) - 1)
-            start_index = max(ob_index - 2, 0)
-            
-            fig.add_shape(
-                type="rect",
-                x0=df_plot.index[start_index],
-                x1=df_plot.index[-1],
-                y0=ob["low"], 
-                y1=ob["high"],
-                fillcolor=color,
-                line=dict(color=border_color, width=2),
-                row=1, col=1
-            )
-
-        # ======== ФИБО УРОВНИ ========
-        for fib in fibonacci:
-            if fib["ratio"] in [0, 23.6, 38.2, 50, 61.8, 78.6, 100]:
-                fib_color = "#8888ff" if fib["ratio"] in [38.2, 50, 61.8] else "#555577"
-                line_width = 2 if fib["ratio"] in [38.2, 50, 61.8] else 1
-                
-                fig.add_hline(
-                    y=fib["level"],
-                    line=dict(color=fib_color, dash="dot", width=line_width),
-                    annotation_text=f"F {fib['ratio']}%",
-                    annotation_position="right",
-                    annotation_font_size=10,
-                    annotation_font_color=fib_color,
-                    row=1, col=1
-                )
-
-        # ======== ЛИНИЯ ВХОДА ========
+        # ======== СОХРАНЯЕМ КЛЮЧЕВЫЕ ЛИНИИ ========
+        # Линия входа
         entry_color = "#ffffff"
         fig.add_hline(
             y=entry_price,
@@ -3608,7 +3722,7 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             row=1, col=1
         )
 
-        # ======== ТЕКУЩАЯ ЦЕНА ========
+        # Текущая цена
         fig.add_hline(
             y=current_price,
             line=dict(color="#00ffff", width=2, dash='dot'),
@@ -3619,17 +3733,14 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             row=1, col=1
         )
 
-        # ======== ИНФО-ПАНЕЛЬ ========
+        # ======== УПРОЩЕННАЯ ИНФО-ПАНЕЛЬ ========
         info_bg = "#00cc66" if direction == "BUY" else "#ff4444"
         info_text = (
             f"<b>PRICE:</b> {current_price:.5f}<br>"
             f"<b>TREND:</b> {trend_analysis['direction']}<br>"
             f"<b>STRENGTH:</b> {trend_analysis['strength']}<br>"
             f"<b>RSI:</b> {trend_analysis['rsi_state']}<br>"
-            f"<b>ORDER BLOCKS:</b> {len(recent_obs)}<br>"
-            f"<b>ZONES:</b> {len(strong_zones)}<br>"
-            f"<b>PATTERNS:</b> {len(pa_patterns)}<br>"
-            f"<b>CHART:</b> 150+20 candles"
+            f"<b>CHART:</b> 130+20 candles"
         )
         
         fig.add_annotation(
@@ -3646,114 +3757,62 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
             opacity=0.95
         )
 
-        # ======== НАСТРОЙКИ ЛАЙАУТА С БОЛЬШИМ ОТСТУПОМ ========
+        # ======== УПРОЩЕННЫЙ ЛАЙАУТ ========
         fig.update_layout(
             title=dict(
-                text=f"🎯 {pair} - SMART MONEY ANALYSIS - {direction} 🎯",
-                font=dict(color="white", size=22, family="Arial Black"),
+                text=f"🎯 {pair} - SMART MONEY - {direction} 🎯",
+                font=dict(color="white", size=20, family="Arial Black"),
                 x=0.5,
                 y=0.98
             ),
             template="plotly_dark",
             plot_bgcolor="#0a1120",
             paper_bgcolor="#0a1120",
-            xaxis=dict(
-                showgrid=False,
-                rangeslider_visible=False,
-                showticklabels=True,
-                tickfont=dict(size=11)
-            ),
-            xaxis2=dict(
-                showgrid=False,
-                showticklabels=True,
-                tickfont=dict(size=11)
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor="#1e2a3a",
-                gridwidth=1,
-                zeroline=False,
-                side="right",
-                domain=[0.05, 0.95]
-            ),
-            yaxis2=dict(
-                showgrid=False,
-                title=dict(text="VOLUME", font=dict(size=12)),
-                side="right"
-            ),
+            xaxis=dict(showgrid=False, rangeslider_visible=False),
+            xaxis2=dict(showgrid=False),
+            yaxis=dict(showgrid=True, gridcolor="#1e2a3a", side="right"),
+            yaxis2=dict(showgrid=False, side="right"),
             font=dict(color="white", family="Arial"),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom", 
-                y=1.02,
-                xanchor="right", 
-                x=1,
-                font=dict(size=12),
-                bgcolor="rgba(0,0,0,0.5)"
-            ),
-            # УВЕЛИЧИВАЕМ ПРАВЫЙ ОТСТУП ДЛЯ 20 СВЕЧЕЙ
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=50, r=120, t=80, b=60),
             showlegend=True
         )
 
-        # Улучшаем отображение объемов
-        fig.update_traces(
-            showlegend=False, 
-            row=2, col=1,
-            selector=dict(type='bar')
-        )
-
-        # Увеличиваем шрифты осей
-        fig.update_xaxes(tickfont=dict(size=12))
-        fig.update_yaxes(tickfont=dict(size=12), row=1, col=1)
-        fig.update_yaxes(tickfont=dict(size=11), row=2, col=1)
-
-        # ======== СОХРАНЕНИЕ PNG ========
+        # ======== УМЕНЬШАЕМ КАЧЕСТВО ДЛЯ СКОРОСТИ ========
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         path = f"smc_chart_{pair}_{timestamp}.png"
         
         fig.write_image(
             path, 
-            scale=2,
-            width=1200,
-            height=1024
+            scale=1,  # ⬅️ УМЕНЬШИЛИ с 2 до 1
+            width=1000, # ⬅️ УМЕНЬШИЛИ размер
+            height=800
         )
 
         web_path = f"smc_chart_{pair}_latest.png"
         fig.write_image(
             web_path,
-            scale=2,
-            width=1200,
-            height=1024
+            scale=1,  # ⬅️ УМЕНЬШИЛИ
+            width=1000,
+            height=800
         )
 
-        # ======== ОБНОВЛЕНИЕ В ВЕБ-API ========
-        global latest_chart_bytes
+        # Обновляем веб-API
         with open(web_path, 'rb') as f:
             latest_chart_bytes = f.read()
 
-        logging.info(f"📊 УЛУЧШЕННЫЙ график сохранен: {web_path} (150+20 свечей)")
-
-        # ======== СЖАТИЕ PNG ========
-        try:
-            file_size = os.path.getsize(path)
-            if file_size > 2.5 * 1024 * 1024:
-                img = Image.open(path)
-                img.save(path, "PNG", optimize=True, quality=95)
-                logging.info(f"📦 График сжат до: {os.path.getsize(path) / 1024 / 1024:.1f} MB")
-        except Exception as e:
-            logging.warning(f"Не удалось сжать изображение: {e}")
+        logging.info(f"📊 УПРОЩЕННЫЙ график сохранен: {web_path} (130+20 свечей)")
 
         return path
 
     except Exception as e:
-        logging.error(f"❌ Ошибка создания графика (Plotly): {e}")
-        import traceback
-        logging.error(f"❌ Детали ошибки: {traceback.format_exc()}")
+        logging.error(f"❌ Ошибка создания упрощенного графика: {e}")
         return None
 # ===================== AUTO TRADING LOOP - ФИНАЛ =====================
 async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
     """Финальная версия торгового цикла с проверкой фиксированного рабочего времени бота"""
+    start_time = datetime.now()  # ⬅️ ДОБАВЬТЕ ЭТО ПЕРЕД try
+    
     try:
         # 🔔 ПРОВЕРЯЕМ И ОТПРАВЛЯЕМ УВЕДОМЛЕНИЯ О СТАТУСЕ
         current_status = is_trading_time()
@@ -3762,6 +3821,7 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
         
         # 🕒 ПРОВЕРЯЕМ ФИКСИРОВАННЫЙ ГРАФИК РАБОТЫ БОТА
         if not current_status:
+            logging.info("⏸ Бот не работает по расписанию - пропуск цикла")
             return
 
         logging.info("🔄 ===== ЗАПУСК АВТО-ТРЕЙДИНГ ЦИКЛА =====")
@@ -3774,17 +3834,18 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
             return
 
         # 🚀 Обрабатываем всех пользователей по очереди
+        processed_users = 0
         for user_id, user_data in users.copy().items():
             try:
                 uid = int(user_id)
                 auto_trading = user_data.get('auto_trading', False)
                 
                 if not auto_trading:
-                    logging.info(f"⏸ Пользователь {uid}: авто-трейдинг отключён")
-                    continue
+                    continue  # Пропускаем пользователей с выключенным авто-трейдингом
                     
                 logging.info(f"🚀 Пользователь {uid}: поиск сигналов...")
                 await process_auto_trade_for_user(uid, user_data, context)
+                processed_users += 1
                 
             except Exception as user_err:
                 logging.error(f"❌ Ошибка обработки пользователя {user_id}: {user_err}", exc_info=True)
@@ -3796,11 +3857,20 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logging.warning(f"⚠ Ошибка при обновлении JSON-файлов: {e}")
 
-        logging.info("✅ ===== АВТО-ТРЕЙДИНГ ЦИКЛ ЗАВЕРШЕН =====\n")
+        logging.info(f"✅ АВТО-ТРЕЙДИНГ ЦИКЛ ЗАВЕРШЕН. Обработано пользователей: {processed_users}/{len(users)}")
 
     except Exception as e:
         logging.error(f"💥 Критическая ошибка авто-трейдинга: {e}", exc_info=True)
         
+    finally:
+        # Логируем время выполнения
+        execution_time = (datetime.now() - start_time).total_seconds()
+        if execution_time > 30:
+            logging.warning(f"⚠️ Авто-трейдинг выполнялся {execution_time:.1f} сек - слишком долго!")
+        else:
+            logging.info(f"⏱️ Авто-трейдинг выполнен за {execution_time:.1f} сек")
+
+
 # ===================== TRADE RESULT CHECKER =====================
 async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
     """Проверяет результат сделки и закрывает её с обновлением истории и статистики"""
@@ -3817,9 +3887,19 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"❌ Пользователь {user_id} не найден")
             return
 
+        # 🔧 ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: если сделка уже завершена
         current_trade = user_data.get('current_trade')
         if not current_trade:
             logging.warning(f"⚠️ У пользователя {user_id} нет активной сделки")
+            
+            # Проверяем, может сделка уже в истории?
+            history = user_data.get('trade_history', [])
+            existing_trade = next((t for t in history if t.get('id') == trade_id), None)
+            if existing_trade:
+                logging.info(f"ℹ️ Сделка #{trade_id} уже завершена ранее")
+                return
+                
+            logging.warning(f"⚠️ Сделка #{trade_id} не найдена - возможно была очищена")
             return
 
         if current_trade.get('id') != trade_id:
@@ -3920,7 +4000,9 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"❌ Ошибка отправки уведомления: {e}")
 
     except Exception as e:
-        logging.error(f"💥 Критическая ошибка в check_trade_result: {e}", exc_info=True)   
+        logging.error(f"💥 Критическая ошибка в check_trade_result: {e}", exc_info=True)
+
+        
 # ===================== 🤖 PROCESS AUTO TRADE =====================
 async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE):
     """Авто-трейдинг: анализ, открытие сделки и отложенная запись после закрытия"""
@@ -4518,6 +4600,10 @@ async def model_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists("ml_info.json"):
             with open("ml_info.json", "r", encoding="utf-8") as f:
                 info = json.load(f)
+
+            # ✅ Исправление: если это список (история переобучений), берём последнюю запись
+            if isinstance(info, list):
+                info = info[-1] if info else {}
         else:
             info = model_info  # fallback на глобальную переменную
 
@@ -4537,13 +4623,18 @@ async def model_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             cv_std = info.get("cv_std", 0)
 
             # Если вдруг проценты >1, не умножаем ещё раз
-            if train_acc > 1: train_acc = train_acc / 100
-            if test_acc > 1: test_acc = test_acc / 100
-            if cv_acc > 1: cv_acc = cv_acc / 100
-            if cv_std > 1: cv_std = cv_std / 100
+            if train_acc > 1:
+                train_acc = train_acc / 100
+            if test_acc > 1:
+                test_acc = test_acc / 100
+            if cv_acc > 1:
+                cv_acc = cv_acc / 100
+            if cv_std > 1:
+                cv_std = cv_std / 100
 
             win_rate = info.get("win_rate", 0)
-            if win_rate > 1: win_rate = win_rate / 100
+            if win_rate > 1:
+                win_rate = win_rate / 100
 
             overfit_ratio = 1.0
             if test_acc > 0:
@@ -4576,6 +4667,8 @@ async def model_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             "❌ Ошибка получения статистики модели",
             reply_markup=get_models_keyboard(update.effective_user.id)
         )
+
+
 async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Переобучает ML модель (только админ)"""
     user_id = update.effective_user.id
@@ -4618,7 +4711,6 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
             "❌ Произошла ошибка при переобучении модели",
             reply_markup=get_models_keyboard(user_id)
         )
-
 
 # -------- TOGGLE FUNCTIONS (ML / GPT / SMC) --------
 async def toggle_ml(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -5256,8 +5348,11 @@ def main():
     # ===================== JOB QUEUE =====================
     job_queue = app.job_queue
     if job_queue:
-        job_queue.run_repeating(auto_trading_loop, interval=30, first=5)
-        logging.info("📅 JobQueue инициализирован — автоцикл каждые 30 сек")
+        job_queue.run_repeating(auto_trading_loop, interval=60, first=10)  # 60 секунд вместо 30
+        job_queue.scheduler.add_listener(job_listener, 
+                                   EVENT_JOB_MISSED | EVENT_JOB_ERROR | EVENT_JOB_EXECUTED)
+        logging.info("📅 JobQueue инициализирован — автоцикл каждые 60 сек с мониторингом")
+        
     else:
         logging.error("❌ JobQueue не инициализирован — автоцикл не запущен")
         return
