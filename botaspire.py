@@ -503,768 +503,6 @@ def is_admin(user_id: int) -> bool:
     """Проверяет, является ли пользователь админом"""
     return user_id == ADMIN_USER_ID
 
-# ===================== SIMPLE HTTP API FOR WEBAPP (LIVE MODE + FRONTEND) =====================
-from flask import Flask, jsonify, send_file, send_from_directory
-from io import BytesIO
-import threading
-import base64
-import json
-import os
-from datetime import datetime
-app_web = Flask("ASPIRE_TRADE_WEB_API")
-from flask_cors import CORS
-CORS(app_web, resources={r"/*": {"origins": "*"}})
-
-# ======= ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ WEB API =======
-last_signal_data = {"error": "no active signal"}
-last_result_data = {"error": "no recent result"} 
-latest_chart_bytes = None
-last_ml_accuracy = 0
-
-# ===================== AUTO GENERATE WEB JSONS =====================
-def update_web_jsons():
-    """Создаёт/обновляет JSON-файлы для веб-панели"""
-    try:
-        print("🔄 ОБНОВЛЕНИЕ WEB JSON...")
-     
-        # Основная статистика системы
-        total_trades = sum(len(u.get("trade_history", [])) for u in users.values())
-        wins = sum(1 for u in users.values() for t in u.get("trade_history", []) if t.get("result") == "WIN")
-        win_rate = round(wins / max(1, total_trades) * 100, 2) if total_trades > 0 else 0
-        
-        # Получаем актуальную точность ML из файла
-        current_ml_accuracy = get_current_ml_accuracy()
-        
-        print(f"📊 Статистика: {total_trades} сделок, {wins} побед, winrate {win_rate}%")
-        print(f"👥 Пользователей: {len(users)}")
-        print(f"🤖 ML Accuracy: {current_ml_accuracy}%")
-        
-        system_data = {
-            "total_trades": total_trades,
-            "win_rate": win_rate,
-            "active_users": len(users),
-            "ml_accuracy": round(current_ml_accuracy, 2),
-            "updated_at": datetime.now().isoformat()
-        }
-        
-        with open("system_status.json", "w", encoding="utf-8") as f:
-            json.dump(system_data, f, ensure_ascii=False, indent=2)
-        print("[WEB_API] ✅ Обновлён system_status.json")
-        
-    except Exception as e:
-        print(f"[WEB_API] ⚠ Ошибка при создании system_status.json: {e}")
-
-    # Последний сигнал
-    try:
-        with open("last_signal.json", "w", encoding="utf-8") as f:
-            json.dump(last_signal_data, f, ensure_ascii=False, indent=2)
-        print("[WEB_API] ✅ Обновлён last_signal.json")
-    except Exception as e:
-        print(f"[WEB_API] ⚠ Ошибка last_signal.json: {e}")
-
-    # Последний результат
-    try:
-        with open("last_result.json", "w", encoding="utf-8") as f:
-            json.dump(last_result_data, f, ensure_ascii=False, indent=2)
-        print("[WEB_API] ✅ Обновлён last_result.json")
-    except Exception as e:
-        print(f"[WEB_API] ⚠ Ошибка last_result.json: {e}")
-
-def get_current_ml_accuracy():
-    """Возвращает актуальную точность ML модели из ml_info.json (с поддержкой списка историй)"""
-    try:
-        if not os.path.exists("ml_info.json"):
-            # если файла нет — вернуть кэшированное значение
-            return round(last_ml_accuracy, 2) if 'last_ml_accuracy' in globals() else 0
-
-        with open("ml_info.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Если в файле список — берём последний элемент
-        if isinstance(data, list):
-            if not data:
-                return round(last_ml_accuracy, 2) if 'last_ml_accuracy' in globals() else 0
-            ml_info = data[-1]
-        elif isinstance(data, dict):
-            ml_info = data
-        else:
-            print(f"⚠️ Неподдерживаемый формат ml_info.json: {type(data)}")
-            return 0
-
-        test_accuracy = ml_info.get("test_accuracy", 0)
-
-        # Если точность в формате 0.5606 (доля), преобразуем в проценты
-        if test_accuracy < 1:
-            test_accuracy *= 100
-
-        return round(test_accuracy, 2)
-
-    except Exception as e:
-        print(f"⚠️ Ошибка чтения ml_info.json: {e}")
-        return round(last_ml_accuracy, 2) if 'last_ml_accuracy' in globals() else 0
-
-# Функции для обновления данных из Telegram бота
-def update_signal_data(pair, direction, confidence, expiry, source, entry_price, chart_bytes=None):
-    """Обновляет данные сигнала для веб-API"""
-    global last_signal_data, latest_chart_bytes
-    
-    last_signal_data = {
-        "pair": pair,
-        "direction": direction.upper(),  # BUY/SELL
-        "confidence": confidence,
-        "expiry": expiry, 
-        "source": source,
-        "entry_price": entry_price,
-        "timestamp": datetime.now().isoformat(),
-        "error": None
-    }
-    
-    if chart_bytes:
-        latest_chart_bytes = chart_bytes
-        
-    print(f"📡 Web API: Signal updated - {pair} {direction}")
-    
-    # 🔥 ОБХОДИМ обновление JSON файлов если веб отключен
-    if WEB_ENABLED:  # ← ДОБАВЬТЕ ЭТУ ПРОВЕРКУ
-        update_web_jsons()  # Автоматически обновляем JSON
-    else:
-        logging.debug("📊 Обновление JSON для веба отключено (signal)")
-
-def update_result_data(pair, direction, result, completion_time):
-    """Обновляет данные результата для веб-API"""
-    global last_result_data
-    
-    last_result_data = {
-        "pair": pair,
-        "direction": direction.upper(),
-        "result": result.upper(),  # WIN/LOSS
-        "time": completion_time,
-        "completed_at": completion_time,
-        "timestamp": datetime.now().isoformat(), 
-        "error": None
-    }
-    
-    print(f"📡 Web API: Result updated - {pair} {result}")
-    
-    # 🔥 ОБХОДИМ обновление JSON файлов если веб отключен
-    if WEB_ENABLED:  # ← ДОБАВЬТЕ ЭТУ ПРОВЕРКУ
-        update_web_jsons()  # Автоматически обновляем JSON
-    else:
-        logging.debug("📊 Обновление JSON для веба отключено (result)")
-
-def update_ml_accuracy(accuracy):
-    """Обновляет точность ML модели для веб-API"""
-    global last_ml_accuracy
-    last_ml_accuracy = accuracy
-    print(f"📡 Web API: ML accuracy updated - {accuracy}%")
-    
-    # 🔥 ОБХОДИМ обновление JSON файлов если веб отключен
-    if WEB_ENABLED:  # ← ДОБАВЬТЕ ЭТУ ПРОВЕРКУ
-        update_web_jsons()  # Автоматически обновляем JSON
-    else:
-        logging.debug("📊 Обновление JSON для веба отключено (ml)")
-
-# ======= ADMIN SECURITY MIDDLEWARE =======
-def require_admin_auth(f):
-    """Декоратор для проверки прав админа"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Простая проверка - в реальном приложении нужно добавить нормальную аутентификацию
-        # Сейчас проверяем только что запрос идет с localhost
-        if request.remote_addr not in ['127.0.0.1', 'localhost']:
-            logging.warning(f"⚠️ Попытка доступа к админ-панели с IP: {request.remote_addr}")
-            return jsonify({'error': 'Access denied'}), 403
-        return f(*args, **kwargs)
-    return decorated_function
-
-# ======= ADMIN API ENDPOINTS =======
-@app_web.route("/api/admin/users.json")
-@require_admin_auth
-def api_admin_users():
-    """API для получения списка пользователей (админ)"""
-    try:
-        users_list = []
-        for user_id, user_data in users.items():
-            # Статистика пользователя
-            trades = user_data.get('trade_history', [])
-            finished_trades = [t for t in trades if t.get('result') in ('WIN', 'LOSS')]
-            wins = len([t for t in finished_trades if t.get('result') == 'WIN'])
-            total_finished = len(finished_trades)
-            win_rate = round((wins / total_finished * 100), 1) if total_finished > 0 else 0
-            
-            users_list.append({
-                'id': user_id,
-                'first_name': user_data.get('first_name', ''),
-                'username': user_data.get('username', ''),
-                'created_at': user_data.get('created_at', ''),
-                'auto_trading': user_data.get('auto_trading', False),
-                'ml_enabled': user_data.get('ml_enabled', ML_ENABLED),
-                'gpt_enabled': user_data.get('gpt_enabled', USE_GPT),
-                'trade_count': user_data.get('trade_counter', 0),
-                'finished_trades': total_finished,
-                'win_rate': win_rate,
-                'wins': wins,
-                'losses': total_finished - wins,
-                'current_trade': user_data.get('current_trade') is not None,
-                'last_activity': user_data.get('last_save', '')
-            })
-        
-        return jsonify({
-            'users': users_list,
-            'total_users': len(users_list),
-            'active_trades': sum(1 for u in users.values() if u.get('current_trade')),
-            'updated_at': datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app_web.route("/api/admin/trades.json")
-@require_admin_auth
-def api_admin_trades():
-    """API для получения всех сделок (админ)"""
-    try:
-        all_trades = []
-        for user_id, user_data in users.items():
-            for trade in user_data.get('trade_history', []):
-                trade_data = trade.copy()
-                trade_data['user_id'] = user_id
-                trade_data['user_name'] = user_data.get('first_name', 'Unknown')
-                all_trades.append(trade_data)
-        
-        # Сортируем по времени (новые сверху)
-        all_trades.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-        
-        # Ограничиваем последними 100 сделками
-        recent_trades = all_trades[:100]
-        
-        return jsonify({
-            'trades': recent_trades,
-            'total_trades': len(all_trades),
-            'updated_at': datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app_web.route("/api/admin/system.json")
-@require_admin_auth
-def api_admin_system():
-    """API для системной статистики (админ)"""
-    try:
-        # 📊 Общая статистика по всем пользователям
-        total_trades = 0
-        total_wins = 0
-        active_trades = 0
-
-        for user_data in users.values():
-            trades = user_data.get("trade_history", [])
-            total_trades += len(trades)
-            total_wins += sum(1 for t in trades if t.get("result") == "WIN")
-            if user_data.get("current_trade"):
-                active_trades += 1
-
-        win_rate = round((total_wins / total_trades * 100), 2) if total_trades > 0 else 0
-
-        # 🧠 Загрузка информации о ML-модели (поддержка истории обучений)
-        ml_info = {}
-        if os.path.exists("ml_info.json"):
-            try:
-                with open("ml_info.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        ml_info = data[-1] if data else {}
-                    elif isinstance(data, dict):
-                        ml_info = data
-                    else:
-                        logging.warning(f"⚠️ Неподдерживаемый формат ml_info.json: {type(data)}")
-            except Exception as e:
-                logging.warning(f"⚠️ Ошибка чтения ml_info.json: {e}")
-                ml_info = {}
-        else:
-            ml_info = model_info or {}
-
-        # 🎯 Извлекаем актуальные ML-метрики
-        test_acc = ml_info.get("test_accuracy", 0)
-        train_acc = ml_info.get("train_accuracy", 0)
-        trades_used = ml_info.get("trades_used", 0)
-        trained_at = ml_info.get("trained_at", "Never")
-
-        # Конвертация в проценты, если значение в долях
-        if test_acc < 1:
-            test_acc *= 100
-        if train_acc < 1:
-            train_acc *= 100
-
-        overfit_ratio = round(train_acc / test_acc, 2) if test_acc > 0 else 1.0
-
-        ml_status = {
-            "trained": ml_model is not None,
-            "accuracy": round(test_acc, 2),
-            "train_accuracy": round(train_acc, 2),
-            "overfitting_ratio": overfit_ratio,
-            "trades_used": trades_used,
-            "last_trained": trained_at,
-            "features": ml_info.get("n_features", 0),
-        }
-
-        # ⚙️ Статус бота
-        bot_status = {
-            "running": IS_RUNNING,
-            "trading_hours": is_trading_time(),
-            "auto_trading_users": sum(1 for u in users.values() if u.get("auto_trading", False)),
-            "total_users": len(users),
-        }
-
-        # 🧾 Итоговый JSON-ответ
-        return jsonify({
-            "statistics": {
-                "total_users": len(users),
-                "total_trades": total_trades,
-                "total_wins": total_wins,
-                "win_rate": win_rate,
-                "active_trades": active_trades,
-            },
-            "ml_model": ml_status,
-            "bot_status": bot_status,
-            "updated_at": datetime.now().isoformat(),
-        })
-
-    except Exception as e:
-        logging.error(f"❌ Ошибка в api_admin_system: {e}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
-
-
-@app_web.route("/api/admin/whitelist.json")
-@require_admin_auth
-def api_admin_whitelist():
-    """API для управления белым списком (админ)"""
-    try:
-        whitelist = load_whitelist()
-        stats = get_whitelist_stats()
-        
-        return jsonify({
-            'whitelist': whitelist,
-            'stats': stats,
-            'updated_at': datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app_web.route("/api/admin/ml_status.json")
-@require_admin_auth
-def api_admin_ml_status():
-    """API для получения статуса ML модели (админ)"""
-    try:
-        # 🧠 Загружаем ml_info.json (учитываем список обучений)
-        ml_info = {}
-        if os.path.exists("ml_info.json"):
-            try:
-                with open("ml_info.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        ml_info = data[-1] if data else {}
-                    elif isinstance(data, dict):
-                        ml_info = data
-                    else:
-                        logging.warning(f"⚠️ Неподдерживаемый формат ml_info.json: {type(data)}")
-                        ml_info = {}
-            except Exception as e:
-                logging.warning(f"⚠️ Ошибка чтения ml_info.json: {e}")
-                ml_info = {}
-        else:
-            ml_info = model_info or {}
-
-        # Если ничего нет — возвращаем сообщение об отсутствии модели
-        if not ml_info:
-            return jsonify({'error': 'ML модель не обучена или повреждена'}), 400
-
-        # 🧮 Извлекаем актуальные метрики
-        test_acc = ml_info.get("test_accuracy", 0)
-        train_acc = ml_info.get("train_accuracy", 0)
-        cv_acc = ml_info.get("cv_accuracy", 0)
-        win_rate = ml_info.get("win_rate", 0)
-
-        # Преобразуем из долей в проценты при необходимости
-        if test_acc < 1: test_acc *= 100
-        if train_acc < 1: train_acc *= 100
-        if cv_acc < 1: cv_acc *= 100
-        if win_rate < 1: win_rate *= 100
-
-        # Коэффициент переобучения
-        overfit_ratio = 1.0
-        if test_acc > 0:
-            overfit_ratio = round(train_acc / test_acc, 2)
-
-        # Итоговые данные для ответа
-        ml_data = {
-            'trained_at': ml_info.get('trained_at', 'Unknown'),
-            'trades_used': ml_info.get('trades_used', 0),
-            'n_features': ml_info.get('n_features', 0),
-            'test_accuracy': round(test_acc, 2),
-            'train_accuracy': round(train_acc, 2),
-            'cv_accuracy': round(cv_acc, 2),
-            'win_rate': round(win_rate, 2),
-            'overfitting_ratio': overfit_ratio,
-            'train_samples': ml_info.get('train_samples', 0),
-            'test_samples': ml_info.get('test_samples', 0),
-            'feature_names': ml_info.get('feature_names', []),
-            'model_loaded': ml_model is not None
-        }
-
-        return jsonify(ml_data)
-
-    except Exception as e:
-        logging.error(f"❌ Ошибка в api_admin_ml_status: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-# ======= ADMIN ACTION ENDPOINTS =======
-@app_web.route("/admin/users/block", methods=['POST'])
-@require_admin_auth
-def admin_block_user():
-    """Блокировка пользователя"""
-    try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID required'}), 400
-            
-        if int(user_id) in users:
-            users[int(user_id)]['auto_trading'] = False
-            save_users_data()
-            
-            logging.info(f"🔒 Админ заблокировал пользователя {user_id}")
-            return jsonify({'success': True, 'message': f'User {user_id} blocked'})
-        else:
-            return jsonify({'error': 'User not found'}), 404
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app_web.route("/admin/users/unblock", methods=['POST'])
-@require_admin_auth
-def admin_unblock_user():
-    """Разблокировка пользователя"""
-    try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID required'}), 400
-            
-        if int(user_id) in users:
-            users[int(user_id)]['auto_trading'] = True
-            save_users_data()
-            
-            logging.info(f"🔓 Админ разблокировал пользователя {user_id}")
-            return jsonify({'success': True, 'message': f'User {user_id} unblocked'})
-        else:
-            return jsonify({'error': 'User not found'}), 404
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app_web.route("/admin/trades/close", methods=['POST'])
-@require_admin_auth
-def admin_close_trade():
-    """Принудительное закрытие сделки"""
-    try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID required'}), 400
-            
-        user_data = users.get(int(user_id))
-        if not user_data:
-            return jsonify({'error': 'User not found'}), 404
-            
-        current_trade = user_data.get('current_trade')
-        if not current_trade:
-            return jsonify({'error': 'No active trade'}), 400
-            
-        # Закрываем сделку как убыточную
-        closed_trade = {
-            'id': current_trade['id'],
-            'pair': current_trade['pair'],
-            'direction': current_trade['direction'],
-            'entry_price': current_trade['entry_price'],
-            'exit_price': current_trade['entry_price'],  # Без изменения
-            'stake': current_trade.get('stake', STAKE_AMOUNT),
-            'timestamp': current_trade.get('timestamp', datetime.now().isoformat()),
-            'completed_at': datetime.now().isoformat(),
-            'result': 'LOSS',
-            'profit': -current_trade.get('stake', STAKE_AMOUNT),
-            'source': 'ADMIN_FORCE_CLOSE',
-            'confidence': current_trade.get('confidence', 0),
-            'expiry_minutes': current_trade.get('expiry_minutes', 1),
-            'ml_features': current_trade.get('ml_features')
-        }
-        
-        # Добавляем в историю
-        if 'trade_history' not in user_data:
-            user_data['trade_history'] = []
-        user_data['trade_history'].append(closed_trade)
-        
-        # Очищаем текущую сделку
-        user_data['current_trade'] = None
-        save_users_data()
-        
-        logging.info(f"🛑 Админ принудительно закрыл сделку пользователя {user_id}")
-        return jsonify({'success': True, 'message': 'Trade closed'})
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app_web.route("/admin/whitelist/add", methods=['POST'])
-@require_admin_auth
-def admin_whitelist_add():
-    """Добавление пользователя в белый список"""
-    try:
-        data = request.get_json()
-        pocket_id = data.get('pocket_id')
-        name = data.get('name')
-        role = data.get('role', 'user')
-        
-        if not pocket_id or not name:
-            return jsonify({'error': 'Pocket ID and name required'}), 400
-            
-        success, message = add_user_to_whitelist(pocket_id, name, role=role)
-        
-        if success:
-            return jsonify({'success': True, 'message': message})
-        else:
-            return jsonify({'error': message}), 400
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app_web.route("/admin/whitelist/remove", methods=['POST'])
-@require_admin_auth
-def admin_whitelist_remove():
-    """Удаление пользователя из белого списка"""
-    try:
-        data = request.get_json()
-        pocket_id = data.get('pocket_id')
-        
-        if not pocket_id:
-            return jsonify({'error': 'Pocket ID required'}), 400
-            
-        success, message = remove_user_from_whitelist(pocket_id)
-        
-        if success:
-            return jsonify({'success': True, 'message': message})
-        else:
-            return jsonify({'error': message}), 400
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# ======= FRONTEND ROUTES (STATIC WEBAPP) =======
-@app_web.route("/")
-def root():
-    """Главная страница — открывает login.html"""
-    return send_from_directory("trading-bot-webapp", "login.html")
-
-@app_web.route("/<path:filename>")
-def static_files(filename):
-    """Любые файлы из папки trading-bot-webapp (html, js, css, изображения)"""
-    return send_from_directory("trading-bot-webapp", filename)
-
-
-# ======= 📊 ГРАФИКИ ИЗ ПАПКИ БОТА =======
-@app_web.route("/charts/smc_chart_<pair>_latest.png")
-def serve_chart_direct(pair):
-    """Раздает графики напрямую из папки бота"""
-    try:
-        chart_path = f"smc_chart_{pair}_latest.png"
-        print(f"📊 Попытка загрузить график: {chart_path}")
-        
-        if os.path.exists(chart_path):
-            print(f"✅ График найден, отправляю: {chart_path}")
-            return send_file(chart_path, mimetype='image/png')
-        else:
-            print(f"❌ График не найден: {chart_path}")
-            return jsonify({"error": f"Chart not found: {chart_path}"}), 404
-            
-    except Exception as e:
-        print(f"💥 Ошибка сервера: {e}")
-        return jsonify({"error": f"Server error: {e}"}), 500
-    
-# ======= LIVE JSON API =======
-@app_web.route("/api/last_signal.json")
-def api_last_signal():
-    """Последний торговый сигнал (в памяти, без файлов)"""
-    try:
-        return jsonify(last_signal_data)
-    except Exception as e:
-        return jsonify({"error": f"API error: {str(e)}"})
-
-@app_web.route("/api/system_status.json")
-def api_system_status():
-    """Статистика системы (live)"""
-    try:
-        global users
-
-        # 📊 Подсчёт общей статистики по пользователям
-        total_trades = sum(len(u.get("trade_history", [])) for u in users.values())
-        wins = sum(1 for u in users.values() for t in u.get("trade_history", []) if t.get("result") == "WIN")
-        win_rate = round(wins / max(1, total_trades) * 100, 2) if total_trades > 0 else 0
-
-        # 🧠 Загружаем актуальную информацию о ML
-        ml_info = {}
-        if os.path.exists("ml_info.json"):
-            try:
-                with open("ml_info.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    # поддержка списков (история обучений)
-                    if isinstance(data, list):
-                        ml_info = data[-1] if data else {}
-                    elif isinstance(data, dict):
-                        ml_info = data
-            except Exception as e:
-                logging.warning(f"⚠️ Ошибка чтения ml_info.json в system_status: {e}")
-
-        # Извлекаем актуальную точность ML
-        current_ml_accuracy = ml_info.get("test_accuracy", 0)
-        if current_ml_accuracy < 1:
-            current_ml_accuracy *= 100  # конвертируем из долей
-
-        # 🔧 Формируем ответ JSON
-        return jsonify({
-            "active_users": len(users),
-            "total_trades": total_trades,
-            "win_rate": win_rate,
-            "ml_accuracy": round(current_ml_accuracy, 2)
-        })
-
-    except Exception as e:
-        logging.error(f"❌ Ошибка в api_system_status: {e}", exc_info=True)
-        return jsonify({"error": str(e)})
-
-
-@app_web.route("/api/chart.png")
-def api_chart():
-    """Возврат последнего графика прямо из памяти (latest_chart_bytes)"""
-    try:
-        if latest_chart_bytes:
-            return send_file(BytesIO(latest_chart_bytes), mimetype='image/png')
-        return jsonify({"error": "no chart in memory"})
-    except Exception as e:
-        return jsonify({"error": f"chart error: {e}"})
-
-
-# ======= COMBINED JSON API (для мини-приложения) =======
-@app_web.route("/api/latest_full.json")
-def api_latest_full():
-    """Объединённый API: сигнал, результат, статистика и график (base64)"""
-    try:
-        global users
-        
-        data = {}
-
-        # --- Сигнал ---
-        data["signal"] = last_signal_data
-
-        # --- Результат ---
-        data["result"] = last_result_data
-
-        # --- Система ---
-        total_trades = sum(len(u.get("trade_history", [])) for u in users.values())
-        wins = sum(1 for u in users.values() for t in u.get("trade_history", []) if t.get("result") == "WIN")
-        win_rate = round(wins / max(1, total_trades) * 100, 2) if total_trades > 0 else 0
-
-        # Используем актуальную точность ML
-        current_ml_accuracy = get_current_ml_accuracy()
-
-        data["system"] = {
-            "active_users": len(users),
-            "total_trades": total_trades,
-            "win_rate": win_rate,
-            "ml_accuracy": round(current_ml_accuracy, 2)
-        }
-
-        # --- График (в base64, прямо из памяти) ---
-        if latest_chart_bytes:
-            data["chart_base64"] = (
-                "data:image/png;base64,"
-                + base64.b64encode(latest_chart_bytes).decode("utf-8")
-            )
-        else:
-            data["chart_base64"] = None
-
-        return jsonify(data)
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-# ======= DEBUG ENDPOINTS =======
-@app_web.route("/api/debug")
-def api_debug():
-    """Отладочная информация о состоянии переменных"""
-    try:
-        current_ml_accuracy = get_current_ml_accuracy()
-        return jsonify({
-            "last_signal_data": last_signal_data,
-            "last_result_data": last_result_data, 
-            "latest_chart_bytes": "exists" if latest_chart_bytes else "none",
-            "last_ml_accuracy": last_ml_accuracy,
-            "current_ml_accuracy_from_file": current_ml_accuracy,
-            "api_status": "running"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app_web.route("/api/test_signal")
-def api_test_signal():
-    """Тестовый эндпоинт для проверки обновления сигнала"""
-    update_signal_data(
-        pair="EURUSD",
-        direction="BUY", 
-        confidence=8,
-        expiry=2,
-        source="TEST",
-        entry_price=1.0850
-    )
-    return jsonify({"status": "test signal created", "signal": last_signal_data})
-
-@app_web.route("/api/test_result")
-def api_test_result():
-    """Тестовый эндпоинт для проверки обновления результата"""
-    update_result_data(
-        pair="EURUSD",
-        direction="BUY",
-        result="WIN",
-        completion_time=datetime.now().isoformat()
-    )
-    return jsonify({"status": "test result created", "result": last_result_data})
-
-# ======= SERVER RUNNER =======
-def run_web_api():
-    """Запуск Flask-сервера в отдельном потоке (через Waitress для стабильности)"""
-    if not WEB_ENABLED:  # ← ДОБАВЬТЕ ПРОВЕРКУ
-        logging.info("🌐 Веб-API сервер отключен (WEB_ENABLED = False)")
-        return
-        
-    try:
-        from waitress import serve
-        serve(app_web, host="0.0.0.0", port=8080, threads=6)
-    except Exception as e:
-        logging.error(f"❌ Ошибка запуска Flask API через Waitress: {e}")
-        app_web.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
-
-# Запускаем API как отдельный поток (чтобы не блокировал Telegram-бота)
-if WEB_ENABLED:  # ← ДОБАВЬТЕ ПРОВЕРКУ
-    threading.Thread(target=run_web_api, daemon=True).start()
-    print("🌐 API сервер запущен (LIVE MODE + FRONTEND): http://0.0.0.0:8080")
-    print("🔧 Доступные эндпоинты:")
-    print("   • http://0.0.0.0:8080/ - Веб-интерфейс")
-    print("   • http://0.0.0.0:8080/api/latest_full.json - Основной API")
-    print("   • http://0.0.0.0:8080/api/debug - Отладка")
-    print("   • http://0.0.0.0:8080/api/test_signal - Тест сигнала")
-    print("   • http://0.0.0.0:8080/api/test_result - Тест результата")
-else:
-    print("🚫 Веб-API сервер отключен (WEB_ENABLED = False)")
-
 
 # ===================== УНИВЕРСАЛЬНЫЙ ФЛЕТТЕР ML ФИЧЕЙ =====================
 def flatten_ml_features(features_dict, parent_key='', sep='_'):
@@ -2896,235 +2134,6 @@ def train_ml_model():
     except Exception as e:
         logging.error(f"❌ Ошибка обучения ML: {e}", exc_info=True)
         model_info["error"] = str(e)        
-# ===================== WEB APP INTEGRATION =====================
-async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает данные от Telegram Web App с реальными данными"""
-    try:
-        data = json.loads(update.effective_message.web_app_data.data)
-        action = data.get('action')
-        user_id = update.effective_user.id
-
-        # ===================== POCKET OPTION AUTH HANDLERS =====================
-        if action == 'check_pocket_id':
-            pocket_id = data.get('pocket_id')
-            telegram_id = data.get('telegram_id')
-            
-            if not pocket_id:
-                await update.message.reply_text("❌ ID не указан")
-                return
-                
-            # Проверяем Pocket ID
-            if is_valid_pocket_id(pocket_id):
-                user_info = get_pocket_user_info(pocket_id)
-                await update.message.reply_text(
-                    f"✅ **ID подтвержден!**\n\n"
-                    f"👤 Добро пожаловать, {user_info['name']}!\n"
-                    f"🆔 Pocket ID: `{pocket_id}`\n"
-                    f"🛡️ Роль: `{'Администратор' if user_info['role'] == 'admin' else 'Пользователь'}`\n\n"
-                    f"Теперь вы можете использовать торговую систему.",
-                    parse_mode='Markdown'
-                )
-            else:
-                await update.message.reply_text(
-                    f"❌ **ID не найден**\n\n"
-                    f"Pocket ID `{pocket_id}` не зарегистрирован в реферальной системе.\n\n"
-                    f"📝 **Что делать:**\n"
-                    f"1. Зарегистрируйтесь по ссылке: {REFERRAL_LINK}\n"
-                    f"2. После регистрации ваш ID будет добавлен в систему\n"
-                    f"3. Вернитесь и попробуйте снова\n\n"
-                    f"🆘 Если возникли проблемы - свяжитесь с поддержкой.",
-                    parse_mode='Markdown'
-                )
-            return
-        # ===================== END POCKET OPTION AUTH =====================
-         
-        logging.info(f"🌐 Web App: user {user_id}, action: {action}")
-        
-        user_data = get_user_data(user_id)
-        
-        if action == 'get_signal':
-            await next_signal_command(update, context)
-            
-        elif action == 'show_stats':
-            await statistics_command(update, context)
-            
-        elif action == 'history':
-            await history_command(update, context)
-            
-        elif action == 'status':
-            await status_command(update, context)
-            
-        elif action == 'get_user_data':
-            # Отправляем реальные данные пользователя
-            wins = len([t for t in user_data.get('trade_history', []) if t.get('result') == "WIN"])
-            losses = len([t for t in user_data.get('trade_history', []) if t.get('result') == "LOSS"])
-            total = wins + losses
-            win_rate = (wins / total * 100) if total > 0 else 0
-            
-            response_text = (
-                f"📊 **РЕАЛЬНАЯ СТАТИСТИКА**\n\n"
-                f"• Всего сделок: `{user_data['trade_counter']}`\n"
-                f"• Win Rate: `{win_rate:.1f}%`\n"
-                f"• Активных сделок: `{1 if user_data.get('current_trade') else 0}`\n"
-                f"• Авто-трейдинг: `{'🟢 ВКЛ' if user_data.get('auto_trading', False) else '🔴 ВЫКЛ'}`\n"
-                f"• ML анализ: `{'🟢 ВКЛ' if user_data.get('ml_enabled', ML_ENABLED) else '🔴 ВЫКЛ'}`\n"
-                f"• GPT анализ: `{'🟢 ВКЛ' if user_data.get('gpt_enabled', USE_GPT) else '🔴 ВЫКЛ'}`"
-            )
-            
-            await update.message.reply_text(response_text, parse_mode='Markdown')
-            
-        elif action == 'get_admin_data':
-            if not is_admin(user_id):
-                await update.message.reply_text("❌ Недостаточно прав")
-                return
-                
-            # Отправляем реальные данные админа
-            if not MULTI_USER_MODE:
-                await update.message.reply_text("❌ Режим не мультипользовательский")
-                return
-                
-            total_users = len(users)
-            active_trades = sum(1 for ud in users.values() if ud.get('current_trade'))
-            
-            all_trades = []
-            for ud in users.values():
-                all_trades.extend(ud.get('trade_history', []))
-                
-            wins = len([t for t in all_trades if t.get('result') == "WIN"])
-            losses = len([t for t in all_trades if t.get('result') == "LOSS"])
-            total = wins + losses
-            system_win_rate = (wins / total * 100) if total > 0 else 0
-            
-            response_text = (
-                f"🛡️ **АДМИН СТАТИСТИКА**\n\n"
-                f"• Пользователей: `{total_users}`\n"
-                f"• Активных сделок: `{active_trades}`\n"
-                f"• Общий Win Rate: `{system_win_rate:.1f}%`\n"
-                f"• ML модель: `{'🟢 Обучена' if ml_model else '🔴 Не обучена'}`\n"
-                f"• GPT анализ: `{'🟢 ВКЛ' if USE_GPT else '🔴 ВЫКЛ'}`\n"
-                f"• Режим: `{'👥 Мультипользовательский' if MULTI_USER_MODE else '👤 Однопользовательский'}`"
-            )
-            
-            await update.message.reply_text(response_text, parse_mode='Markdown')
-            
-        elif action == 'toggle_auto_trading':
-            user_data['auto_trading'] = not user_data.get('auto_trading', False)
-            status = "🟢 ВКЛЮЧЕН" if user_data['auto_trading'] else "🔴 ВЫКЛЮЧЕН"
-            await update.message.reply_text(f"🤖 Авто-трейдинг {status}")
-            save_users_data()
-            
-        elif action == 'toggle_ml':
-            user_data['ml_enabled'] = not user_data.get('ml_enabled', ML_ENABLED)
-            status = "🟢 ВКЛЮЧЕН" if user_data['ml_enabled'] else "🔴 ВЫКЛЮЧЕН"
-            await update.message.reply_text(f"🧠 ML анализ {status}")
-            save_users_data()
-            
-        elif action == 'toggle_gpt':
-            user_data['gpt_enabled'] = not user_data.get('gpt_enabled', USE_GPT)
-            status = "🟢 ВКЛЮЧЕН" if user_data['gpt_enabled'] else "🔴 ВЫКЛЮЧЕН"
-            await update.message.reply_text(f"💬 GPT анализ {status}")
-            save_users_data()
-            
-        # Админские команды
-        elif action == 'modelstats':
-            await model_stats_command(update, context)
-            
-        elif action == 'retrain':
-            await retrain_model_command(update, context)
-            
-        elif action == 'checkdata':
-            await check_data_command(update, context)
-            
-        elif action == 'restorecounter':
-            await restore_counter_command(update, context)
-            
-        elif action == 'clearalltrades':
-            await clear_all_trades_command(update, context)
-            
-        elif action == 'repairml':
-            await repair_ml_command(update, context)
-            
-        elif action == 'forceml':
-            await force_enable_ml_command(update, context)
-            
-    except Exception as e:
-        logging.error(f"❌ Web App error: {e}")
-        await update.message.reply_text("❌ Ошибка обработки запроса от веб-приложения")
-
-# ===================== WEB APP REAL DATA =====================
-async def send_user_data_to_webapp(user_id: int, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляет реальные данные пользователя в веб-приложение"""
-    try:
-        user_data = get_user_data(user_id)
-        
-        # Статистика сделок
-        wins = len([t for t in user_data.get('trade_history', []) if t.get('result') == "WIN"])
-        losses = len([t for t in user_data.get('trade_history', []) if t.get('result') == "LOSS"])
-        total = wins + losses
-        win_rate = (wins / total * 100) if total > 0 else 0
-        
-        # Активные сделки
-        open_trades = 1 if user_data.get('current_trade') else 0
-        
-        # Данные для веб-приложения
-        webapp_data = {
-            'type': 'user_data',
-            'data': {
-                'trade_count': user_data.get('trade_counter', 0),
-                'win_rate': round(win_rate, 1),
-                'open_trades': open_trades,
-                'auto_trading': user_data.get('auto_trading', False),
-                'ml_enabled': user_data.get('ml_enabled', ML_ENABLED),
-                'gpt_enabled': user_data.get('gpt_enabled', USE_GPT),
-                'last_signal': user_data.get('last_signal_time', 'Никогда')
-            }
-        }
-        
-        # В реальном Mini App данные отправляются через специальный метод
-        # Пока просто логируем
-        logging.info(f"📊 WebApp данные для {user_id}: {webapp_data}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка подготовки данных WebApp: {e}")
-
-async def send_admin_data_to_webapp(user_id: int, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляет реальные данные админа в веб-приложение"""
-    try:
-        if not MULTI_USER_MODE:
-            return
-            
-        # Статистика системы
-        total_users = len(users)
-        active_trades = sum(1 for user_data in users.values() if user_data.get('current_trade'))
-        
-        # Общая статистика по всем пользователям
-        all_trades = []
-        for user_data in users.values():
-            all_trades.extend(user_data.get('trade_history', []))
-            
-        wins = len([t for t in all_trades if t.get('result') == "WIN"])
-        losses = len([t for t in all_trades if t.get('result') == "LOSS"])
-        total = wins + losses
-        system_win_rate = (wins / total * 100) if total > 0 else 0
-        
-        # Данные для админ панели
-        webapp_data = {
-            'type': 'admin_data',
-            'data': {
-                'total_users': total_users,
-                'active_trades': active_trades,
-                'system_win_rate': round(system_win_rate, 1),
-                'system_status': 'online',
-                'bot_status': 'running',
-                'ml_model': 'trained' if ml_model else 'not_trained',
-                'gpt_status': 'enabled' if USE_GPT else 'disabled'
-            }
-        }
-        
-        logging.info(f"📊 WebApp админ данные: {webapp_data}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка подготовки админ данных WebApp: {e}")
 
        
 # ===================== TELEGRAM HANDLERS =====================
@@ -3832,10 +2841,61 @@ def enhanced_plot_chart(df, pair, entry_price, direction):
     except Exception as e:
         logging.error(f"❌ Ошибка создания упрощенного графика: {e}")
         return None
+# ===================== GLOBAL SIGNAL VARIABLES =====================
+CURRENT_SIGNAL = None
+CURRENT_SIGNAL_TIMESTAMP = None
+SIGNAL_EXPIRY_MINUTES = 2  # Сигнал действителен 2 минуты
+
+# ===================== COMMON SIGNAL FINDER =====================
+async def find_common_signal():
+    """Находит ОДИН общий сигнал для всех пользователей"""
+    try:
+        random.shuffle(PAIRS)
+        
+        for pair in PAIRS:
+            # Проверяем фильтр по времени для пары
+            if not is_trade_allowed(pair):
+                continue
+
+            result = analyze_pair(pair)
+            if not result or len(result) < 4:
+                continue
+
+            signal, expiry, conf, source = result[:4]
+
+            # 🎯 Фильтрация слабых сигналов
+            if not signal or conf < 6:
+                continue
+
+            # 📊 Получаем данные с MT5
+            df = get_mt5_data(pair, 300, mt5.TIMEFRAME_M1)
+            if df is None or len(df) < 50:
+                continue
+
+            entry_price = df['close'].iloc[-1]
+            
+            # Возвращаем общий сигнал
+            return {
+                'pair': pair,
+                'direction': signal,
+                'entry_price': float(entry_price),
+                'expiry_minutes': int(expiry),
+                'confidence': int(conf),
+                'source': source,
+                'timestamp': datetime.now().isoformat(),
+                'chart_data': df  # Данные для графика
+            }
+            
+        return None
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка поиска общего сигнала: {e}")
+        return None
+
 # ===================== AUTO TRADING LOOP - ФИНАЛ =====================
 async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
-    """Финальная версия торгового цикла с проверкой фиксированного рабочего времени бота"""
-    start_time = datetime.now()  # ⬅️ ДОБАВЬТЕ ЭТО ПЕРЕД try
+    """Финальная версия торгового цикла с ОБЩИМ сигналом для всех"""
+    start_time = datetime.now()
     
     try:
         # 🔔 ПРОВЕРЯЕМ И ОТПРАВЛЯЕМ УВЕДОМЛЕНИЯ О СТАТУСЕ
@@ -3857,7 +2917,29 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
             logging.warning("⚠ База пользователей пуста")
             return
 
-        # 🚀 Обрабатываем всех пользователей по очереди
+        # 🔍 ПОИСК ОБЩЕГО СИГНАЛА (1 раз для всех)
+        global CURRENT_SIGNAL, CURRENT_SIGNAL_TIMESTAMP
+        
+        # Проверяем актуальность текущего сигнала
+        signal_expired = (
+            CURRENT_SIGNAL_TIMESTAMP is None or 
+            (datetime.now() - CURRENT_SIGNAL_TIMESTAMP).total_seconds() > SIGNAL_EXPIRY_MINUTES * 60
+        )
+        
+        if signal_expired or CURRENT_SIGNAL is None:
+            logging.info("🔄 Поиск нового общего сигнала...")
+            CURRENT_SIGNAL = await find_common_signal()
+            CURRENT_SIGNAL_TIMESTAMP = datetime.now()
+            
+            if CURRENT_SIGNAL:
+                logging.info(f"📢 НОВЫЙ ОБЩИЙ СИГНАЛ: {CURRENT_SIGNAL['pair']} {CURRENT_SIGNAL['direction']}")
+            else:
+                logging.info("❌ Общий сигнал не найден")
+                return
+        else:
+            logging.info(f"📊 Используем актуальный общий сигнал: {CURRENT_SIGNAL['pair']}")
+
+        # 🚀 Обрабатываем всех пользователей с ОДНИМ СИГНАЛОМ
         processed_users = 0
         for user_id, user_data in users.copy().items():
             try:
@@ -3865,21 +2947,14 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
                 auto_trading = user_data.get('auto_trading', False)
                 
                 if not auto_trading:
-                    continue  # Пропускаем пользователей с выключенным авто-трейдингом
+                    continue
                     
-                logging.info(f"🚀 Пользователь {uid}: поиск сигналов...")
-                await process_auto_trade_for_user(uid, user_data, context)
+                logging.info(f"🚀 Пользователь {uid}: открываем общий сигнал...")
+                await process_common_signal_for_user(uid, user_data, context, CURRENT_SIGNAL)
                 processed_users += 1
                 
             except Exception as user_err:
                 logging.error(f"❌ Ошибка обработки пользователя {user_id}: {user_err}", exc_info=True)
-
-        # 💾 После завершения цикла обновляем JSON-файлы для веб-панели
-        try:
-            update_web_jsons()
-            logging.info("🌐 JSON-файлы для WebApp успешно обновлены")
-        except Exception as e:
-            logging.warning(f"⚠ Ошибка при обновлении JSON-файлов: {e}")
 
         logging.info(f"✅ АВТО-ТРЕЙДИНГ ЦИКЛ ЗАВЕРШЕН. Обработано пользователей: {processed_users}/{len(users)}")
 
@@ -3887,13 +2962,86 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"💥 Критическая ошибка авто-трейдинга: {e}", exc_info=True)
         
     finally:
-        # Логируем время выполнения
         execution_time = (datetime.now() - start_time).total_seconds()
-        if execution_time > 30:
-            logging.warning(f"⚠️ Авто-трейдинг выполнялся {execution_time:.1f} сек - слишком долго!")
-        else:
-            logging.info(f"⏱️ Авто-трейдинг выполнен за {execution_time:.1f} сек")
+        logging.info(f"⏱️ Авто-трейдинг выполнен за {execution_time:.1f} сек")
 
+# ===================== PROCESS COMMON SIGNAL =====================
+async def process_common_signal_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, common_signal: Dict):
+    """Обрабатывает ОБЩИЙ сигнал для конкретного пользователя"""
+    try:
+        # ⏸ Проверка на уже открытую сделку
+        if user_data.get('current_trade'):
+            logging.info(f"⏸ Пользователь {user_id} уже имеет открытую сделку — пропуск")
+            return
+
+        pair = common_signal['pair']
+        signal = common_signal['direction']
+        entry_price = common_signal['entry_price']
+        expiry = common_signal['expiry_minutes']
+        conf = common_signal['confidence']
+        source = common_signal['source']
+        df = common_signal['chart_data']
+
+        trade_number = user_data['trade_counter'] + 1
+        ml_features_dict = prepare_ml_features(df) or {}
+
+        # 📝 Текст сигнала (одинаковый для всех)
+        signal_text = (
+            f"🎯 СДЕЛКА #{trade_number}\n"
+            f"🤖 АВТО-ТРЕЙДИНГ СИГНАЛ\n"
+            f"💼 Пара: `{pair}`\n"
+            f"📊 Сигнал: {signal}\n"
+            f"💰 Цена входа: {entry_price:.5f}\n"
+            f"⏰ Экспирация: {expiry} мин\n"
+            f"🎯 Уверенность: {conf}/10\n"
+            f"🔍 Источник: {source}\n\n"
+            f"Сделка открыта! Результат через {expiry} минут..."
+        )
+
+        # 📈 Отправка графика или сообщения
+        chart_path = enhanced_plot_chart(df, pair, entry_price, signal)
+        user_markup = get_trading_keyboard(user_id)
+        
+        try:
+            if chart_path:
+                with open(chart_path, 'rb') as photo:
+                    await context.bot.send_photo(chat_id=user_id, photo=photo, caption=signal_text, reply_markup=user_markup)
+                os.remove(chart_path)
+            else:
+                await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=user_markup)
+        except Exception as tg_err:
+            logging.error(f"⚠ Ошибка отправки сигнала пользователю {user_id}: {tg_err}")
+
+        # 📌 Сохраняем сделку
+        trade = {
+            'id': trade_number,
+            'pair': pair,
+            'direction': signal,
+            'entry_price': float(entry_price),
+            'expiry_minutes': int(expiry),
+            'stake': float(STAKE_AMOUNT),
+            'timestamp': datetime.now().isoformat(),
+            'ml_features': ml_features_dict,
+            'source': source,
+            'confidence': int(conf)
+        }
+
+        user_data['current_trade'] = trade
+        user_data['trade_counter'] += 1
+        save_users_data()
+
+        # ⏱ Планируем проверку результата
+        check_delay = (expiry * 60) + 5
+        context.job_queue.run_once(
+            check_trade_result,
+            check_delay,
+            data={'user_id': user_id, 'pair': pair, 'trade_id': trade_number}
+        )
+
+        logging.info(f"✅ Пользователь {user_id} открыл общую сделку #{trade_number}")
+
+    except Exception as e:
+        logging.error(f"❌ Ошибка process_common_signal_for_user: {e}", exc_info=True)
 
 # ===================== TRADE RESULT CHECKER =====================
 async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
@@ -3982,15 +3130,6 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
         # ✅ Сохраняем обновлённые данные пользователя
         save_users_data()
 
-        # ✅ ДОБАВИТЬ ЗДЕСЬ: Обновляем веб-JSON файлы после закрытия сделки
-        update_web_jsons()
-
-        # ✅ Логируем сделку в файл истории (если функция есть)
-        try:
-            log_trade_to_file(closed_trade, result)
-        except Exception as e:
-            logging.error(f"⚠️ Ошибка логирования сделки в файл: {e}")
-
         # 📝 Подсчёт текущей статистики для отображения в сообщении
         total = len(user_data['trade_history'])
         wins = sum(1 for t in user_data['trade_history'] if t.get('result') == 'WIN')
@@ -4026,142 +3165,7 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logging.error(f"💥 Критическая ошибка в check_trade_result: {e}", exc_info=True)
 
-        
-# ===================== 🤖 PROCESS AUTO TRADE =====================
-async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE):
-    """Авто-трейдинг: анализ, открытие сделки и отложенная запись после закрытия"""
-    try:
-        # ⏸ Проверка фиксированного рабочего времени бота
-        if not is_trading_time():
-            logging.info(f"⏸ Вне рабочего времени — пользователь {user_id}, цикл пропущен")
-            return
-
-        # ⏸ Проверка на уже открытую сделку
-        if user_data.get('current_trade'):
-            logging.info(f"⏸ Пользователь {user_id} уже имеет открытую сделку — пропуск")
-            return
-
-        logging.info(f"🚀 [AUTO] Старт автоанализа для user_id={user_id}")
-        random.shuffle(PAIRS)
-
-        for pair in PAIRS:
-            # Проверяем фильтр по времени для пары
-            if not is_trade_allowed(pair):
-                logging.info(f"⏰ Пропуск {pair} — неразрешённое время торговли.")
-                continue
-
-            
-            start_time = datetime.now()
-            result = analyze_pair(pair)
-            if not result or len(result) < 4:
-                continue
-
-            signal, expiry, conf, source = result[:4]
-
-            # 🎯 Фильтрация слабых сигналов
-            if not signal or conf < 6:
-                continue
-
-            # 📊 Получаем данные с MT5
-            df = get_mt5_data(pair, 300, mt5.TIMEFRAME_M1)
-            if df is None or len(df) < 50:
-                continue
-
-            entry_price = df['close'].iloc[-1]
-            trade_number = user_data['trade_counter'] + 1
-            ml_features_dict = prepare_ml_features(df) or {}
-
-            # 📝 Текст сигнала
-            signal_text = (
-                f"🎯 СДЕЛКА #{trade_number}\n"
-                f"🤖 АВТО-ТРЕЙДИНГ СИГНАЛ\n"
-                f"💼 Пара: `{pair}`\n"
-                f"📊 Сигнал: {signal}\n"
-                f"💰 Цена входа: {entry_price:.5f}\n"
-                f"⏰ Экспирация: {expiry} мин\n"
-                f"🎯 Уверенность: {conf}/10\n"
-                f"🔍 Источник: {source}\n\n"
-                f"Сделка открыта! Результат через {expiry} минут..."
-            )
-
-            # 📈 Отправка графика или сообщения
-            chart_path = enhanced_plot_chart(df, pair, entry_price, signal)
-            user_markup = get_trading_keyboard(user_id)
-            try:
-                if chart_path:
-                    with open(chart_path, 'rb') as photo:
-                        await context.bot.send_photo(chat_id=user_id, photo=photo, caption=signal_text, reply_markup=user_markup)
-        
-                    # ✅ УДАЛЯЕМ только временный файл, но веб-копия остается!
-                    os.remove(chart_path)
-                    logging.info(f"✅ Временный файл графика удален: {chart_path}")
-        
-                else:
-                    await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=user_markup)
-            except Exception as tg_err:
-                logging.error(f"⚠ Ошибка отправки сигнала пользователю {user_id}: {tg_err}")
-
-            # 📌 Сделка сохраняется ТОЛЬКО как текущая
-            trade = {
-                'id': trade_number,
-                'pair': pair,
-                'direction': signal,
-                'entry_price': float(entry_price),
-                'expiry_minutes': int(expiry),
-                'stake': float(STAKE_AMOUNT),
-                'timestamp': datetime.now().isoformat(),
-                'ml_features': ml_features_dict,
-                'source': source,
-                'confidence': int(conf)
-            }
-
-            user_data['current_trade'] = trade
-            user_data['trade_counter'] += 1
-            save_users_data()
-            logging.info(f"📌 Текущая сделка #{trade_number} сохранена (история — после закрытия)")
-
-            # ⏱ Планируем проверку результата сделки
-            check_delay = (expiry * 60) + 5
-            context.job_queue.run_once(
-                check_trade_result,
-                check_delay,
-                data={'user_id': user_id, 'pair': pair, 'trade_id': trade_number}
-            )
-
-            logging.info(f"🕒 План проверки сделки #{trade_number} через {check_delay} сек")
-            elapsed = (datetime.now() - start_time).total_seconds()
-            logging.info(f"✅ Сделка #{trade_number} ({pair} {signal}) открыта за {elapsed:.2f} сек")
-
-            # 🛑 Одна сделка за цикл
-            return
-
-        logging.info(f"🏁 [AUTO] Анализ для user_id={user_id} завершён без открытия сделок")
-
-    except Exception as e:
-        logging.error(f"❌ Ошибка process_auto_trade_for_user: {e}", exc_info=True)
-
 # ===================== TELEGRAM COMMANDS =====================
-
-# -------- WEB APP COMMANDS --------
-async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает кнопку для открытия Mini App"""
-    web_app_url = "https://niktradestart-gif.github.io/trading-bot-webapp/login.html"
-    
-    # Создаем кнопку с Web App
-    keyboard = [
-        [{
-            "text": "📱 Открыть торговую панель", 
-            "web_app": {"url": web_app_url}
-        }]
-    ]
-    
-    await update.message.reply_text(
-        "🌐 *Торговая Панель*\n\n"
-        "Нажмите кнопку ниже чтобы открыть продвинутую панель управления:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
-        parse_mode='Markdown'
-    )
-
 # -------- WHITELIST MANAGEMENT COMMANDS --------
 async def whitelist_add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Добавляет пользователя в белый список (только админ)"""
