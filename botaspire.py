@@ -20,6 +20,9 @@ from scipy.signal import argrelextrema
 import mplfinance as mpf
 from matplotlib.patches import Rectangle
 from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+
+WEB_ENABLED = False
+
 # ===================== JOB QUEUE LISTENER =====================
 def job_listener(event):
     """Обработчик событий job queue"""
@@ -620,7 +623,12 @@ def update_signal_data(pair, direction, confidence, expiry, source, entry_price,
         latest_chart_bytes = chart_bytes
         
     print(f"📡 Web API: Signal updated - {pair} {direction}")
-    update_web_jsons()  # Автоматически обновляем JSON
+    
+    # 🔥 ОБХОДИМ обновление JSON файлов если веб отключен
+    if WEB_ENABLED:  # ← ДОБАВЬТЕ ЭТУ ПРОВЕРКУ
+        update_web_jsons()  # Автоматически обновляем JSON
+    else:
+        logging.debug("📊 Обновление JSON для веба отключено (signal)")
 
 def update_result_data(pair, direction, result, completion_time):
     """Обновляет данные результата для веб-API"""
@@ -637,14 +645,24 @@ def update_result_data(pair, direction, result, completion_time):
     }
     
     print(f"📡 Web API: Result updated - {pair} {result}")
-    update_web_jsons()  # Автоматически обновляем JSON
+    
+    # 🔥 ОБХОДИМ обновление JSON файлов если веб отключен
+    if WEB_ENABLED:  # ← ДОБАВЬТЕ ЭТУ ПРОВЕРКУ
+        update_web_jsons()  # Автоматически обновляем JSON
+    else:
+        logging.debug("📊 Обновление JSON для веба отключено (result)")
 
 def update_ml_accuracy(accuracy):
     """Обновляет точность ML модели для веб-API"""
     global last_ml_accuracy
     last_ml_accuracy = accuracy
     print(f"📡 Web API: ML accuracy updated - {accuracy}%")
-    update_web_jsons()  # Автоматически обновляем JSON
+    
+    # 🔥 ОБХОДИМ обновление JSON файлов если веб отключен
+    if WEB_ENABLED:  # ← ДОБАВЬТЕ ЭТУ ПРОВЕРКУ
+        update_web_jsons()  # Автоматически обновляем JSON
+    else:
+        logging.debug("📊 Обновление JSON для веба отключено (ml)")
 
 # ======= ADMIN SECURITY MIDDLEWARE =======
 def require_admin_auth(f):
@@ -1223,23 +1241,29 @@ def api_test_result():
 # ======= SERVER RUNNER =======
 def run_web_api():
     """Запуск Flask-сервера в отдельном потоке (через Waitress для стабильности)"""
+    if not WEB_ENABLED:  # ← ДОБАВЬТЕ ПРОВЕРКУ
+        logging.info("🌐 Веб-API сервер отключен (WEB_ENABLED = False)")
+        return
+        
     try:
         from waitress import serve
         serve(app_web, host="0.0.0.0", port=8080, threads=6)
     except Exception as e:
         logging.error(f"❌ Ошибка запуска Flask API через Waitress: {e}")
         app_web.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
-        
-# Запускаем API как отдельный поток (чтобы не блокировал Telegram-бота)
-threading.Thread(target=run_web_api, daemon=True).start()
 
-print("🌐 API сервер запущен (LIVE MODE + FRONTEND): http://0.0.0.0:8080")
-print("🔧 Доступные эндпоинты:")
-print("   • http://0.0.0.0:8080/ - Веб-интерфейс")
-print("   • http://0.0.0.0:8080/api/latest_full.json - Основной API")
-print("   • http://0.0.0.0:8080/api/debug - Отладка")
-print("   • http://0.0.0.0:8080/api/test_signal - Тест сигнала")
-print("   • http://0.0.0.0:8080/api/test_result - Тест результата")
+# Запускаем API как отдельный поток (чтобы не блокировал Telegram-бота)
+if WEB_ENABLED:  # ← ДОБАВЬТЕ ПРОВЕРКУ
+    threading.Thread(target=run_web_api, daemon=True).start()
+    print("🌐 API сервер запущен (LIVE MODE + FRONTEND): http://0.0.0.0:8080")
+    print("🔧 Доступные эндпоинты:")
+    print("   • http://0.0.0.0:8080/ - Веб-интерфейс")
+    print("   • http://0.0.0.0:8080/api/latest_full.json - Основной API")
+    print("   • http://0.0.0.0:8080/api/debug - Отладка")
+    print("   • http://0.0.0.0:8080/api/test_signal - Тест сигнала")
+    print("   • http://0.0.0.0:8080/api/test_result - Тест результата")
+else:
+    print("🚫 Веб-API сервер отключен (WEB_ENABLED = False)")
 
 
 # ===================== УНИВЕРСАЛЬНЫЙ ФЛЕТТЕР ML ФИЧЕЙ =====================
