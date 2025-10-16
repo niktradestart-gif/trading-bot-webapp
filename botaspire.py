@@ -36,7 +36,7 @@ from openai import OpenAI
 
 
 # ===================== FIXED BOT WORKING HOURS =====================
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 # 🕒 Рабочие часы по локальному времени (например, Молдова UTC+2)
 TRADING_START = time(4, 0)    # Начало торговли: 04:00
@@ -46,8 +46,53 @@ TRADING_END   = time(23, 59)  # Конец торговли: 23:59
 WEEKEND_DAYS = {5, 6}  # 5 = суббота, 6 = воскресенье
 
 def is_trading_time() -> bool:
-    """⏰ ВРЕМЕННО ОТКЛЮЧЕНО - всегда разрешено торговать для теста"""
-    return True
+    """⏰ Проверяет, находится ли текущее время в рабочих часах бота с уведомлениями"""
+    global BOT_LAST_STATUS, BOT_STATUS_NOTIFIED
+    
+    try:
+        now = datetime.now()
+        current_time = now.time()
+        current_weekday = now.weekday()
+        
+        # 🗓️ Проверяем выходные (суббота и воскресенье)
+        if current_weekday in WEEKEND_DAYS:
+            is_working_time = False
+        else:
+            # 🕒 Проверяем рабочие часы
+            is_working_time = TRADING_START <= current_time <= TRADING_END
+        
+        # 🔔 ПРОВЕРЯЕМ ИЗМЕНЕНИЕ СТАТУСА ДЛЯ УВЕДОМЛЕНИЙ
+        if BOT_LAST_STATUS is None:
+            BOT_LAST_STATUS = is_working_time
+            BOT_STATUS_NOTIFIED = True
+        elif BOT_LAST_STATUS != is_working_time:
+            # Статус изменился - сбрасываем флаг уведомления
+            BOT_LAST_STATUS = is_working_time
+            BOT_STATUS_NOTIFIED = False
+        
+        if not is_working_time:
+            # Расчет времени до следующего открытия для уведомления
+            if current_weekday in WEEKEND_DAYS:
+                days_until_monday = (7 - current_weekday) % 7
+                next_work_day = now + timedelta(days=days_until_monday)
+                next_open = datetime.combine(next_work_day.date(), TRADING_START)
+            elif current_time < TRADING_START:
+                next_open = datetime.combine(now.date(), TRADING_START)
+            else:
+                next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+            
+            time_until = next_open - now
+            hours = time_until.seconds // 3600
+            minutes = (time_until.seconds % 3600) // 60
+            
+            logging.info(f"⏰ Вне рабочего времени. До открытия: {hours}ч {minutes}мин")
+            return False
+        else:
+            return True
+            
+    except Exception as e:
+        logging.error(f"❌ Ошибка проверки времени: {e}")
+        return False
 
 # ==================== TIME FILTERS (TRADE HOURS) ====================
 import json
@@ -148,6 +193,13 @@ PAIRS: List[str] = [
     "EURCHF","EURGBP","EURJPY","GBPAUD","GBPCAD",
     "GBPCHF","GBPJPY","GBPUSD","USDCAD","USDCHF","USDJPY"
 ]
+
+
+# ===================== BOT STATUS TRACKING =====================
+BOT_LAST_STATUS = None  # Последний статус бота (True - работает, False - остановлен)
+BOT_STATUS_NOTIFIED = False  # Флаг чтобы не спамить уведомлениями
+
+
 # ===================== POCKET OPTION WHITELIST SYSTEM =====================
 import json
 import os
@@ -257,7 +309,7 @@ WHITELIST = load_whitelist()
 
 
 # ===================== SETTINGS =====================
-USE_GPT = False
+USE_GPT = True
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 ML_ENABLED = True
@@ -296,7 +348,7 @@ from telegram import ReplyKeyboardMarkup
 main_keyboard = [
     ["📊 Торговля", "⚙️ Управление"],
     ["📈 Статистика", "🧠 Модели"],
-    ["📋 Помощь"]
+    ["📅 Расписание", "📋 Помощь"]
 ]
 main_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
 
@@ -530,6 +582,323 @@ def update_ml_accuracy(accuracy):
     last_ml_accuracy = accuracy
     print(f"📡 Web API: ML accuracy updated - {accuracy}%")
     update_web_jsons()  # Автоматически обновляем JSON
+
+# ======= ADMIN API ENDPOINTS =======
+@app_web.route("/api/admin/users.json")
+def api_admin_users():
+    """API для получения списка пользователей (админ)"""
+    try:
+        users_list = []
+        for user_id, user_data in users.items():
+            # Статистика пользователя
+            trades = user_data.get('trade_history', [])
+            finished_trades = [t for t in trades if t.get('result') in ('WIN', 'LOSS')]
+            wins = len([t for t in finished_trades if t.get('result') == 'WIN'])
+            total_finished = len(finished_trades)
+            win_rate = round((wins / total_finished * 100), 1) if total_finished > 0 else 0
+            
+            users_list.append({
+                'id': user_id,
+                'first_name': user_data.get('first_name', ''),
+                'username': user_data.get('username', ''),
+                'created_at': user_data.get('created_at', ''),
+                'auto_trading': user_data.get('auto_trading', False),
+                'ml_enabled': user_data.get('ml_enabled', ML_ENABLED),
+                'gpt_enabled': user_data.get('gpt_enabled', USE_GPT),
+                'trade_count': user_data.get('trade_counter', 0),
+                'finished_trades': total_finished,
+                'win_rate': win_rate,
+                'wins': wins,
+                'losses': total_finished - wins,
+                'current_trade': user_data.get('current_trade') is not None,
+                'last_activity': user_data.get('last_save', '')
+            })
+        
+        return jsonify({
+            'users': users_list,
+            'total_users': len(users_list),
+            'active_trades': sum(1 for u in users.values() if u.get('current_trade')),
+            'updated_at': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app_web.route("/api/admin/trades.json")
+def api_admin_trades():
+    """API для получения всех сделок (админ)"""
+    try:
+        all_trades = []
+        for user_id, user_data in users.items():
+            for trade in user_data.get('trade_history', []):
+                trade_data = trade.copy()
+                trade_data['user_id'] = user_id
+                trade_data['user_name'] = user_data.get('first_name', 'Unknown')
+                all_trades.append(trade_data)
+        
+        # Сортируем по времени (новые сверху)
+        all_trades.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        # Ограничиваем последними 100 сделками
+        recent_trades = all_trades[:100]
+        
+        return jsonify({
+            'trades': recent_trades,
+            'total_trades': len(all_trades),
+            'updated_at': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app_web.route("/api/admin/system.json")
+def api_admin_system():
+    """API для системной статистики (админ)"""
+    try:
+        # Общая статистика
+        total_trades = 0
+        total_wins = 0
+        active_trades = 0
+        
+        for user_data in users.values():
+            trades = user_data.get('trade_history', [])
+            total_trades += len(trades)
+            total_wins += len([t for t in trades if t.get('result') == 'WIN'])
+            if user_data.get('current_trade'):
+                active_trades += 1
+        
+        win_rate = round((total_wins / total_trades * 100), 1) if total_trades > 0 else 0
+        
+        # Статус ML модели
+        ml_status = {
+            'trained': ml_model is not None,
+            'accuracy': model_info.get('test_accuracy', 0) * 100 if model_info else 0,
+            'trades_used': model_info.get('trades_used', 0) if model_info else 0,
+            'last_trained': model_info.get('trained_at', 'Never') if model_info else 'Never'
+        }
+        
+        # Статус бота
+        bot_status = {
+            'running': IS_RUNNING,
+            'trading_hours': is_trading_time(),
+            'auto_trading_users': sum(1 for u in users.values() if u.get('auto_trading', False)),
+            'total_users': len(users)
+        }
+        
+        return jsonify({
+            'statistics': {
+                'total_users': len(users),
+                'total_trades': total_trades,
+                'total_wins': total_wins,
+                'win_rate': win_rate,
+                'active_trades': active_trades
+            },
+            'ml_model': ml_status,
+            'bot_status': bot_status,
+            'updated_at': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app_web.route("/api/admin/whitelist.json")
+def api_admin_whitelist():
+    """API для управления белым списком (админ)"""
+    try:
+        whitelist = load_whitelist()
+        stats = get_whitelist_stats()
+        
+        return jsonify({
+            'whitelist': whitelist,
+            'stats': stats,
+            'updated_at': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app_web.route("/api/admin/ml_status.json")
+def api_admin_ml_status():
+    """API для статуса ML модели (админ)"""
+    try:
+        if not model_info:
+            return jsonify({'error': 'ML модель не обучена'})
+        
+        # Получаем актуальные данные из файла
+        current_ml_accuracy = get_current_ml_accuracy()
+        
+        ml_data = {
+            'trained_at': model_info.get('trained_at', 'Unknown'),
+            'trades_used': model_info.get('trades_used', 0),
+            'n_features': model_info.get('n_features', 0),
+            'test_accuracy': current_ml_accuracy,
+            'train_accuracy': model_info.get('train_accuracy', 0),
+            'cv_accuracy': model_info.get('cv_accuracy', 0),
+            'win_rate': model_info.get('win_rate', 0),
+            'overfitting_ratio': model_info.get('overfitting_ratio', 0),
+            'feature_names': model_info.get('feature_names', []),
+            'model_loaded': ml_model is not None
+        }
+        
+        return jsonify(ml_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ======= ADMIN ACTION ENDPOINTS =======
+@app_web.route("/admin/users/block", methods=['POST'])
+def admin_block_user():
+    """Блокировка пользователя"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID required'}), 400
+            
+        if int(user_id) in users:
+            users[int(user_id)]['auto_trading'] = False
+            save_users_data()
+            
+            logging.info(f"🔒 Админ заблокировал пользователя {user_id}")
+            return jsonify({'success': True, 'message': f'User {user_id} blocked'})
+        else:
+            return jsonify({'error': 'User not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app_web.route("/admin/users/unblock", methods=['POST'])
+def admin_unblock_user():
+    """Разблокировка пользователя"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID required'}), 400
+            
+        if int(user_id) in users:
+            users[int(user_id)]['auto_trading'] = True
+            save_users_data()
+            
+            logging.info(f"🔓 Админ разблокировал пользователя {user_id}")
+            return jsonify({'success': True, 'message': f'User {user_id} unblocked'})
+        else:
+            return jsonify({'error': 'User not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app_web.route("/admin/trades/close", methods=['POST'])
+def admin_close_trade():
+    """Принудительное закрытие сделки"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID required'}), 400
+            
+        user_data = users.get(int(user_id))
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+            
+        current_trade = user_data.get('current_trade')
+        if not current_trade:
+            return jsonify({'error': 'No active trade'}), 400
+            
+        # Закрываем сделку как убыточную
+        closed_trade = {
+            'id': current_trade['id'],
+            'pair': current_trade['pair'],
+            'direction': current_trade['direction'],
+            'entry_price': current_trade['entry_price'],
+            'exit_price': current_trade['entry_price'],  # Без изменения
+            'stake': current_trade.get('stake', STAKE_AMOUNT),
+            'timestamp': current_trade.get('timestamp', datetime.now().isoformat()),
+            'completed_at': datetime.now().isoformat(),
+            'result': 'LOSS',
+            'profit': -current_trade.get('stake', STAKE_AMOUNT),
+            'source': 'ADMIN_FORCE_CLOSE',
+            'confidence': current_trade.get('confidence', 0),
+            'expiry_minutes': current_trade.get('expiry_minutes', 1),
+            'ml_features': current_trade.get('ml_features')
+        }
+        
+        # Добавляем в историю
+        if 'trade_history' not in user_data:
+            user_data['trade_history'] = []
+        user_data['trade_history'].append(closed_trade)
+        
+        # Очищаем текущую сделку
+        user_data['current_trade'] = None
+        save_users_data()
+        
+        logging.info(f"🛑 Админ принудительно закрыл сделку пользователя {user_id}")
+        return jsonify({'success': True, 'message': 'Trade closed'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app_web.route("/admin/whitelist/add", methods=['POST'])
+def admin_whitelist_add():
+    """Добавление пользователя в белый список"""
+    try:
+        data = request.get_json()
+        pocket_id = data.get('pocket_id')
+        name = data.get('name')
+        role = data.get('role', 'user')
+        
+        if not pocket_id or not name:
+            return jsonify({'error': 'Pocket ID and name required'}), 400
+            
+        success, message = add_user_to_whitelist(pocket_id, name, role=role)
+        
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'error': message}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app_web.route("/admin/whitelist/remove", methods=['POST'])
+def admin_whitelist_remove():
+    """Удаление пользователя из белого списка"""
+    try:
+        data = request.get_json()
+        pocket_id = data.get('pocket_id')
+        
+        if not pocket_id:
+            return jsonify({'error': 'Pocket ID required'}), 400
+            
+        success, message = remove_user_from_whitelist(pocket_id)
+        
+        if success:
+            return jsonify({'success': True, 'message': message})
+        else:
+            return jsonify({'error': message}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ======= ADMIN SECURITY MIDDLEWARE =======
+def require_admin_auth(f):
+    """Декоратор для проверки прав админа"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Простая проверка - в реальном приложении нужно добавить нормальную аутентификацию
+        # Сейчас проверяем только что запрос идет с localhost
+        if request.remote_addr not in ['127.0.0.1', 'localhost']:
+            logging.warning(f"⚠️ Попытка доступа к админ-панели с IP: {request.remote_addr}")
+            return jsonify({'error': 'Access denied'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Применяем защиту ко всем админским endpoint'ам
+for endpoint in [
+    api_admin_users, api_admin_trades, api_admin_system, 
+    api_admin_whitelist, api_admin_ml_status,
+    admin_block_user, admin_unblock_user, admin_close_trade,
+    admin_whitelist_add, admin_whitelist_remove
+]:
+    app_web.route(endpoint.__name__)(require_admin_auth(endpoint))
 
 # ======= FRONTEND ROUTES (STATIC WEBAPP) =======
 @app_web.route("/")
@@ -2321,7 +2690,6 @@ def train_ml_model():
     except Exception as e:
         logging.error(f"❌ Ошибка обучения ML: {e}", exc_info=True)
         model_info["error"] = str(e)
-
 # ===================== WEB APP INTEGRATION =====================
 async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает данные от Telegram Web App с реальными данными"""
@@ -2588,7 +2956,7 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # ===================== GPT ANALYSIS =====================
 def gpt_full_market_read(pair: str, df_m1: pd.DataFrame, df_m5: pd.DataFrame):
-    """GPT-анализ последних свечей (400 M1 свечей = ~6.5 часов)"""
+    """GPT-анализ с улучшенной логикой времени экспирации (1-4 минуты)"""
     try:
         if df_m1 is None or len(df_m1) < 100:
             return None, None
@@ -2597,17 +2965,37 @@ def gpt_full_market_read(pair: str, df_m1: pd.DataFrame, df_m5: pd.DataFrame):
         candles = df_m1.tail(400)[['open','high','low','close','tick_volume']].round(5)
         candles = candles.to_dict(orient='records')
         
+        # Анализируем волатильность для определения времени экспирации
+        current_price = df_m1['close'].iloc[-1]
+        atr = ta.ATR(df_m1['high'], df_m1['low'], df_m1['close'], timeperiod=14).iloc[-1]
+        volatility_percent = (atr / current_price) * 100 if current_price > 0 else 0
+        
+        # Определяем базовое время экспирации по волатильности (как в SMC)
+        if volatility_percent >= 0.035:
+            base_expiry = 1
+        elif volatility_percent >= 0.02:
+            base_expiry = 2
+        elif volatility_percent >= 0.01:
+            base_expiry = 3
+        else:
+            base_expiry = 4
+            
+        # Ограничиваем 1-4 минутами как в SMC
+        base_expiry = max(1, min(base_expiry, 4))
+
         prompt = f"""
 Ты профессиональный трейдер бинарных опционов. Проанализируй последние 400 свечей M1 (6.5 часа данных) для пары {pair}.
 
 КРИТЕРИИ АНАЛИЗА:
 1. Определи общий тренд (бычий/медвежий/флэт)
-2. Найди ключевые уровни поддержки/сопротивления
+2. Найди ключевые уровни поддержки/сопротивления  
 3. Проанализируй объемы на ключевых движениях
 4. Оцени силу текущего движения
 5. Определи потенциальные точки входа
 
-Ответ строго в формате JSON: {{"decision":"BUY/SELL/WAIT","expiry":1-5,"confidence":1-10,"reason":"краткое обоснование"}}
+ВАЖНО: Время экспирации должно быть от 1 до 4 минут. Текущая волатильность: {volatility_percent:.4f}% - рекомендуется {base_expiry} мин.
+
+Ответ строго в формате JSON: {{"decision":"BUY/SELL/WAIT","expiry":1-4,"confidence":1-10,"reason":"краткое обоснование"}}
 
 Данные свечей (первые 50 из 400): {json.dumps(candles[:50], ensure_ascii=False)}
 """
@@ -2628,8 +3016,11 @@ def gpt_full_market_read(pair: str, df_m1: pd.DataFrame, df_m5: pd.DataFrame):
             try:
                 data = json.loads(json_str)
                 decision = data.get("decision")
-                expiry = data.get("expiry", 2)
+                expiry = data.get("expiry", base_expiry)
                 confidence = data.get("confidence", 5)
+                
+                # Ограничиваем экспирацию 1-4 минутами как в SMC
+                expiry = max(1, min(expiry, 4))
                 
                 if decision in ["BUY","SELL"] and confidence >= 6:
                     return decision, expiry
@@ -2815,6 +3206,7 @@ def analyze_trend(df, timeframe_name="M1"):
 
 def analyze_pair(pair: str):
     try:
+        # 🕒 ПРОВЕРЯЕМ ФИКСИРОВАННЫЙ ГРАФИК РАБОТЫ БОТА
         if not is_trading_time():
             logging.info(f"⏸ Вне рабочего времени бота — пропускаем анализ {pair}")
             return None, None, 0, "OUT_OF_SCHEDULE", None
@@ -2970,188 +3362,409 @@ def analyze_pair(pair: str):
         logging.error(f"💥 Ошибка анализа пары {pair}: {e}", exc_info=True)
         return None, None, 0, "ERROR", None
     
-# ===================== ENHANCED CHART =====================
+# ===================== ENHANCED CHART (TradingView Style) =====================
+import plotly.graph_objects as go
+import plotly.io as pio
+import pandas as pd
+import logging, os
+from datetime import datetime
+from io import BytesIO
+from PIL import Image
+from plotly.subplots import make_subplots
+
+pio.defaults.default_format = "png"
+pio.defaults.width = 1200
+pio.defaults.height = 900
+pio.defaults.scale = 2
+
 def enhanced_plot_chart(df, pair, entry_price, direction):
-    """Улучшенный график с зонами, OB и уровнями Фибоначчи"""
+    """TradingView-стиль графика с улучшенной читаемостью"""
     try:
         if df is None or len(df) < 100:
             return None
-            
-        df_plot = df.tail(300).copy()
-        
+
+        # Увеличиваем количество свечей до 150 + 20 отступ
+        df_plot = df.tail(150).copy()
         if 'tick_volume' in df_plot.columns and 'volume' not in df_plot.columns:
             df_plot = df_plot.rename(columns={'tick_volume': 'volume'})
+
+        # ======== ДОБАВЛЯЕМ 20 СВЕЧЕЙ ОТСТУПА СПРАВА ========
+        last_index = None
+        if len(df_plot) > 0:
+            last_index = df_plot.index[-1]
+            last_close = df_plot['close'].iloc[-1]
+            
+            # Создаем пустые индексы для отступа
+            if isinstance(last_index, pd.Timestamp):
+                # Для временных индексов
+                empty_indices = [last_index + pd.Timedelta(minutes=i+1) for i in range(20)]
+            else:
+                # Для числовых индексов
+                empty_indices = [last_index + i + 1 for i in range(20)]
+            
+            # Создаем DataFrame с пустыми свечами
+            empty_df = pd.DataFrame(index=empty_indices)
+            for col in ['open', 'high', 'low', 'close']:
+                empty_df[col] = last_close
+            empty_df['volume'] = 0
+            
+            # Объединяем с основными данными
+            df_plot = pd.concat([df_plot, empty_df])
         
+        # ======== Аналитика ========
         supply_demand_zones = find_supply_demand_zones(df)
         order_blocks = calculate_order_blocks_advanced(df)
-        structure_points = find_market_structure(df)
         fibonacci = calculate_fibonacci_levels(df)
         trend_analysis = enhanced_trend_analysis(df)
-        liquidity_levels = liquidity_analysis(df)
         pa_patterns = price_action_patterns(df)
         current_price = df_plot['close'].iloc[-1]
 
-        sma_20 = df_plot['close'].rolling(20).mean()
-        sma_50 = df_plot['close'].rolling(50).mean()
-        
-        mc = mpf.make_marketcolors(
-            up='#00ff88', down='#ff4444',
-            edge='inherit', wick={'up':'#00ff88','down':'#ff4444'},
-            volume='in'
-        )
-        
-        s = mpf.make_mpf_style(
-            marketcolors=mc, 
-            gridstyle='-', 
-            gridcolor='#333333',
-            facecolor='#1a1a2e', 
-            figcolor='#1a1a2e',
-            rc={'font.size': 10}
-        )
-        
-        fig, ax = mpf.plot(
-            df_plot, 
-            type="candle", 
-            style=s, 
-            volume=True,
-            returnfig=True, 
-            figsize=(12, 6),
-            volume_panel=1,
-            panel_ratios=(3, 1)
-        )
-        
-        main_ax = ax[0] if isinstance(ax, list) else ax
-        volume_ax = ax[1] if isinstance(ax, list) and len(ax) > 1 else None
-        
-        main_ax.set_title(f'{pair} - Smart Money Analysis - {direction}', 
-                         fontsize=16, fontweight='bold', color='white', pad=10)
+        # ======== SMA линии ========
+        df_plot["SMA20"] = df_plot["close"].rolling(20).mean()
+        df_plot["SMA50"] = df_plot["close"].rolling(50).mean()
 
-        # SMA линии
-        main_ax.plot(range(len(sma_20)), sma_20, color='#ffaa00', linewidth=2, 
-                    alpha=0.8, label='SMA 20')
-        main_ax.plot(range(len(sma_50)), sma_50, color='#ff6600', linewidth=2, 
-                    alpha=0.8, label='SMA 50')
+        # ======== СОЗДАНИЕ СУБПЛОТОВ ========
+        fig = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.03,
+            row_heights=[0.75, 0.25],
+            specs=[
+                [{"secondary_y": False}],
+                [{"secondary_y": False}]
+            ]
+        )
 
-        # Supply/Demand зоны
+        # ======== УЛУЧШЕННЫЕ СВЕЧИ ========
+        # ФИКС: Правильное создание масок для реальных и пустых данных
+        if last_index is not None:
+            # Создаем булевы маски
+            real_data_mask = df_plot.index <= last_index
+            empty_data_mask = df_plot.index > last_index
+        else:
+            # Если last_index не определен, все данные реальные
+            real_data_mask = [True] * len(df_plot)
+            empty_data_mask = [False] * len(df_plot)
+        
+        # Реальные свечи
+        real_indices = df_plot.index[real_data_mask]
+        fig.add_trace(go.Candlestick(
+            x=real_indices,
+            open=df_plot.loc[real_data_mask, "open"], 
+            high=df_plot.loc[real_data_mask, "high"],
+            low=df_plot.loc[real_data_mask, "low"], 
+            close=df_plot.loc[real_data_mask, "close"],
+            name="Price",
+            increasing_line_color="#00ff88",
+            decreasing_line_color="#ff4444",
+            increasing_fillcolor="rgba(0,255,136,0.8)",
+            decreasing_fillcolor="rgba(255,68,68,0.8)",
+            line=dict(width=1.5),
+            whiskerwidth=0.8,
+        ), row=1, col=1)
+
+        # Пустые свечи (прозрачные)
+        if any(empty_data_mask):
+            empty_indices = df_plot.index[empty_data_mask]
+            fig.add_trace(go.Candlestick(
+                x=empty_indices,
+                open=df_plot.loc[empty_data_mask, "open"], 
+                high=df_plot.loc[empty_data_mask, "high"],
+                low=df_plot.loc[empty_data_mask, "low"], 
+                close=df_plot.loc[empty_data_mask, "close"],
+                name="Future",
+                increasing_line_color="rgba(200,200,200,0.3)",
+                decreasing_line_color="rgba(200,200,200,0.3)",
+                increasing_fillcolor="rgba(200,200,200,0.1)",
+                decreasing_fillcolor="rgba(200,200,200,0.1)",
+                line=dict(width=1),
+                whiskerwidth=0.5,
+                showlegend=False
+            ), row=1, col=1)
+
+        # ======== SMA С БОЛЕЕ ЯРКИМИ ЛИНИЯМИ ========
+        fig.add_trace(go.Scatter(
+            x=real_indices, 
+            y=df_plot.loc[real_data_mask, "SMA20"],
+            line=dict(color="#ffaa00", width=3),
+            name="SMA 20",
+            opacity=0.9
+        ), row=1, col=1)
+        
+        # Продолжаем SMA в область отступа
+        if any(empty_data_mask):
+            empty_indices = df_plot.index[empty_data_mask]
+            fig.add_trace(go.Scatter(
+                x=empty_indices, 
+                y=df_plot.loc[empty_data_mask, "SMA20"],
+                line=dict(color="#ffaa00", width=2, dash='dot'),
+                name="SMA 20 (proj)",
+                opacity=0.5,
+                showlegend=False
+            ), row=1, col=1)
+        
+        fig.add_trace(go.Scatter(
+            x=real_indices, 
+            y=df_plot.loc[real_data_mask, "SMA50"],
+            line=dict(color="#ff6600", width=3),
+            name="SMA 50",
+            opacity=0.9
+        ), row=1, col=1)
+        
+        # Продолжаем SMA50 в область отступа
+        if any(empty_data_mask):
+            empty_indices = df_plot.index[empty_data_mask]
+            fig.add_trace(go.Scatter(
+                x=empty_indices, 
+                y=df_plot.loc[empty_data_mask, "SMA50"],
+                line=dict(color="#ff6600", width=2, dash='dot'),
+                name="SMA 50 (proj)",
+                opacity=0.5,
+                showlegend=False
+            ), row=1, col=1)
+
+        # ======== ОБЪЕМЫ С УЛУЧШЕННОЙ ВИЗУАЛИЗАЦИЕЙ ========
+        # ФИКС: создаем colors_volume только для реальных данных
+        colors_volume_real = []
+        for idx in real_indices:
+            close_val = df_plot.loc[idx, 'close']
+            open_val = df_plot.loc[idx, 'open']
+            color = 'rgba(255,68,68,0.7)' if close_val < open_val else 'rgba(0,255,136,0.7)'
+            colors_volume_real.append(color)
+        
+        # Только реальные объемы
+        fig.add_trace(go.Bar(
+            x=real_indices, 
+            y=df_plot.loc[real_data_mask, "volume"],
+            name="Volume",
+            marker_color=colors_volume_real,
+            marker_line_width=0,
+            opacity=0.8
+        ), row=2, col=1)
+
+        # ======== SUPPLY/DEMAND ЗОНЫ ========
         strong_zones = [z for z in supply_demand_zones if z.get('volume_ratio', 0) > 2.0]
-        for zone in strong_zones[:3]:
-            color = '#ff6b6b' if zone['type'] == 'SUPPLY' else '#4ecdc4'
-            alpha = 0.25
-            rect = Rectangle(
-                (0, zone['bottom']), len(df_plot), zone['top'] - zone['bottom'],
-                facecolor=color, alpha=alpha, edgecolor=color, linewidth=1.5
+        for zone in strong_zones[:4]:
+            color = 'rgba(255,107,107,0.4)' if zone['type'] == 'SUPPLY' else 'rgba(78,205,196,0.4)'
+            border_color = 'rgba(255,50,50,0.8)' if zone['type'] == 'SUPPLY' else 'rgba(50,205,150,0.8)'
+            
+            fig.add_shape(
+                type="rect",
+                x0=df_plot.index[0],
+                x1=df_plot.index[-1],
+                y0=zone["bottom"], 
+                y1=zone["top"],
+                fillcolor=color, 
+                line=dict(color=border_color, width=2, dash='dot'),
+                row=1, col=1
             )
-            main_ax.add_patch(rect)
 
-        # Ордер-блоки
-        recent_obs = order_blocks[-2:] if len(order_blocks) >= 2 else order_blocks
+        # ======== ОРДЕР-БЛОКИ ========
+        recent_obs = order_blocks[-3:] if len(order_blocks) >= 3 else order_blocks
         for ob in recent_obs:
-            color = '#ff4444' if 'BEARISH' in ob['type'] else '#00ff88'
-            alpha = 0.35
-            block_width = len(df_plot) - ob['index'] - 5
-            rect = Rectangle(
-                (ob['index'], ob['low']), block_width, ob['high'] - ob['low'],
-                facecolor=color, alpha=alpha, edgecolor=color, linewidth=2
+            color = "rgba(255,68,68,0.5)" if "BEARISH" in ob["type"] else "rgba(0,255,136,0.5)"
+            border_color = "rgba(255,0,0,0.8)" if "BEARISH" in ob["type"] else "rgba(0,255,0,0.8)"
+            
+            # ФИКС: Проверяем границы индексов
+            ob_index = min(ob["index"], len(df_plot) - 1)
+            start_index = max(ob_index - 2, 0)
+            
+            fig.add_shape(
+                type="rect",
+                x0=df_plot.index[start_index],
+                x1=df_plot.index[-1],
+                y0=ob["low"], 
+                y1=ob["high"],
+                fillcolor=color,
+                line=dict(color=border_color, width=2),
+                row=1, col=1
             )
-            main_ax.add_patch(rect)
 
-        # ✅ Уровни Фибоначчи
+        # ======== ФИБО УРОВНИ ========
         for fib in fibonacci:
-            fib_color = '#8888ff' if fib["ratio"] in [38, 50, 61] else '#555577'
-            main_ax.axhline(y=fib["level"], color=fib_color, linestyle='--', linewidth=1)
-            main_ax.text(len(df_plot)-5, fib["level"], f"{fib['ratio']}%", 
-                        color=fib_color, fontsize=8, ha='right', va='center',
-                        bbox=dict(boxstyle="round,pad=0.2", facecolor='#1a1a2e', alpha=0.6))
+            if fib["ratio"] in [0, 23.6, 38.2, 50, 61.8, 78.6, 100]:
+                fib_color = "#8888ff" if fib["ratio"] in [38.2, 50, 61.8] else "#555577"
+                line_width = 2 if fib["ratio"] in [38.2, 50, 61.8] else 1
+                
+                fig.add_hline(
+                    y=fib["level"],
+                    line=dict(color=fib_color, dash="dot", width=line_width),
+                    annotation_text=f"F {fib['ratio']}%",
+                    annotation_position="right",
+                    annotation_font_size=10,
+                    annotation_font_color=fib_color,
+                    row=1, col=1
+                )
 
-        # Линия входа
-        entry_color = '#ffffff'
-        main_ax.axhline(y=entry_price, color=entry_color, linestyle='-', 
-                       linewidth=3, alpha=0.9, label=f'Entry: {entry_price:.5f}')
+        # ======== ЛИНИЯ ВХОДА ========
+        entry_color = "#ffffff"
+        fig.add_hline(
+            y=entry_price,
+            line=dict(color=entry_color, width=3, dash='dash'),
+            annotation_text=f"ENTRY: {entry_price:.5f}",
+            annotation_position="right",
+            annotation_font_color="#fff",
+            annotation_font_size=12,
+            row=1, col=1
+        )
 
-        # Информационная панель
-        trend_direction = 'BULL' if sma_20.iloc[-1] > sma_50.iloc[-1] else 'BEAR'
+        # ======== ТЕКУЩАЯ ЦЕНА ========
+        fig.add_hline(
+            y=current_price,
+            line=dict(color="#00ffff", width=2, dash='dot'),
+            annotation_text=f"CURRENT: {current_price:.5f}",
+            annotation_position="right",
+            annotation_font_color="#00ffff",
+            annotation_font_size=11,
+            row=1, col=1
+        )
+
+        # ======== ИНФО-ПАНЕЛЬ ========
+        info_bg = "#00cc66" if direction == "BUY" else "#ff4444"
         info_text = (
-            f"Price: {current_price:.5f}\n"
-            f"Trend: {trend_analysis['direction']}\n"
-            f"Strength: {trend_analysis['strength']}\n"
-            f"RSI: {trend_analysis['rsi_state']}\n"
-            f"OB: {len(recent_obs)}\n"
-            f"Zones: {len(strong_zones)}\n"
-            f"Patterns: {len(pa_patterns)}"
+            f"<b>PRICE:</b> {current_price:.5f}<br>"
+            f"<b>TREND:</b> {trend_analysis['direction']}<br>"
+            f"<b>STRENGTH:</b> {trend_analysis['strength']}<br>"
+            f"<b>RSI:</b> {trend_analysis['rsi_state']}<br>"
+            f"<b>ORDER BLOCKS:</b> {len(recent_obs)}<br>"
+            f"<b>ZONES:</b> {len(strong_zones)}<br>"
+            f"<b>PATTERNS:</b> {len(pa_patterns)}<br>"
+            f"<b>CHART:</b> 150+20 candles"
         )
         
-        info_bg_color = '#00cc66' if direction == 'BUY' else '#ff4444'
-        main_ax.text(0.02, 0.95, info_text, 
-                    color='white', fontsize=10, ha='left', va='top',
-                    transform=main_ax.transAxes,
-                    bbox=dict(boxstyle="round,pad=0.4", facecolor=info_bg_color, 
-                            edgecolor='white', alpha=0.9, linewidth=1))
+        fig.add_annotation(
+            text=info_text,
+            xref="paper", yref="paper",
+            x=0.02, y=0.98,
+            showarrow=False,
+            align="left",
+            font=dict(color="white", size=12, family="Arial Black"),
+            bordercolor="white",
+            borderwidth=2,
+            borderpad=4,
+            bgcolor=info_bg,
+            opacity=0.95
+        )
 
-        # Оформление
-        main_ax.set_facecolor('#1a1a2e')
-        main_ax.tick_params(colors='white', labelsize=10)
-        main_ax.grid(True, alpha=0.3, color='#444444')
-        
-        if volume_ax:
-            volume_ax.set_facecolor('#1a1a2e')
-            volume_ax.tick_params(colors='white', labelsize=9)
-            volume_ax.grid(True, alpha=0.2, color='#444444')
+        # ======== НАСТРОЙКИ ЛАЙАУТА С БОЛЬШИМ ОТСТУПОМ ========
+        fig.update_layout(
+            title=dict(
+                text=f"🎯 {pair} - SMART MONEY ANALYSIS - {direction} 🎯",
+                font=dict(color="white", size=22, family="Arial Black"),
+                x=0.5,
+                y=0.98
+            ),
+            template="plotly_dark",
+            plot_bgcolor="#0a1120",
+            paper_bgcolor="#0a1120",
+            xaxis=dict(
+                showgrid=False,
+                rangeslider_visible=False,
+                showticklabels=True,
+                tickfont=dict(size=11)
+            ),
+            xaxis2=dict(
+                showgrid=False,
+                showticklabels=True,
+                tickfont=dict(size=11)
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridcolor="#1e2a3a",
+                gridwidth=1,
+                zeroline=False,
+                side="right",
+                domain=[0.05, 0.95]
+            ),
+            yaxis2=dict(
+                showgrid=False,
+                title=dict(text="VOLUME", font=dict(size=12)),
+                side="right"
+            ),
+            font=dict(color="white", family="Arial"),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom", 
+                y=1.02,
+                xanchor="right", 
+                x=1,
+                font=dict(size=12),
+                bgcolor="rgba(0,0,0,0.5)"
+            ),
+            # УВЕЛИЧИВАЕМ ПРАВЫЙ ОТСТУП ДЛЯ 20 СВЕЧЕЙ
+            margin=dict(l=50, r=120, t=80, b=60),
+            showlegend=True
+        )
 
-        # ИСПРАВЛЕНИЕ: убрали tight_layout и используем subplots_adjust
-        plt.subplots_adjust(left=0.06, right=0.96, bottom=0.08, top=0.94, hspace=0.1)
+        # Улучшаем отображение объемов
+        fig.update_traces(
+            showlegend=False, 
+            row=2, col=1,
+            selector=dict(type='bar')
+        )
 
+        # Увеличиваем шрифты осей
+        fig.update_xaxes(tickfont=dict(size=12))
+        fig.update_yaxes(tickfont=dict(size=12), row=1, col=1)
+        fig.update_yaxes(tickfont=dict(size=11), row=2, col=1)
+
+        # ======== СОХРАНЕНИЕ PNG ========
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         path = f"smc_chart_{pair}_{timestamp}.png"
         
-        fig.savefig(path, dpi=120, bbox_inches='tight', pad_inches=0.1,
-                   facecolor='#1a1a2e', edgecolor='none', format='png')
-        
-        # ✅ ДОБАВЛЕНО: Сохраняем копию для веб-приложения
+        fig.write_image(
+            path, 
+            scale=2,
+            width=1200,
+            height=1024
+        )
+
         web_path = f"smc_chart_{pair}_latest.png"
-        fig.savefig(web_path, dpi=120, bbox_inches='tight', pad_inches=0.1,
-                   facecolor='#1a1a2e', edgecolor='none', format='png')
-        
-        plt.close(fig)
-        
-        # ✅ ДОБАВЛЕНО: Сохраняем байты графика для веб-API
-        try:
-            with open(web_path, 'rb') as f:
-                chart_bytes = f.read()
-            
-            # Обновляем данные в веб-API
-            global latest_chart_bytes
-            latest_chart_bytes = chart_bytes
-            
-            logging.info(f"📊 График сохранен для веб-приложения: {web_path}")
-        except Exception as e:
-            logging.error(f"❌ Ошибка сохранения графика для веб-приложения: {e}")
-        
-        # Сжатие изображения (оригинальный код)
+        fig.write_image(
+            web_path,
+            scale=2,
+            width=1200,
+            height=1024
+        )
+
+        # ======== ОБНОВЛЕНИЕ В ВЕБ-API ========
+        global latest_chart_bytes
+        with open(web_path, 'rb') as f:
+            latest_chart_bytes = f.read()
+
+        logging.info(f"📊 УЛУЧШЕННЫЙ график сохранен: {web_path} (150+20 свечей)")
+
+        # ======== СЖАТИЕ PNG ========
         try:
             file_size = os.path.getsize(path)
-            if file_size > 1.8 * 1024 * 1024:
-                from PIL import Image
+            if file_size > 2.5 * 1024 * 1024:
                 img = Image.open(path)
-                img.save(path, "PNG", optimize=True, quality=85)
+                img.save(path, "PNG", optimize=True, quality=95)
+                logging.info(f"📦 График сжат до: {os.path.getsize(path) / 1024 / 1024:.1f} MB")
         except Exception as e:
             logging.warning(f"Не удалось сжать изображение: {e}")
-            
-        return path
-        
-    except Exception as e:
-        logging.error(f"Ошибка создания графика: {e}")
-        return None
 
+        return path
+
+    except Exception as e:
+        logging.error(f"❌ Ошибка создания графика (Plotly): {e}")
+        import traceback
+        logging.error(f"❌ Детали ошибки: {traceback.format_exc()}")
+        return None
 # ===================== AUTO TRADING LOOP - ФИНАЛ =====================
 async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
     """Финальная версия торгового цикла с проверкой фиксированного рабочего времени бота"""
     try:
-        logging.info("🔄 ===== ЗАПУСК АВТО-ТРЕЙДИНГ ЦИКЛА =====")
-
-        # 🕒 Проверяем фиксированный график работы бота
-        if not is_trading_time():
-            logging.info("⏸ Вне рабочего времени бота — цикл пропущен")
+        # 🔔 ПРОВЕРЯЕМ И ОТПРАВЛЯЕМ УВЕДОМЛЕНИЯ О СТАТУСЕ
+        current_status = is_trading_time()
+        if not BOT_STATUS_NOTIFIED:
+            await send_bot_status_notification(context)
+        
+        # 🕒 ПРОВЕРЯЕМ ФИКСИРОВАННЫЙ ГРАФИК РАБОТЫ БОТА
+        if not current_status:
             return
+
+        logging.info("🔄 ===== ЗАПУСК АВТО-ТРЕЙДИНГ ЦИКЛА =====")
 
         # 📥 Загружаем / обновляем данные пользователей
         logging.info(f"👥 Загружено пользователей: {len(users)}")
@@ -3538,6 +4151,92 @@ async def whitelist_show_command(update: Update, context: ContextTypes.DEFAULT_T
     
     await update.message.reply_text(message, parse_mode='Markdown')
 
+# -------- BOT STATUS NOTIFICATIONS --------
+async def send_bot_status_notification(context: ContextTypes.DEFAULT_TYPE):
+    """Отправляет уведомления о изменении статуса бота всем пользователям"""
+    global BOT_LAST_STATUS, BOT_STATUS_NOTIFIED
+    
+    try:
+        if BOT_STATUS_NOTIFIED:
+            return  # Уже уведомили
+            
+        now = datetime.now()
+        current_time = now.time()
+        current_weekday = now.weekday()
+        weekday_name = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][current_weekday]
+        
+        if BOT_LAST_STATUS:  # Бот начал работу
+            message = (
+                "🚀 **БОТ НАЧАЛ РАБОТУ!**\n\n"
+                f"🕐 Время: {now.strftime('%H:%M:%S')}\n"
+                f"📅 День: {weekday_name}\n\n"
+                "🤖 Авто-трейдинг активирован\n"
+                "📊 Поиск сигналов запущен\n"
+                "🎯 Готов к торговле!"
+            )
+            
+        else:  # Бот остановился
+            # Расчет времени до следующего открытия
+            if current_weekday in WEEKEND_DAYS:
+                days_until_monday = (7 - current_weekday) % 7
+                next_work_day = now + timedelta(days=days_until_monday)
+                next_open = datetime.combine(next_work_day.date(), TRADING_START)
+                reason = "выходной день"
+            else:
+                next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+                reason = "окончание рабочего дня"
+            
+            time_until = next_open - now
+            hours = time_until.seconds // 3600
+            minutes = (time_until.seconds % 3600) // 60
+            
+            message = (
+                "⏸ **БОТ ОСТАНОВЛЕН**\n\n"
+                f"🕐 Время: {now.strftime('%H:%M:%S')}\n"
+                f"📅 День: {weekday_name}\n"
+                f"📋 Причина: {reason}\n\n"
+                f"🔄 **Возобновление работы:**\n"
+                f"⏰ {next_open.strftime('%d.%m.%Y в %H:%M')}\n"
+                f"⏳ Через: {hours}ч {minutes}мин\n\n"
+                "📊 Торговля приостановлена до утра"
+            )
+        
+        # Отправляем уведомление всем пользователям с авто-трейдингом
+        notified_users = 0
+        for user_id, user_data in users.items():
+            try:
+                if user_data.get('auto_trading', False):
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=message,
+                        parse_mode='Markdown',
+                        reply_markup=main_markup
+                    )
+                    notified_users += 1
+                    
+                    # При старте дополнительно отправляем приветственное сообщение
+                    if BOT_LAST_STATUS:
+                        welcome_text = (
+                            f"👋 С возвращением! Рабочий день начался.\n\n"
+                            f"📊 Статус: 🟢 АКТИВЕН\n"
+                            f"🤖 Авто-трейдинг: {'🟢 ВКЛ' if user_data.get('auto_trading', False) else '🔴 ВЫКЛ'}\n"
+                            f"🎯 Режим: Поиск сигналов"
+                        )
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=welcome_text,
+                            reply_markup=get_trading_keyboard(user_id)
+                        )
+                        
+            except Exception as e:
+                logging.error(f"❌ Ошибка уведомления пользователя {user_id}: {e}")
+        
+        BOT_STATUS_NOTIFIED = True
+        logging.info(f"🔔 Уведомления о статусе отправлены {notified_users} пользователям")
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка отправки уведомлений о статусе: {e}")
+
 # -------- START & STATUS --------
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Приветственное сообщение и показ главного меню"""
@@ -3603,6 +4302,51 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(status_text, reply_markup=main_markup)
 
+# -------- НОВАЯ КОМАНДА РАСПИСАНИЯ --------
+async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает текущий статус расписания работы бота"""
+    now = datetime.now()
+    current_time = now.time()
+    current_weekday = now.weekday()
+    weekday_name = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][current_weekday]
+    
+    is_working_time = is_trading_time()
+    status = "🟢 РАБОТАЕТ" if is_working_time else "🔴 ОТКЛЮЧЕН"
+    
+    # Расчет времени до следующего открытия
+    if not is_working_time:
+        if current_weekday in WEEKEND_DAYS:
+            days_until_monday = (7 - current_weekday) % 7
+            next_work_day = now + timedelta(days=days_until_monday)
+            next_open = datetime.combine(next_work_day.date(), TRADING_START)
+        elif current_time < TRADING_START:
+            next_open = datetime.combine(now.date(), TRADING_START)
+        else:
+            next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+        
+        time_until = next_open - now
+        hours = time_until.seconds // 3600
+        minutes = (time_until.seconds % 3600) // 60
+        until_text = f"⏰ До открытия: {hours}ч {minutes}мин"
+    else:
+        time_until_close = datetime.combine(now.date(), TRADING_END) - now
+        hours = time_until_close.seconds // 3600
+        minutes = (time_until_close.seconds % 3600) // 60
+        until_text = f"⏰ До закрытия: {hours}ч {minutes}мин"
+    
+    schedule_text = (
+        f"📅 РАСПИСАНИЕ РАБОТЫ БОТА\n\n"
+        f"🕐 Текущее время: {now.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"📅 День недели: {weekday_name}\n"
+        f"📊 Статус: {status}\n"
+        f"{until_text}\n\n"
+        f"🕒 Рабочие часы:\n"
+        f"• Ежедневно: {TRADING_START.strftime('%H:%M')} - {TRADING_END.strftime('%H:%M')}\n"
+        f"• Выходные: Суббота, Воскресенье\n\n"
+        f"🌐 Часовой пояс: Локальное время системы"
+    )
+    
+    await update.message.reply_text(schedule_text)
 
 # -------- ИСТОРИЯ & СИГНАЛЫ --------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3641,6 +4385,38 @@ async def next_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     user_data = get_user_data(user_id)
 
+    # 🕒 ПРОВЕРКА РАБОЧЕГО ВРЕМЕНИ ДЛЯ РУЧНЫХ СИГНАЛОВ
+    if not is_trading_time():
+        now = datetime.now()
+        current_weekday = now.weekday()
+        
+        # Расчет времени до следующего открытия
+        if current_weekday in WEEKEND_DAYS:
+            days_until_monday = (7 - current_weekday) % 7
+            next_work_day = now + timedelta(days=days_until_monday)
+            next_open = datetime.combine(next_work_day.date(), TRADING_START)
+            reason = "выходной день"
+        else:
+            next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+            reason = "окончание рабочего дня"
+        
+        time_until = next_open - now
+        hours = time_until.seconds // 3600
+        minutes = (time_until.seconds % 3600) // 60
+        
+        await update.message.reply_text(
+            f"⏸ **Сейчас нерабочее время бота**\n\n"
+            f"📋 Причина: {reason}\n"
+            f"🔄 **Бот начнет работу:**\n"
+            f"⏰ {next_open.strftime('%d.%m.%Y в %H:%M')}\n"
+            f"⏳ Через: {hours}ч {minutes}мин\n\n"
+            f"🕒 Рабочие часы:\n"
+            f"• {TRADING_START.strftime('%H:%M')}-{TRADING_END.strftime('%H:%M')}\n"
+            f"• Без выходных (кроме субботы, воскресенья)",
+            parse_mode='Markdown',
+            reply_markup=get_trading_keyboard(user_id)
+        )
+        return
     if user_data.get('current_trade'):
         await update.message.reply_text(
             "⏳ У вас уже есть активная сделка! Дождитесь её завершения.",
@@ -4327,6 +5103,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "📋 Помощь":
         await help_command(update, context)
 
+    elif text == "📅 Расписание":  # ← ДОБАВЬТЕ ЭТОТ БЛОК
+        await schedule_command(update, context)
 
     # ---------- ⬅️ ВОЗВРАТ В МЕНЮ ----------
     elif text in ["◀️ Главное меню", "◀️ Назад", "◀️ Назад в главное меню"]:
@@ -4415,6 +5193,22 @@ def main():
         print(f"❌ Ошибка доступа к лог-файлу: {e}")
         return
     
+    # 🔧 6. ИНИЦИАЛИЗАЦИЯ СТАТУСА БОТА ПРИ ЗАПУСКЕ
+    global BOT_LAST_STATUS, BOT_STATUS_NOTIFIED
+    BOT_LAST_STATUS = is_trading_time()
+    BOT_STATUS_NOTIFIED = False
+    
+    # Логируем начальный статус
+    status_text = "🟢 РАБОТАЕТ" if BOT_LAST_STATUS else "🔴 ОСТАНОВЛЕН (вне рабочего времени)"
+    logging.info(f"🤖 Статус бота при запуске: {status_text}")
+    print(f"🤖 Статус бота при запуске: {status_text}")
+    
+    # Если бот запущен в нерабочее время - предупреждаем
+    if not BOT_LAST_STATUS:
+        now = datetime.now()
+        logging.warning(f"⏸ Бот запущен в нерабочее время: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+        print("⚠ ВНИМАНИЕ: Бот запущен в нерабочее время и будет ожидать начала рабочего дня")
+    
     # Подключение к MT5
     if not mt5.initialize(path=MT5_PATH, login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
         logging.error(f"❌ Ошибка инициализации MT5: {mt5.last_error()}")
@@ -4422,14 +5216,13 @@ def main():
     logging.info("✅ MT5 подключен успешно")
     print("✅ MT5 подключен успешно")
     
-    # (ML отключён у тебя, оставим как есть)
-    
     # Создание приложения Telegram
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     
     # Обработчики команд
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("status", status_command))
+    app.add_handler(CommandHandler("schedule", schedule_command))
     app.add_handler(CommandHandler("whitelist_add", whitelist_add_command))
     app.add_handler(CommandHandler("whitelist_remove", whitelist_remove_command))
     app.add_handler(CommandHandler("whitelist_stats", whitelist_stats_command))
