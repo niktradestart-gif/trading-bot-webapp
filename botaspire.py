@@ -2133,40 +2133,6 @@ def train_ml_model():
         logging.error(f"❌ Ошибка обучения ML: {e}", exc_info=True)
         model_info["error"] = str(e)        
 
-       
-# ===================== TELEGRAM HANDLERS =====================
-async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает данные от веб-приложения"""
-    try:
-        data = json.loads(update.effective_message.web_app_data.data)
-        action = data.get('action')
-        user_id = update.effective_user.id
-        
-        if action == 'get_signal':
-            await next_signal_command(update, context)
-        elif action == 'show_stats':
-            await statistics_command(update, context)
-        elif action == 'train_model':
-            await retrain_model_command(update, context)
-        elif action == 'get_data':
-            user_data = get_user_data(user_id)
-            wins = len([t for t in user_data['trade_history'] if t.get('result') == "WIN"])
-            losses = len([t for t in user_data['trade_history'] if t.get('result') == "LOSS"])
-            total = wins + losses
-            win_rate = (wins / total * 100) if total > 0 else 0
-            
-            # ИСПРАВЛЕНИЕ: используем правильную клавиатуру
-            user_markup = get_trading_keyboard(user_id)
-            
-            await update.message.reply_text(
-                f"💰 Баланс: {user_data['virtual_balance']:.2f}\n"
-                f"📊 Сделок: {user_data['trade_counter']}\n"
-                f"🎯 Win Rate: {win_rate:.0f}%",
-                reply_markup=user_markup
-            )
-    except Exception as e:
-        logging.error(f"Ошибка обработки веб-приложения: {e}")
-
 # ===================== GPT ANALYSIS =====================
 def gpt_full_market_read(pair: str, df_m1: pd.DataFrame, df_m5: pd.DataFrame):
     """GPT-анализ с улучшенной логикой времени экспирации (1-4 минуты)"""
@@ -2558,179 +2524,155 @@ def analyze_pair(pair: str):
         logging.error(f"💥 Ошибка анализа пары {pair}: {e}", exc_info=True)
         return None, None, 0, "ERROR", None
     
-# ===================== ENHANCED CHART (TradingView Style) =====================
-import plotly.graph_objects as go
-import plotly.io as pio
+# ===================== FAST CHART (MATPLOTLIB) =====================
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from io import BytesIO
 import pandas as pd
-import logging, os
+import logging
 from datetime import datetime
-from PIL import Image
-from plotly.subplots import make_subplots
 
-pio.defaults.default_format = "png"
-pio.defaults.width = 1000  # ⬅️ УМЕНЬШИЛИ
-pio.defaults.height = 700  # ⬅️ УМЕНЬШИЛИ
-pio.defaults.scale = 1     # ⬅️ УМЕНЬШИЛИ качество для скорости
+# 🔥 ГЛОБАЛЬНЫЙ КЭШ ГРАФИКОВ В ПАМЯТИ
+CHART_CACHE = {}
+CACHE_EXPIRY = 300  # 5 минут
 
 def enhanced_plot_chart(df, pair, entry_price, direction):
-    """TradingView-стиль графика для ЛЕГКОЙ ВЕРСИИ (без веба)"""
-    
-    # 🔥 УДАЛИЛИ глобальную переменную latest_chart_bytes
-    # global latest_chart_bytes
-    
-    # 🔥 УПРОЩЕННОЕ КЭШИРОВАНИЕ - только для текущего запуска
-    web_path = f"smc_chart_{pair}_latest.png"
-    if os.path.exists(web_path):
-        file_time = datetime.fromtimestamp(os.path.getmtime(web_path))
-        if (datetime.now() - file_time).total_seconds() < 300:  # 5 минут
-            logging.info(f"📊 Используем кэшированный график для {pair}")
-            return web_path
+    """СУПЕР-БЫСТРЫЙ TradingView-стиль график со свечами (1-2 секунды)"""
     
     try:
         if df is None or len(df) < 100:
             return None
 
-        # ✅ СОХРАНЯЕМ отступ в 20 свечей
-        df_plot = df.tail(130).copy()  # ⬅️ УМЕНЬШИЛИ с 150 до 130
+        # 🔥 ПРОВЕРКА КЭША В ПАМЯТИ
+        cache_key = f"{pair}_{direction}_{entry_price:.5f}"
+        current_time = datetime.now()
         
-        # ======== УПРОЩЕННАЯ АНАЛИТИКА ========
-        trend_analysis = enhanced_trend_analysis(df)
-        current_price = df_plot['close'].iloc[-1]
+        if cache_key in CHART_CACHE:
+            cached_time, chart_bytes = CHART_CACHE[cache_key]
+            if (current_time - cached_time).total_seconds() < CACHE_EXPIRY:
+                logging.info(f"📊 Используем кэшированный график из памяти для {pair}")
+                chart_stream = BytesIO(chart_bytes)
+                chart_stream.name = f"chart_{pair}.png"
+                return chart_stream
 
-        # ======== ТОЛЬКО ОСНОВНЫЕ ИНДИКАТОРЫ ========
-        df_plot["SMA20"] = df_plot["close"].rolling(20).mean()
-
-        # ======== СОЗДАНИЕ СУБПЛОТОВ ========
-        fig = make_subplots(
-            rows=2, cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.03,
-            row_heights=[0.75, 0.25],
-            specs=[
-                [{"secondary_y": False}],
-                [{"secondary_y": False}]
-            ]
-        )
-
-        # ======== ПРОСТЫЕ СВЕЧИ ========
-        fig.add_trace(go.Candlestick(
-            x=df_plot.index,
-            open=df_plot["open"], 
-            high=df_plot["high"],
-            low=df_plot["low"], 
-            close=df_plot["close"],
-            name="Price",
-            increasing_line_color="#00ff88",
-            decreasing_line_color="#ff4444",
-            increasing_fillcolor="rgba(0,255,136,0.8)",
-            decreasing_fillcolor="rgba(255,68,68,0.8)",
-            line=dict(width=1),
-            whiskerwidth=0.8,
-        ), row=1, col=1)
-
-        # ======== SMA ========
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, 
-            y=df_plot["SMA20"],
-            line=dict(color="#ffaa00", width=2),
-            name="SMA 20",
-            opacity=0.9
-        ), row=1, col=1)
-
-        # ======== ОБЪЕМЫ ========
-        colors_volume = []
-        for idx in df_plot.index:
-            close_val = df_plot.loc[idx, 'close']
-            open_val = df_plot.loc[idx, 'open']
-            color = 'rgba(255,68,68,0.7)' if close_val < open_val else 'rgba(0,255,136,0.7)'
-            colors_volume.append(color)
+        # Используем только последние 80 свечей для скорости и читаемости
+        df_plot = df.tail(80).copy()
         
-        fig.add_trace(go.Bar(
-            x=df_plot.index, 
-            y=df_plot["volume"] if "volume" in df_plot.columns else df_plot.get("tick_volume", 0),
-            name="Volume",
-            marker_color=colors_volume,
-            marker_line_width=0,
-            opacity=0.8
-        ), row=2, col=1)
-
+        # Создаем график
+        plt.style.use('dark_background')
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), 
+                                      gridspec_kw={'height_ratios': [3, 1]})
+        fig.patch.set_facecolor('#0a1120')
+        
+        # ======== СВЕЧНОЙ ГРАФИК ========
+        # Цвета TradingView
+        green_color = '#00ff88'  # Бычий
+        red_color = '#ff4444'    # Медвежий
+        
+        # Рисуем свечи вручную
+        for i in range(len(df_plot)):
+            open_price = df_plot['open'].iloc[i]
+            close_price = df_plot['close'].iloc[i]
+            high_price = df_plot['high'].iloc[i]
+            low_price = df_plot['low'].iloc[i]
+            
+            # Определяем цвет свечи
+            color = green_color if close_price >= open_price else red_color
+            alpha = 0.8
+            
+            # Тело свечи
+            body_bottom = min(open_price, close_price)
+            body_top = max(open_price, close_price)
+            body_height = body_top - body_bottom
+            
+            if body_height > 0:
+                ax1.bar(i, body_height, bottom=body_bottom, color=color, alpha=alpha, width=0.8)
+            
+            # Тени свечи
+            ax1.plot([i, i], [low_price, body_bottom], color=color, linewidth=1, alpha=alpha)
+            ax1.plot([i, i], [body_top, high_price], color=color, linewidth=1, alpha=alpha)
+        
+        # SMA20
+        sma20 = df_plot['close'].rolling(20).mean()
+        ax1.plot(range(len(sma20)), sma20, color='#ffaa00', linewidth=2, label='SMA 20', alpha=0.9)
+        
         # ======== КЛЮЧЕВЫЕ ЛИНИИ ========
-        # Линия входа
-        entry_color = "#ffffff"
-        fig.add_hline(
-            y=entry_price,
-            line=dict(color=entry_color, width=2, dash='dash'),
-            annotation_text=f"ENTRY: {entry_price:.5f}",
-            annotation_position="right",
-            annotation_font_color="#fff",
-            annotation_font_size=10,
-            row=1, col=1
-        )
-
-        # ======== УПРОЩЕННАЯ ИНФО-ПАНЕЛЬ ========
-        info_bg = "#00cc66" if direction == "BUY" else "#ff4444"
-        info_text = (
-            f"<b>PRICE:</b> {current_price:.5f}<br>"
-            f"<b>TREND:</b> {trend_analysis['direction']}<br>"
-            f"<b>SIGNAL:</b> {direction}"
-        )
+        # Линия входа (белая пунктирная)
+        ax1.axhline(y=entry_price, color='white', linestyle='--', 
+                   linewidth=2, label=f'Entry: {entry_price:.5f}')
         
-        fig.add_annotation(
-            text=info_text,
-            xref="paper", yref="paper",
-            x=0.02, y=0.98,
-            showarrow=False,
-            align="left",
-            font=dict(color="white", size=10, family="Arial"),
-            bordercolor="white",
-            borderwidth=1,
-            borderpad=3,
-            bgcolor=info_bg,
-            opacity=0.9
-        )
-
-        # ======== УПРОЩЕННЫЙ ЛАЙАУТ ========
-        fig.update_layout(
-            title=dict(
-                text=f"{pair} - {direction}",
-                font=dict(color="white", size=16, family="Arial"),
-                x=0.5,
-                y=0.98
-            ),
-            template="plotly_dark",
-            plot_bgcolor="#0a1120",
-            paper_bgcolor="#0a1120",
-            xaxis=dict(showgrid=False, rangeslider_visible=False),
-            xaxis2=dict(showgrid=False),
-            yaxis=dict(showgrid=True, gridcolor="#1e2a3a", side="right"),
-            yaxis2=dict(showgrid=False, side="right"),
-            font=dict(color="white", family="Arial"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=40, r=80, t=60, b=40),  # ⬅️ УМЕНЬШИЛИ отступы
-            showlegend=True
-        )
-
-        # ======== СОХРАНЕНИЕ ========
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        path = f"smc_chart_{pair}_{timestamp}.png"
+        # Текущая цена (голубая точечная)
+        current_price = df_plot['close'].iloc[-1]
+        ax1.axhline(y=current_price, color='#00ffff', linestyle=':', 
+                   linewidth=1.5, label=f'Current: {current_price:.5f}')
         
-        fig.write_image(
-            path, 
-            scale=1,    # ⬅️ НИЗКОЕ КАЧЕСТВО ДЛЯ СКОРОСТИ
-            width=800,  # ⬅️ МЕНЬШИЙ РАЗМЕР
-            height=600
-        )
+        # ======== ОФОРМЛЕНИЕ ========
+        # 🔥 ИСПРАВЛЕНИЕ ШРИФТОВ - убираем эмодзи из заголовка
+        title_text = f"{pair} - SMART MONEY - {direction}"
+        ax1.set_title(title_text, color='white', fontsize=16, fontweight='bold', pad=20)
+        
+        ax1.legend(loc='upper left', facecolor='#1e2a3a')
+        ax1.grid(True, alpha=0.3, color='#1e2a3a')
+        ax1.set_facecolor('#0a1120')
+        ax1.tick_params(colors='white')
+        
+        # ======== ОБЪЕМЫ ========
+        if 'volume' in df_plot.columns or 'tick_volume' in df_plot.columns:
+            volumes = df_plot['volume'] if 'volume' in df_plot.columns else df_plot['tick_volume']
+            
+            # Цвета объемов как в TradingView (зеленый/красный)
+            volume_colors = []
+            for i in range(len(df_plot)):
+                if df_plot['close'].iloc[i] >= df_plot['open'].iloc[i]:
+                    volume_colors.append(green_color)
+                else:
+                    volume_colors.append(red_color)
+            
+            ax2.bar(range(len(volumes)), volumes, color=volume_colors, alpha=0.7)
+        
+        ax2.set_ylabel('Volume', color='white')
+        ax2.grid(True, alpha=0.3, color='#1e2a3a')
+        ax2.set_facecolor('#0a1120')
+        ax2.tick_params(colors='white')
+        
+        # ======== ИНФО-ПАНЕЛЬ ========
+        trend_analysis = enhanced_trend_analysis(df)
+        info_bg = '#00cc66' if direction == 'BUY' else '#ff4444'
+        
+        # 🔥 ИСПРАВЛЕНИЕ ШРИФТОВ - простой текст без спецсимволов
+        info_text = (f"PRICE: {current_price:.5f}\n"
+                    f"TREND: {trend_analysis['direction']}\n"
+                    f"STRENGTH: {trend_analysis['strength']}\n"
+                    f"SIGNAL: {direction}")
+        
+        ax1.text(0.02, 0.98, info_text, transform=ax1.transAxes, 
+                fontsize=10, verticalalignment='top', color='white',
+                bbox=dict(boxstyle='round', facecolor=info_bg, alpha=0.9, edgecolor='white'))
 
-        # 🔥 СОХРАНЯЕМ ТОЛЬКО ДЛЯ TELEGRAM, НЕ ДЛЯ ВЕБА
-        web_path = f"smc_chart_{pair}_latest.png"
-        fig.write_image(web_path, scale=1, width=800, height=600)
-
-        logging.info(f"📊 ЛЕГКИЙ график создан: {web_path}")
-
-        return path
-
+        plt.tight_layout()
+        
+        # ======== СОХРАНЕНИЕ В ПАМЯТЬ ========
+        chart_stream = BytesIO()
+        
+        # 🔥 ИСПРАВЛЕНИЕ ШРИФТОВ - убираем эмодзи из настроек сохранения
+        plt.savefig(chart_stream, format='png', dpi=100, bbox_inches='tight', 
+                   facecolor='#0a1120', edgecolor='none')
+        plt.close()
+        
+        chart_bytes = chart_stream.getvalue()
+        
+        # 🔥 СОХРАНЯЕМ В КЭШ ПАМЯТИ
+        CHART_CACHE[cache_key] = (current_time, chart_bytes)
+        
+        # 🔥 СОЗДАЕМ НОВЫЙ BytesIO для отправки
+        chart_stream = BytesIO(chart_bytes)
+        chart_stream.name = f"chart_{pair}.png"
+        
+        logging.info(f"⚡ БЫСТРЫЙ график создан в памяти: {pair} (1-2 сек)")
+        return chart_stream
+        
     except Exception as e:
-        logging.error(f"❌ Ошибка создания легкого графика: {e}")
+        logging.error(f"❌ Ошибка создания быстрого графика: {e}")
         return None
 
 # ===================== GLOBAL SIGNAL VARIABLES =====================
@@ -2786,43 +2728,50 @@ async def find_common_signal():
 
 # ===================== AUTO TRADING LOOP - ФИНАЛ =====================
 async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
-    """Финальная версия торгового цикла с ОБЩИМ сигналом для всех"""
+    """Финальная версия торгового цикла с ПАРАЛЛЕЛЬНОЙ обработкой пользователей"""
     start_time = datetime.now()
-    
+
     try:
         # 🔔 ПРОВЕРЯЕМ И ОТПРАВЛЯЕМ УВЕДОМЛЕНИЯ О СТАТУСЕ
         current_status = is_trading_time()
-        if not BOT_STATUS_NOTIFIED:
+        global BOT_STATUS_NOTIFIED, BOT_LAST_STATUS, users
+
+        if BOT_LAST_STATUS != current_status or not BOT_STATUS_NOTIFIED:
             await send_bot_status_notification(context)
-        
-        # 🕒 ПРОВЕРЯЕМ ФИКСИРОВАННЫЙ ГРАФИК РАБОТЫ БОТА
+            BOT_LAST_STATUS = current_status
+            BOT_STATUS_NOTIFIED = True
+
+        # 🕒 ПРОВЕРЯЕМ РАСПИСАНИЕ РАБОТЫ
         if not current_status:
-            logging.info("⏸ Бот не работает по расписанию - пропуск цикла")
+            logging.info("⏸ Бот не работает по расписанию — пропуск цикла")
             return
 
         logging.info("🔄 ===== ЗАПУСК АВТО-ТРЕЙДИНГ ЦИКЛА =====")
 
-        # 📥 Загружаем / обновляем данные пользователей
-        logging.info(f"👥 Загружено пользователей: {len(users)}")
-
-        if not users or len(users) == 0:
-            logging.warning("⚠ База пользователей пуста")
+        # 📥 НАДЁЖНАЯ ЗАГРУЗКА ПОЛЬЗОВАТЕЛЕЙ
+        try:
+            load_users_data()  # функция обновляет global users
+            if not users or len(users) == 0:
+                logging.warning("⚠ База пользователей пуста — возможно, первый запуск")
+                return
+            logging.info(f"👥 Загружено пользователей: {len(users)}")
+        except Exception as e:
+            logging.error(f"💥 Ошибка при загрузке данных пользователей: {e}", exc_info=True)
             return
 
         # 🔍 ПОИСК ОБЩЕГО СИГНАЛА (1 раз для всех)
         global CURRENT_SIGNAL, CURRENT_SIGNAL_TIMESTAMP
-        
-        # Проверяем актуальность текущего сигнала
+
         signal_expired = (
-            CURRENT_SIGNAL_TIMESTAMP is None or 
+            CURRENT_SIGNAL_TIMESTAMP is None or
             (datetime.now() - CURRENT_SIGNAL_TIMESTAMP).total_seconds() > SIGNAL_EXPIRY_MINUTES * 60
         )
-        
+
         if signal_expired or CURRENT_SIGNAL is None:
             logging.info("🔄 Поиск нового общего сигнала...")
             CURRENT_SIGNAL = await find_common_signal()
             CURRENT_SIGNAL_TIMESTAMP = datetime.now()
-            
+
             if CURRENT_SIGNAL:
                 logging.info(f"📢 НОВЫЙ ОБЩИЙ СИГНАЛ: {CURRENT_SIGNAL['pair']} {CURRENT_SIGNAL['direction']}")
             else:
@@ -2831,33 +2780,43 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
         else:
             logging.info(f"📊 Используем актуальный общий сигнал: {CURRENT_SIGNAL['pair']}")
 
-        # 🚀 Обрабатываем всех пользователей с ОДНИМ СИГНАЛОМ
-        processed_users = 0
+        # 🚀 ПАРАЛЛЕЛЬНАЯ ОБРАБОТКА ПОЛЬЗОВАТЕЛЕЙ
+        tasks, user_tasks = [], []
+
         for user_id, user_data in users.copy().items():
             try:
                 uid = int(user_id)
-                auto_trading = user_data.get('auto_trading', False)
-                
-                if not auto_trading:
+                if not user_data.get('auto_trading', False):
                     continue
-                    
-                logging.info(f"🚀 Пользователь {uid}: открываем общий сигнал...")
-                await process_common_signal_for_user(uid, user_data, context, CURRENT_SIGNAL)
-                processed_users += 1
-                
+
+                logging.info(f"🚀 Пользователь {uid}: добавляем в параллельную обработку...")
+                task = process_common_signal_for_user(uid, user_data, context, CURRENT_SIGNAL)
+                tasks.append(task)
+                user_tasks.append(uid)
+
             except Exception as user_err:
-                logging.error(f"❌ Ошибка обработки пользователя {user_id}: {user_err}", exc_info=True)
+                logging.error(f"❌ Ошибка подготовки пользователя {user_id}: {user_err}", exc_info=True)
+
+        # 🔥 ЗАПУСК ПАРАЛЛЕЛЬНЫХ ЗАДАЧ
+        processed_users = 0
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logging.error(f"❌ Ошибка у пользователя {user_tasks[i]}: {result}")
+                else:
+                    processed_users += 1
 
         logging.info(f"✅ АВТО-ТРЕЙДИНГ ЦИКЛ ЗАВЕРШЕН. Обработано пользователей: {processed_users}/{len(users)}")
 
     except Exception as e:
         logging.error(f"💥 Критическая ошибка авто-трейдинга: {e}", exc_info=True)
-        
+
     finally:
         execution_time = (datetime.now() - start_time).total_seconds()
         logging.info(f"⏱️ Авто-трейдинг выполнен за {execution_time:.1f} сек")
 
-# ===================== PROCESS COMMON SIGNAL =====================
+# ===================== PROCESS COMMON SIGNAL (ОБНОВЛЕННАЯ) =====================
 async def process_common_signal_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, common_signal: Dict):
     """Обрабатывает ОБЩИЙ сигнал для конкретного пользователя"""
     try:
@@ -2890,15 +2849,21 @@ async def process_common_signal_for_user(user_id: int, user_data: Dict, context:
             f"Сделка открыта! Результат через {expiry} минут..."
         )
 
-        # 📈 Отправка графика или сообщения
-        chart_path = enhanced_plot_chart(df, pair, entry_price, signal)
+        # 📈 Отправка графика ИЗ ПАМЯТИ
+        chart_stream = enhanced_plot_chart(df, pair, entry_price, signal)
         user_markup = get_trading_keyboard(user_id)
         
         try:
-            if chart_path:
-                with open(chart_path, 'rb') as photo:
-                    await context.bot.send_photo(chat_id=user_id, photo=photo, caption=signal_text, reply_markup=user_markup)
-                os.remove(chart_path)
+            if chart_stream:
+                # 🔥 ОТПРАВЛЯЕМ ИЗ ПАМЯТИ, НЕ ИЗ ФАЙЛА
+                await context.bot.send_photo(
+                    chat_id=user_id, 
+                    photo=chart_stream, 
+                    caption=signal_text, 
+                    reply_markup=user_markup
+                )
+                # 🔥 НЕ НУЖНО УДАЛЯТЬ ФАЙЛ - его нет!
+                logging.info(f"✅ График отправлен из памяти пользователю {user_id}")
             else:
                 await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=user_markup)
         except Exception as tg_err:
@@ -2934,6 +2899,7 @@ async def process_common_signal_for_user(user_id: int, user_data: Dict, context:
 
     except Exception as e:
         logging.error(f"❌ Ошибка process_common_signal_for_user: {e}", exc_info=True)
+
 
 # ===================== TRADE RESULT CHECKER =====================
 async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
@@ -4238,9 +4204,7 @@ def main():
     app.add_handler(CommandHandler("whitelist_add", whitelist_add_command))
     app.add_handler(CommandHandler("whitelist_remove", whitelist_remove_command))
     app.add_handler(CommandHandler("whitelist_stats", whitelist_stats_command))
-    app.add_handler(CommandHandler("whitelist_show", whitelist_show_command))
-    app.add_handler(CommandHandler("panel", webapp_command))  
-    app.add_handler(CommandHandler("web", webapp_command))     
+    app.add_handler(CommandHandler("whitelist_show", whitelist_show_command))    
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("next", next_signal_command))
     app.add_handler(CommandHandler("stats", statistics_command))
@@ -4260,9 +4224,6 @@ def main():
     app.add_handler(CommandHandler("marketstatus", market_status_command))
     app.add_handler(CommandHandler("clearalltrades", clear_all_trades_command))
     app.add_handler(CommandHandler("debug", debug_user_data))
-    
-    # Обработчики сообщений
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # ===================== JOB QUEUE =====================
