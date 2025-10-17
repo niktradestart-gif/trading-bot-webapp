@@ -3025,6 +3025,326 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
     except Exception as e:
         logging.error(f"❌ Ошибка process_auto_trade_for_user: {e}", exc_info=True)
 
+# ===================== 🔄 СИСТЕМА ДОГОНОВ =====================
+
+async def start_martingale_series(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, pair: str, direction: str):
+    """Запуск серии догонов после первого проигрыша"""
+    try:
+        martingale_data = user_data.get('martingale', {})
+        
+        # Активируем систему догонов
+        martingale_data.update({
+            'active': True,
+            'current_level': 1,
+            'original_pair': pair,
+            'original_direction': direction,
+            'trades': [{
+                'level': 1,
+                'timestamp': datetime.now().isoformat(),
+                'result': 'LOSS'
+            }]
+        })
+        
+        save_users_data()
+        
+        # Уведомление о запуске догона
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=f"🔄 ЗАПУСК СИСТЕМЫ ДОГОНОВ\n\n"
+                 f"💼 Пара: {pair}\n"
+                 f"📊 Направление: {direction}\n"
+                 f"⚡ Уровень: 1/3\n"
+                 f"📈 Коэффициент: 1.0x\n\n"
+                 f"⚠️ Следующая сделка будет открыта автоматически",
+            reply_markup=get_trading_keyboard(user_id)
+        )
+        
+        logging.info(f"🔄 Запущена серия догонов для пользователя {user_id}: {pair} {direction}")
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка запуска серии догонов: {e}")
+
+async def handle_martingale_loss(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, 
+                               pair: str, direction: str, current_level: int):
+    """Обработка проигрыша в системе догонов"""
+    try:
+        martingale_data = user_data.get('martingale', {})
+        
+        if current_level >= 3:
+            # 🏁 Достигнут максимум догонов - завершаем серию
+            await finish_martingale_series(user_id, user_data, context, pair, False)
+            return
+        
+        # 🔄 Переход на следующий уровень
+        next_level = current_level + 1
+        martingale_data['current_level'] = next_level
+        martingale_data['trades'].append({
+            'level': next_level,
+            'timestamp': datetime.now().isoformat(),
+            'result': 'LOSS'
+        })
+        
+        save_users_data()
+        
+        # Коэффициенты для каждого уровня
+        multipliers = {1: "1.0x", 2: "2.0x", 3: "2.5x"}
+        next_multiplier = multipliers.get(next_level, "2.5x")
+        
+        # Уведомление о переходе на следующий уровень
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=f"🔄 ПЕРЕХОД НА ДОГОН #{next_level}\n\n"
+                 f"💼 Пара: {pair}\n"
+                 f"📊 Направление: {direction}\n"
+                 f"⚡ Уровень: {next_level}/3\n"
+                 f"📈 Коэффициент: {next_multiplier}\n"
+                 f"⚠️ Риск: {'Повышенный' if next_level == 2 else 'Максимальный'}\n\n"
+                 f"🎯 Цель: Полное восстановление",
+            reply_markup=get_trading_keyboard(user_id)
+        )
+        
+        logging.info(f"🔄 Переход на догон #{next_level} для пользователя {user_id}")
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка обработки проигрыша догона: {e}")
+
+async def handle_martingale_win(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, 
+                              pair: str, current_level: int):
+    """Обработка выигрыша в системе догонов"""
+    try:
+        # ✅ Успешное завершение серии догонов
+        await finish_martingale_series(user_id, user_data, context, pair, True)
+        
+        logging.info(f"✅ Догон #{current_level} успешен для пользователя {user_id}")
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка обработки выигрыша догона: {e}")
+
+async def finish_martingale_series(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, 
+                                 pair: str, success: bool):
+    """Завершение серии догонов"""
+    try:
+        martingale_data = user_data.get('martingale', {})
+        current_level = martingale_data.get('current_level', 0)
+        
+        # Сбрасываем систему догонов
+        martingale_data.update({
+            'active': False,
+            'current_level': 0,
+            'original_pair': None,
+            'original_direction': None,
+            'trades': []
+        })
+        
+        save_users_data()
+        
+        # Уведомление о результате серии
+        if success:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f"✅ СЕРИЯ ДОГОНОВ УСПЕШНО ЗАВЕРШЕНА\n\n"
+                     f"💼 Пара: {pair}\n"
+                     f"📊 Уровень: {current_level}/3\n"
+                     f"🎯 Результат: ✅ Полное восстановление\n\n"
+                     f"💫 Система догонов отключена",
+                reply_markup=get_trading_keyboard(user_id)
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f"🏁 СЕРИЯ ДОГОНОВ ЗАВЕРШЕНА\n\n"
+                     f"💼 Пара: {pair}\n"
+                     f"📊 Уровень: {current_level}/3\n"
+                     f"🎯 Результат: ❌ Неудача\n"
+                     f"⚠️ Статус: Авто-остановка\n\n"
+                     f"🛑 Рекомендация: Оцените риски перед следующим догоном",
+                reply_markup=get_trading_keyboard(user_id)
+            )
+        
+        logging.info(f"🏁 Завершена серия догонов для пользователя {user_id}: {'УСПЕХ' if success else 'НЕУДАЧА'}")
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка завершения серии догонов: {e}")
+
+async def open_martingale_trade(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, 
+                              pair: str, direction: str, entry_price: float, df: pd.DataFrame, 
+                              trade_number: int, current_level: int):
+    """Открытие сделки в системе догонов"""
+    try:
+        # Коэффициенты для каждого уровня
+        multipliers = {1: "1.0x", 2: "2.0x", 3: "2.5x"}
+        current_multiplier = multipliers.get(current_level, "2.5x")
+        
+        # Определяем экспирацию (можно сделать динамической)
+        expiry = 1  # минута
+        
+        # 📝 Текст сигнала догона
+        signal_text = (
+            f"🔄 ДОГОН #{current_level} | {pair}\n\n"
+            f"🎯 СДЕЛКА #{trade_number} (Догон {current_level}/3)\n"
+            f"📊 Сигнал: {direction}\n"
+            f"💰 Цена входа: {entry_price:.5f}\n"
+            f"⚡ Коэффициент: {current_multiplier}\n"
+            f"⏰ Экспирация: {expiry} мин\n"
+            f"🎯 Уверенность: 10/10\n\n"
+            f"⚠️ Риск: {'Повышенный' if current_level == 2 else 'Максимальный' if current_level == 3 else 'Стандартный'}"
+        )
+
+        # 📈 Отправка графика
+        chart_stream = enhanced_plot_chart(df, pair, entry_price, direction)
+        user_markup = get_trading_keyboard(user_id)
+        
+        try:
+            if chart_stream:
+                await context.bot.send_photo(
+                    chat_id=user_id, 
+                    photo=chart_stream, 
+                    caption=signal_text, 
+                    reply_markup=user_markup
+                )
+                logging.info(f"✅ График догона отправлен пользователю {user_id}")
+            else:
+                await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=user_markup)
+        except Exception as tg_err:
+            logging.error(f"⚠ Ошибка отправки сигнала догона пользователю {user_id}: {tg_err}")
+
+        # 📌 Сохраняем сделку догона
+        trade = {
+            'id': trade_number,
+            'pair': pair,
+            'direction': direction,
+            'entry_price': float(entry_price),
+            'expiry_minutes': int(expiry),
+            'stake': float(STAKE_AMOUNT),
+            'timestamp': datetime.now().isoformat(),
+            'ml_features': prepare_ml_features(df) or {},
+            'source': 'MARTINGALE',
+            'confidence': 10,
+            'martingale_level': current_level
+        }
+
+        user_data['current_trade'] = trade
+        user_data['trade_counter'] += 1
+        save_users_data()
+
+        # ⏱ Планируем проверку результата
+        check_delay = (expiry * 60) + 5
+        context.job_queue.run_once(
+            check_trade_result,
+            check_delay,
+            data={'user_id': user_id, 'pair': pair, 'trade_id': trade_number}
+        )
+
+        logging.info(f"✅ Догон #{current_level} открыт для пользователя {user_id}")
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка открытия сделки догона: {e}")
+
+async def format_martingale_result(user_id: int, result: str, pair: str, direction: str, 
+                                 entry_price: float, current_price: float, current_level: int,
+                                 total: int, wins: int, losses: int, win_rate: float):
+    """Форматирование результата для сделки догона"""
+    
+    result_emoji = "🟢" if result == "WIN" else "🔴"
+    
+    if result == "WIN":
+        return (
+            f"✅ ДОГОН #{current_level} УСПЕШЕН!\n\n"
+            f"💼 Пара: {pair}\n"
+            f"📊 Уровень: {current_level}/3\n"
+            f"📊 Направление: {direction}\n"
+            f"💰 Вход: {entry_price:.5f}\n"
+            f"💰 Выход: {current_price:.5f}\n"
+            f"🎯 Результат: {result}\n\n"
+            f"💫 Серия догона завершена успешно!\n"
+            f"📊 Общая статистика:\n"
+            f"• Всего: {total}\n"
+            f"• 🟢 Выигрыши: {wins}\n"
+            f"• 🔴 Проигрыши: {losses}\n"
+            f"• 🎯 Win Rate: {win_rate}%"
+        )
+    else:
+        return (
+            f"{result_emoji} ДОГОН #{current_level} ЗАВЕРШЕН\n\n"
+            f"💼 Пара: {pair}\n"
+            f"📊 Уровень: {current_level}/3\n"
+            f"📊 Направление: {direction}\n"
+            f"💰 Вход: {entry_price:.5f}\n"
+            f"💰 Выход: {current_price:.5f}\n"
+            f"🎯 Результат: {result}\n\n"
+            f"📊 Общая статистика:\n"
+            f"• Всего: {total}\n"
+            f"• 🟢 Выигрыши: {wins}\n"
+            f"• 🔴 Проигрыши: {losses}\n"
+            f"• 🎯 Win Rate: {win_rate}%"
+        )
+
+def check_win_streak(user_data: Dict) -> int:
+    """Проверка текущей серии выигрышей"""
+    try:
+        trade_history = user_data.get('trade_history', [])
+        if len(trade_history) < 5:
+            return 0
+        
+        # Считаем последние результаты (исключая текущие догоны)
+        recent_trades = [t for t in trade_history[-20:] if t.get('martingale_level', 0) == 0]
+        if not recent_trades:
+            return 0
+            
+        current_streak = 0
+        
+        # Идем с конца до первого проигрыша
+        for trade in reversed(recent_trades):
+            if trade.get('result') == 'WIN':
+                current_streak += 1
+            else:
+                break
+        
+        return current_streak
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка проверки серии выигрышей: {e}")
+        return 0
+
+async def send_streak_notification(context: ContextTypes.DEFAULT_TYPE, user_id: int, streak: int):
+    """Отправка уведомления о серии выигрышей"""
+    try:
+        if streak == 5:
+            message = (
+                f"🔥 СЕРИЯ ИЗ 5 ВЫИГРЫШЕЙ ПОДРЯД!\n\n"
+                f"📈 Текущая статистика:\n"
+                f"• Активная серия: 5 ✅ подряд\n"
+                f"• Тренд: 📈 Восходящий\n\n"
+                f"💫 Идеальные условия для торговли!"
+            )
+        elif streak == 10:
+            message = (
+                f"🎯 ИСТОРИЧЕСКАЯ СЕРИЯ - 10 ВЫИГРЫШЕЙ!\n\n"
+                f"🏆 Новый рекорд: 10 ✅ подряд\n"
+                f"📈 Эффективность: Выдающаяся\n\n"
+                f"🚀 Ваша стратегия показывает превосходные результаты!"
+            )
+        elif streak == 15:
+            message = (
+                f"🌟 ЛЕГЕНДАРНАЯ СЕРИЯ - 15 ВЫИГРЫШЕЙ!\n\n"
+                f"💫 АБСОЛЮТНЫЙ РЕКОРД: 15 ✅ подряд\n"
+                f"🏆 Статус: Топ-трейдер\n\n"
+                f"🎯 Вы достигли максимальной эффективности!"
+            )
+        else:
+            return
+            
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=message,
+            reply_markup=get_trading_keyboard(user_id)
+        )
+        
+        logging.info(f"🎯 Отправлено уведомление о серии {streak} выигрышей пользователю {user_id}")
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка отправки уведомления о серии: {e}")
+
 # ===================== TELEGRAM COMMANDS =====================
 # -------- WHITELIST MANAGEMENT COMMANDS --------
 async def whitelist_add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
