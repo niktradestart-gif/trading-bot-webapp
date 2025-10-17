@@ -41,10 +41,14 @@ from telegram.ext import (
 )
 # ML
 import talib as ta
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split, cross_val_score  # ✅ cross_val_score добавлен
-import joblib  # для загрузки/сохранения модели
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+import joblib
+import pickle
 
 # OpenAI
 from openai import OpenAI
@@ -742,33 +746,46 @@ def save_users_data():
 
 
 def load_users_data():
-    """Загрузка данных пользователей с инициализацией системы догонов"""
-    global users
+    """📥 Надёжная загрузка данных с бэкапами и восстановлением счетчиков"""
+    global users, single_user_data
     try:
-        if os.path.exists(USERS_FILE):
-            with open(USERS_FILE, 'r', encoding='utf-8') as f:
-                users = json.load(f)
-                
-            # 🔄 ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ДОГОНОВ ДЛЯ СУЩЕСТВУЮЩИХ ПОЛЬЗОВАТЕЛЕЙ
-            for user_id, user_data in users.items():
-                if 'martingale' not in user_data:
-                    user_data['martingale'] = {
-                        'active': False,
-                        'current_level': 0,
-                        'original_pair': None,
-                        'original_direction': None,
-                        'trades': []
-                    }
-                    
-            logging.info(f"✅ Данные {len(users)} пользователей загружены с системой догонов")
+        if MULTI_USER_MODE:
+            if os.path.exists("users_data.json"):
+                success = load_from_file("users_data.json", "multi")
+                if not success:
+                    backups = [f for f in os.listdir("backups") if f.startswith("users_data_backup")]
+                    if backups:
+                        backups.sort(reverse=True)
+                        latest = os.path.join("backups", backups[0])
+                        logging.warning(f"⚠ Повреждён файл, пробуем бэкап: {latest}")
+                        load_from_file(latest, "multi")
+                    else:
+                        users = {}
+                        logging.warning("⚠ Нет бэкапов — пустая база")
+            else:
+                users = {}
+                logging.info("📝 users_data.json не найден — создаём новую базу")
         else:
-            users = {}
-            logging.info("📁 Файл пользователей не найден, создан новый словарь")
-            
+            if os.path.exists("single_user_data.json"):
+                success = load_from_file("single_user_data.json", "single")
+                if not success:
+                    backups = [f for f in os.listdir("backups") if f.startswith("single_user_backup")]
+                    if backups:
+                        backups.sort(reverse=True)
+                        latest = os.path.join("backups", backups[0])
+                        logging.warning(f"⚠ Повреждён single файл, пробуем бэкап: {latest}")
+                        load_from_file(latest, "single")
+                    else:
+                        single_user_data = create_default_single_data()
+            else:
+                single_user_data = create_default_single_data()
+                logging.info("📝 single_user_data.json не найден — создаём новую базу")
     except Exception as e:
-        logging.error(f"❌ Ошибка загрузки данных пользователей: {e}")
+        logging.error(f"💥 Ошибка загрузки данных: {e}")
         users = {}
-        
+        single_user_data = create_default_single_data()
+
+
 def load_from_file(filename, mode):
     """📥 Загружает JSON и восстанавливает счётчики"""
     try:
@@ -1586,28 +1603,64 @@ def enhanced_smart_money_analysis(df):
         return None, None, 0, "SMC_ERROR"
 
 
-# ===================== ML =====================
 ml_model = None
 ml_scaler = None
 model_info = {}
+ML_PROBABILITY_THRESHOLD = 0.6  # Порог для принятия торгового решения
 
 def prepare_ml_features(df):
-    """Готовит полный словарь из 42 ML-признаков для сделки и обучения"""
+    """Готовит полный словарь из 50+ ML-признаков для сделки и обучения"""
     try:
         if df is None or len(df) < 100:
             return None
 
         close, high, low, volume = df['close'], df['high'], df['low'], df['tick_volume']
-
         features = {}
 
-        # ===================== 📌 БАЗОВЫЕ ПРИЗНАКИ =====================
+        # ===================== 📌 БАЗОВЫЕ ПРИЗНАКИ (УЛУЧШЕННЫЕ) =====================
         features['price'] = float(close.iloc[-1])
         features['volume'] = float(volume.iloc[-1]) if not volume.isna().all() else 0.0
-        features['rsi'] = float(ta.RSI(close, timeperiod=14).iloc[-1]) if len(close) >= 14 else 50.0
-        features['atr'] = float(ta.ATR(high, low, close, timeperiod=14).iloc[-1]) if len(close) >= 14 else 0.0
+        
+        # 📈 RSI с несколькими периодами
+        for period in [14, 21]:
+            rsi = ta.RSI(close, timeperiod=period)
+            features[f'rsi_{period}'] = float(rsi.iloc[-1]) if len(close) >= period and not rsi.isna().all() else 50.0
+        
+        # 📊 ATR с ratio (новый признак)
+        atr = ta.ATR(high, low, close, timeperiod=14)
+        if len(close) >= 14 and not atr.isna().all():
+            features['atr'] = float(atr.iloc[-1])
+            # ATR Ratio - отношение текущего ATR к среднему за 50 периодов
+            atr_50 = atr.rolling(50).mean()
+            features['atr_ratio'] = float(atr.iloc[-1] / atr_50.iloc[-1]) if len(atr_50) > 0 and not pd.isna(atr_50.iloc[-1]) else 1.0
+        else:
+            features['atr'] = 0.0
+            features['atr_ratio'] = 1.0
+        
+        # 📈 OBV (On-Balance Volume) - новый признак
+        try:
+            obv = ta.OBV(close, volume)
+            features['obv'] = float(obv.iloc[-1]) if not obv.isna().all() else 0.0
+            # OBV тренд (производная)
+            if len(obv) > 5:
+                obv_trend = obv.diff(5).iloc[-1]
+                features['obv_trend'] = float(obv_trend) if not pd.isna(obv_trend) else 0.0
+            else:
+                features['obv_trend'] = 0.0
+        except Exception:
+            features['obv'] = 0.0
+            features['obv_trend'] = 0.0
+        
         features['adx'] = float(ta.ADX(high, low, close, timeperiod=14).iloc[-1]) if len(close) >= 14 else 0.0
-        features['price_change_1h'] = float((close.iloc[-1] - close.iloc[-60]) / close.iloc[-60] * 100) if len(close) >= 60 else 0.0
+        
+        # 📊 Ценовые изменения с разными периодами
+        for period in [15, 30, 60]:  # M1, M2, M4
+            if len(close) >= period:
+                price_change = (close.iloc[-1] - close.iloc[-period]) / close.iloc[-period] * 100
+                features[f'price_change_{period}m'] = float(price_change)
+            else:
+                features[f'price_change_{period}m'] = 0.0
+        
         features['volatility'] = float(close.pct_change().std() * 100)
 
         # ===================== 📈 MACD =====================
@@ -1628,8 +1681,83 @@ def prepare_ml_features(df):
         except Exception:
             features['bb_position'] = 0.5
 
-        # ===================== 🧠 SMC признаки =====================
+        # ===================== 🕯️ СВЕЧНЫЕ ПАТТЕРНЫ (УЛУЧШЕННЫЕ) =====================
         try:
+            # Определяем свечные паттерны более надежно
+            current_open = df['open'].iloc[-1]
+            current_high = df['high'].iloc[-1] 
+            current_low = df['low'].iloc[-1]
+            current_close = df['close'].iloc[-1]
+            
+            prev_open = df['open'].iloc[-2] if len(df) > 1 else current_open
+            prev_high = df['high'].iloc[-2] if len(df) > 1 else current_high
+            prev_low = df['low'].iloc[-2] if len(df) > 1 else current_low
+            prev_close = df['close'].iloc[-2] if len(df) > 1 else current_close
+            
+            # Bullish Engulfing
+            features['bullish_engulfing'] = 1 if (
+                prev_close < prev_open and  # предыдущая медвежья
+                current_close > current_open and  # текущая бычья
+                current_open < prev_close and  # открытие ниже закрытия предыдущей
+                current_close > prev_open  # закрытие выше открытия предыдущей
+            ) else 0
+            
+            # Bearish Engulfing  
+            features['bearish_engulfing'] = 1 if (
+                prev_close > prev_open and  # предыдущая бычья
+                current_close < current_open and  # текущая медвежья
+                current_open > prev_close and  # открытие выше закрытия предыдущей
+                current_close < prev_open  # закрытие ниже открытия предыдущей
+            ) else 0
+            
+            # Three White Soldiers (упрощенная версия)
+            if len(df) >= 4:
+                soldiers = all([
+                    df['close'].iloc[-3] > df['open'].iloc[-3],  # 3 свечи назад бычья
+                    df['close'].iloc[-2] > df['open'].iloc[-2],  # 2 свечи назад бычья  
+                    df['close'].iloc[-1] > df['open'].iloc[-1],  # текущая бычья
+                    df['close'].iloc[-1] > df['close'].iloc[-2],  # каждая следующая выше
+                    df['close'].iloc[-2] > df['close'].iloc[-3]
+                ])
+                features['three_white_soldiers'] = 1 if soldiers else 0
+            else:
+                features['three_white_soldiers'] = 0
+                
+        except Exception:
+            features['bullish_engulfing'] = 0
+            features['bearish_engulfing'] = 0  
+            features['three_white_soldiers'] = 0
+
+        # ===================== 📏 РАССТОЯНИЕ ДО HIGH/LOW (НОВОЕ) =====================
+        try:
+            # Расстояние до дневного high/low в %
+            daily_high = high.tail(1440).max()  # 24 часа
+            daily_low = low.tail(1440).min()
+            
+            features['distance_to_daily_high'] = float((daily_high - close.iloc[-1]) / daily_high * 100) if daily_high > 0 else 50.0
+            features['distance_to_daily_low'] = float((close.iloc[-1] - daily_low) / close.iloc[-1] * 100) if close.iloc[-1] > 0 else 50.0
+            
+            # Позиция в дневном диапазоне (0-1)
+            daily_range = daily_high - daily_low
+            if daily_range > 0:
+                features['daily_range_position'] = float((close.iloc[-1] - daily_low) / daily_range)
+            else:
+                features['daily_range_position'] = 0.5
+                
+        except Exception:
+            features['distance_to_daily_high'] = 50.0
+            features['distance_to_daily_low'] = 50.0
+            features['daily_range_position'] = 0.5
+
+        # ===================== 🧠 SMC ПРИЗНАКИ =====================
+        try:
+            # Импортируем функции SMC анализа (должны быть определены в вашем коде)
+            from your_smc_module import (
+                find_supply_demand_zones, find_market_structure, 
+                calculate_order_blocks_advanced, calculate_fibonacci_levels,
+                price_action_patterns, detect_round_levels
+            )
+            
             zones = find_supply_demand_zones(df)
             structure = find_market_structure(df)
             order_blocks = calculate_order_blocks_advanced(df)
@@ -1642,19 +1770,20 @@ def prepare_ml_features(df):
             features['smc_fib_count'] = len(fibonacci)
             features['smc_patterns_count'] = len(pa_patterns)
 
-            features['smc_has_demand_zone'] = 1 if any(z['type'] == 'DEMAND' for z in zones) else 0
-            features['smc_has_supply_zone'] = 1 if any(z['type'] == 'SUPPLY' for z in zones) else 0
-            features['smc_has_bullish_ob'] = 1 if any(ob['type'] == 'BULLISH_OB' for ob in order_blocks) else 0
-            features['smc_has_bearish_ob'] = 1 if any(ob['type'] == 'BEARISH_OB' for ob in order_blocks) else 0
-            features['smc_has_engulfing'] = 1 if any('ENGULFING' in p['type'] for p in pa_patterns) else 0
-            features['smc_has_pinbar'] = 1 if any('PIN' in p['type'] for p in pa_patterns) else 0
+            features['smc_has_demand_zone'] = 1 if any(z.get('type') == 'DEMAND' for z in zones) else 0
+            features['smc_has_supply_zone'] = 1 if any(z.get('type') == 'SUPPLY' for z in zones) else 0
+            features['smc_has_bullish_ob'] = 1 if any(ob.get('type') == 'BULLISH_OB' for ob in order_blocks) else 0
+            features['smc_has_bearish_ob'] = 1 if any(ob.get('type') == 'BEARISH_OB' for ob in order_blocks) else 0
+            features['smc_has_engulfing'] = 1 if any('ENGULFING' in p.get('type', '') for p in pa_patterns) else 0
+            features['smc_has_pinbar'] = 1 if any('PIN' in p.get('type', '') for p in pa_patterns) else 0
 
             current_price = close.iloc[-1]
             round_info = detect_round_levels(current_price)
-            features['smc_round_distance_pips'] = float(round_info['distance_pips'])
-            features['smc_round_strength'] = {'WEAK': 0, 'MEDIUM': 1, 'STRONG': 2, 'VERY_STRONG': 3}.get(round_info['strength'], 0)
+            features['smc_round_distance_pips'] = float(round_info.get('distance_pips', 100))
+            features['smc_round_strength'] = {'WEAK': 0, 'MEDIUM': 1, 'STRONG': 2, 'VERY_STRONG': 3}.get(round_info.get('strength', 'WEAK'), 0)
 
-        except Exception:
+        except Exception as e:
+            logging.warning(f"SMC features error: {e}")
             for key in [
                 'smc_zones_count','smc_structure_count','smc_ob_count','smc_fib_count','smc_patterns_count',
                 'smc_has_demand_zone','smc_has_supply_zone','smc_has_bullish_ob','smc_has_bearish_ob',
@@ -1662,8 +1791,10 @@ def prepare_ml_features(df):
             ]:
                 features[key] = 0
 
-        # ===================== 📐 Горизонтальные уровни =====================
+        # ===================== 📐 ГОРИЗОНТАЛЬНЫЕ УРОВНИ =====================
         try:
+            from your_technical_module import find_horizontal_levels
+            
             horizontal_levels = find_horizontal_levels(df)
             features['horizontal_levels_count'] = len(horizontal_levels)
             if horizontal_levels:
@@ -1675,22 +1806,25 @@ def prepare_ml_features(df):
                 features['distance_to_horizontal_level'] = 100
                 features['horizontal_level_strength'] = 0
                 features['is_near_horizontal_level'] = 0
-        except Exception:
+        except Exception as e:
+            logging.warning(f"Horizontal levels error: {e}")
             features['horizontal_levels_count'] = 0
             features['distance_to_horizontal_level'] = 100
             features['horizontal_level_strength'] = 0
             features['is_near_horizontal_level'] = 0
 
-        # ===================== 🕒 Время и свечи =====================
+        # ===================== 🕒 ВРЕМЯ И СВЕЧИ =====================
         try:
+            from your_time_module import get_candle_time_info, early_entry_strategy, closing_candle_strategy
+            
             candle_time = get_candle_time_info()
 
-            features['candle_seconds_remaining'] = candle_time['seconds_remaining']
-            features['candle_seconds_passed'] = candle_time['seconds_passed']
-            features['candle_completion_percent'] = candle_time['completion_percent']
-            features['candle_is_beginning'] = 1 if candle_time['is_beginning'] else 0
-            features['candle_is_middle'] = 1 if candle_time['is_middle'] else 0
-            features['candle_is_ending'] = 1 if candle_time['is_ending'] else 0
+            features['candle_seconds_remaining'] = candle_time.get('seconds_remaining', 0)
+            features['candle_seconds_passed'] = candle_time.get('seconds_passed', 0)
+            features['candle_completion_percent'] = candle_time.get('completion_percent', 0)
+            features['candle_is_beginning'] = 1 if candle_time.get('is_beginning', False) else 0
+            features['candle_is_middle'] = 1 if candle_time.get('is_middle', False) else 0
+            features['candle_is_ending'] = 1 if candle_time.get('is_ending', False) else 0
 
             current_candle = df.iloc[-1]
             features['candle_body_size'] = abs(current_candle['close'] - current_candle['open'])
@@ -1699,7 +1833,8 @@ def prepare_ml_features(df):
 
             features['early_gap_signal'] = 1 if early_entry_strategy(df, candle_time, {'direction': 'NEUTRAL'})[0] else 0
             features['closing_breakout_signal'] = 1 if closing_candle_strategy(df, candle_time, {'direction': 'NEUTRAL'})[0] else 0
-        except Exception:
+        except Exception as e:
+            logging.warning(f"Candle time features error: {e}")
             for key in [
                 'candle_seconds_remaining','candle_seconds_passed','candle_completion_percent',
                 'candle_is_beginning','candle_is_middle','candle_is_ending',
@@ -1708,12 +1843,12 @@ def prepare_ml_features(df):
             ]:
                 features[key] = 0
 
-        # ===================== 🧮 Контекстные =====================
-        features['exhaustion_rsi_extreme'] = 1 if (features['rsi'] < 25 or features['rsi'] > 75) else 0
+        # ===================== 🧮 КОНТЕКСТНЫЕ (УЛУЧШЕННЫЕ) =====================
+        features['exhaustion_rsi_extreme'] = 1 if (features.get('rsi_14', 50) < 25 or features.get('rsi_14', 50) > 75) else 0
 
-        price_change_1h = features['price_change_1h']
-        if price_change_1h == 0 and len(df) >= 15:
-            price_change_1h = (close.iloc[-1] - close.iloc[-15]) / close.iloc[-15] * 100
+        # Используем самый короткий доступный период для импульса
+        price_change_key = 'price_change_15m' if 'price_change_15m' in features else 'price_change_1h'
+        price_change_1h = features.get(price_change_key, 0)
         features['strong_impulse'] = 1 if abs(price_change_1h) > 0.3 else 0
 
         volume_avg_20 = df['tick_volume'].tail(20).mean() if 'tick_volume' in df.columns else 1
@@ -1723,21 +1858,21 @@ def prepare_ml_features(df):
         features['signal_vs_trend_conflict'] = 0
         features['signal_vs_rsi_conflict'] = 0
 
-        # ===================== 🧹 Очистка NaN =====================
+        # ===================== 🧹 ОЧИСТКА NaN =====================
         for k, v in features.items():
             if pd.isna(v):
                 features[k] = 0
 
+        logging.debug(f"✅ Подготовлено {len(features)} ML признаков")
         return features
 
     except Exception as e:
-        logging.error(f"Ошибка ML features: {e}", exc_info=True)
+        logging.error(f"❌ Ошибка ML features: {e}", exc_info=True)
         return None
 
 def ml_predict_enhanced(features_dict: dict, pair: str, current_price: float):
     """
-    ML прогноз под 42 признака.
-    features_dict — словарь фич от prepare_ml_features()
+    ML прогноз с учетом отобранных признаков
     """
     global ml_model, ml_scaler
     try:
@@ -1745,9 +1880,18 @@ def ml_predict_enhanced(features_dict: dict, pair: str, current_price: float):
             logging.warning(f"⚠ ML модель не загружена — предикт {pair} невозможен")
             return {"probability": 0.5, "confidence": 0, "signal": None}
 
-        # ✅ Жёстко фиксируем порядок признаков
-        feature_names = list(features_dict.keys())
-        features_array = np.array([features_dict[f] for f in feature_names]).reshape(1, -1)
+        # 🔧 Загружаем список отобранных признаков
+        selected_features = []
+        try:
+            with open("ml_features_selected.pkl", "rb") as f:
+                selected_features = pickle.load(f)
+        except:
+            # Если файла нет, используем все признаки
+            selected_features = list(features_dict.keys())
+            logging.info(f"📝 Используем все {len(selected_features)} признаков (файл отбора не найден)")
+
+        # ✅ Используем только отобранные признаки в правильном порядке
+        features_array = np.array([features_dict.get(f, 0.0) for f in selected_features]).reshape(1, -1)
 
         features_scaled = ml_scaler.transform(features_array)
         probabilities = ml_model.predict_proba(features_scaled)[0]
@@ -1762,14 +1906,16 @@ def ml_predict_enhanced(features_dict: dict, pair: str, current_price: float):
 
         logging.info(
             f"🤖 ML прогноз {pair}: WIN={win_probability:.3f}, "
-            f"уверенность={confidence_score:.3f}, сигнал={signal}"
+            f"уверенность={confidence_score:.3f}, сигнал={signal}, "
+            f"признаков={len(selected_features)}"
         )
 
         return {
             "probability": win_probability,
             "confidence": confidence_score,
             "signal": signal,
-            "price": current_price
+            "price": current_price,
+            "features_used": len(selected_features)
         }
 
     except Exception as e:
@@ -1785,22 +1931,22 @@ def validate_ml_signal_with_context(ml_result, trend_analysis, pair):
     confidence = ml_result['confidence']
 
     # 1️⃣ Фильтр против тренда
-    if (signal == 'BUY' and trend_analysis['direction'] == 'BEARISH' and 
-        trend_analysis['strength'] in ['STRONG', 'VERY_STRONG']):
+    if (signal == 'BUY' and trend_analysis.get('direction') == 'BEARISH' and 
+        trend_analysis.get('strength') in ['STRONG', 'VERY_STRONG']):
         confidence *= 0.5
         logging.info(f"⚠️ ML валидация: BUY против сильного медвежьего тренда ({pair})")
 
-    elif (signal == 'SELL' and trend_analysis['direction'] == 'BULLISH' and 
-          trend_analysis['strength'] in ['STRONG', 'VERY_STRONG']):
+    elif (signal == 'SELL' and trend_analysis.get('direction') == 'BULLISH' and 
+          trend_analysis.get('strength') in ['STRONG', 'VERY_STRONG']):
         confidence *= 0.5
         logging.info(f"⚠️ ML валидация: SELL против сильного бычьего тренда ({pair})")
 
     # 2️⃣ Фильтр RSI экстремумов
-    if signal == 'BUY' and trend_analysis['rsi_state'] == 'OVERBOUGHT':
+    if signal == 'BUY' and trend_analysis.get('rsi_state') == 'OVERBOUGHT':
         confidence *= 0.6
         logging.info(f"⚠️ ML валидация: BUY в зоне перекупленности ({pair})")
 
-    elif signal == 'SELL' and trend_analysis['rsi_state'] == 'OVERSOLD':
+    elif signal == 'SELL' and trend_analysis.get('rsi_state') == 'OVERSOLD':
         confidence *= 0.6
         logging.info(f"⚠️ ML валидация: SELL в зоне перепроданности ({pair})")
 
@@ -1811,11 +1957,11 @@ def validate_ml_signal_with_context(ml_result, trend_analysis, pair):
             confidence *= 0.4  # Сильное наказание за торговлю против импульса
             logging.info(f"⚠️ ML валидация: сигнал против сильного импульса ({pair})")
 
-    ml_result['confidence'] = confidence
+    ml_result['confidence'] = min(confidence, 1.0)  # Ограничиваем сверху 1.0
     ml_result['validated'] = confidence >= 0.3  # минимальный порог после фильтров
 
     return ml_result
-# ===================== ADVANCED SIGNAL FILTER =====================
+
 def should_take_trade(pair: str, smc_signal: dict, ml_result: dict, rsi_value: float, trends: dict) -> bool:
     """
     Комбинированный фильтр для сигналов перед входом в сделку.
@@ -1878,71 +2024,23 @@ def should_take_trade(pair: str, smc_signal: dict, ml_result: dict, rsi_value: f
         logging.error(f"[FILTER] Ошибка фильтрации сигнала для {pair}: {e}")
         return False
 
-    
-def repair_ml_features():
-    """Помечает сделки для пересчета ml_features, но НЕ создает случайные данные"""
-    try:
-        needs_repair_count = 0
-        
-        if MULTI_USER_MODE:
-            for user_id, user_data in users.items():
-                for trade in user_data.get('trade_history', []):
-                    if not trade.get('ml_features') and trade.get('pair'):
-                        # 🔧 ТОЛЬКО помечаем, что нужны реальные данные
-                        trade['needs_ml_recalculation'] = True
-                        needs_repair_count += 1
-        else:
-            for trade in single_user_data.get('trade_history', []):
-                if not trade.get('ml_features') and trade.get('pair'):
-                    trade['needs_ml_recalculation'] = True
-                    needs_repair_count += 1
-        
-        if needs_repair_count > 0:
-            save_users_data()
-            logging.info(f"🔧 Помечено {needs_repair_count} сделок для пересчета ml_features")
-        
-        return needs_repair_count
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка восстановления ml_features: {e}")
-        return 0
-
-async def repair_ml_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Восстанавливает ml_features для старых сделок"""
-    user_id = update.effective_user.id
-    
-    if MULTI_USER_MODE and not is_admin(user_id):
-        await update.message.reply_text("❌ Эта команда доступна только администратору")
-        return
-        
-    await update.message.reply_text("🔄 Восстановление ml_features для ВСЕХ сделок...")
-    
-    repaired_count = repair_ml_features()
-    
-    if repaired_count > 0:
-        await update.message.reply_text(
-            f"✅ Восстановлено ml_features для {repaired_count} сделок!\n"
-            f"📊 Теперь {repaired_count}/176 сделок имеют данные для ML\n"
-            f"🚀 Запускайте /forcetrain для обучения модели!"
-        )
-    else:
-        await update.message.reply_text(
-            "ℹ️ Все сделки уже имеют ml_features или нет данных для восстановления."
-        )
-
-# 🔧 ДОБАВЬТЕ АВТОМАТИЧЕСКОЕ СОХРАНЕНИЕ ML_FEATURES В НОВЫХ СДЕЛКАХ
-def ensure_ml_features_in_new_trades():
-    """Гарантирует что новые сделки будут иметь ml_features"""
-    # Эта функция будет вызываться при создании новой сделки
-    pass
-
-# ===================== УЛУЧШЕННОЕ ОБУЧЕНИЕ ML МОДЕЛИ =====================
-def train_ml_model():
-    """Улучшенная версия обучения ML модели с адаптацией под объем данных"""
+def train_ml_model_enhanced():
+    """Улучшенная версия обучения с ансамблированием и отбором признаков"""
     global ml_model, ml_scaler, model_info
+    
+    # 🔧 Инициализация лучшего результата
+    if not hasattr(train_ml_model_enhanced, 'best_test_score'):
+        train_ml_model_enhanced.best_test_score = 0
+    
     try:
-        # 🧠 Сбор сделок
+        # 🧠 Сбор сделок (замените на ваши глобальные переменные)
         all_trades = []
+        
+        # 🔧 ЗАМЕНИТЕ ЭТИ ПЕРЕМЕННЫЕ НА ВАШИ РЕАЛЬНЫЕ
+        MULTI_USER_MODE = False  # Измените на True если используете multi-user
+        users = {}  # Ваш словарь пользователей
+        single_user_data = {'trade_history': []}  # Ваши данные пользователя
+        
         if MULTI_USER_MODE:
             for user_data in users.values():
                 all_trades.extend(user_data.get('trade_history', []))
@@ -1963,15 +2061,14 @@ def train_ml_model():
         
         if len(completed_trades) < 30:
             logging.warning(f"⚠ Недостаточно данных для обучения: {len(completed_trades)} < 30")
-            # 🔧 ИСПРАВЛЕНИЕ: создаем словарь model_info если его нет
             if not isinstance(model_info, dict):
                 model_info = {}
             model_info["error"] = f"Недостаточно данных: {len(completed_trades)} сделок"
-            return
+            return None
 
         # 🧭 Определяем признаки
         feature_names = None
-        for t in completed_trades[-100:]:  # Анализируем последние сделки
+        for t in completed_trades[-100:]:
             feats = t.get('ml_features')
             if isinstance(feats, dict) and len(feats) >= 30:
                 feature_names = list(feats.keys())
@@ -1979,9 +2076,7 @@ def train_ml_model():
 
         if not feature_names:
             logging.warning("❌ Нет сделок с ml_features — обучение невозможно")
-            return
-
-        logging.info(f"🔍 ML: обнаружено {len(feature_names)} признаков для обучения")
+            return None
 
         # 📊 Формируем X и y
         X, y = [], []
@@ -1991,149 +2086,245 @@ def train_ml_model():
                 row = [feats.get(f, 0.0) for f in feature_names]
                 if len(row) == len(feature_names) and all(isinstance(x, (int, float)) for x in row):
                     X.append(row)
-                    y.append(1 if trade.get('result') == "WIN" else 0)
+                    # 🔧 Target Smoothing: взвешенный таргет для уверенных сделок
+                    result = trade.get('result')
+                    if result == "WIN":
+                        # Если сделка с высоким профитом - считаем более уверенной
+                        profit = trade.get('profit_pips', 0)
+                        if profit > 20:  # сильная сделка
+                            y.append(1.0)
+                        else:  # слабая сделка
+                            y.append(0.7)
+                    else:  # LOSS
+                        loss = abs(trade.get('profit_pips', 0))
+                        if loss > 20:  # сильный убыток
+                            y.append(0.0)
+                        else:  # небольшой убыток
+                            y.append(0.3)
 
         if len(X) < 30:
             logging.warning(f"⚠ Недостаточно данных для обучения ML: {len(X)}")
-            return
+            return None
 
         X = np.array(X, dtype=float)
-        y = np.array(y, dtype=int)
+        y = np.array(y, dtype=float)
         logging.info(f"🤖 ML: подготовлено {len(X)} образцов с {X.shape[1]} фичами")
-        logging.info(f"📊 Win/Loss: {sum(y)}/{len(y)-sum(y)}")
+        logging.info(f"📊 Target distribution: mean={np.mean(y):.3f}, std={np.std(y):.3f}")
 
-        # 🎯 Динамическое разделение данных
-        if len(X) > 2000:
-            test_size = 0.15
-            cv_folds = 5
-        elif len(X) > 1000:
-            test_size = 0.2  
-            cv_folds = 5
-        else:
-            test_size = 0.25
-            cv_folds = 3
+        # 🎯 Time Decay - веса для последних сделок
+        sample_weights = np.ones(len(X))
+        if len(X) > 50:
+            # Последние 25% сделок получают больший вес (примерно 7 дней при 100 сделках)
+            recent_count = max(7, len(X) // 4)
+            sample_weights[-recent_count:] = 1.4
+            logging.info(f"⏰ Time decay: {recent_count} последних сделок с весом 1.4x")
 
         # 🧪 Масштабирование
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        # 🌲 Динамические параметры модели
-        if len(X) > 2000:
-            model_params = {
-                'n_estimators': 200,
-                'max_depth': 12,
-                'min_samples_split': 5,
-                'min_samples_leaf': 2,
-                'max_features': 'sqrt',
-                'random_state': 42,
-                'class_weight': 'balanced'
-            }
-        elif len(X) > 1000:
-            model_params = {
-                'n_estimators': 150, 
-                'max_depth': 10,
-                'min_samples_split': 8,
-                'min_samples_leaf': 3,
-                'max_features': 'sqrt',
-                'random_state': 42,
-                'class_weight': 'balanced'
-            }
+        # 🌲 Feature Selection - отбираем топ-25 признаков
+        if X_scaled.shape[1] > 25:
+            selector = SelectKBest(score_func=f_classif, k=min(25, X_scaled.shape[1]))
+            X_selected = selector.fit_transform(X_scaled, (y > 0.5).astype(int))
+            selected_features = [feature_names[i] for i in selector.get_support(indices=True)]
+            logging.info(f"🔍 Feature selection: выбрано {len(selected_features)} из {len(feature_names)} признаков")
         else:
-            model_params = {
-                'n_estimators': 100,
-                'max_depth': 8,
-                'min_samples_split': 10,
-                'min_samples_leaf': 4,
-                'max_features': 'sqrt',
-                'random_state': 42,
-                'class_weight': 'balanced'
-            }
+            X_selected = X_scaled
+            selected_features = feature_names
 
-        model = RandomForestClassifier(**model_params)
+        # 🎯 Model Stacking: RandomForest + LogisticRegression
+        if len(X) > 100:  # Используем stacking только при достаточном количестве данных
+            base_models = [
+                ('rf', RandomForestClassifier(
+                    n_estimators=100,
+                    max_depth=10,
+                    min_samples_split=10,
+                    random_state=42,
+                    class_weight='balanced'
+                )),
+                ('lr', LogisticRegression(
+                    C=0.1,
+                    random_state=42,
+                    class_weight='balanced',
+                    max_iter=1000
+                ))
+            ]
+            
+            model = VotingClassifier(
+                estimators=base_models,
+                voting='soft',  # Используем вероятности
+                weights=[2, 1]  # Больший вес для RandomForest
+            )
+            logging.info("🤖 Используем Model Stacking (RF + LR)")
+        else:
+            # Для малого количества данных используем только RandomForest
+            model = RandomForestClassifier(
+                n_estimators=100,
+                max_depth=8,
+                min_samples_split=15,
+                random_state=42,
+                class_weight='balanced'
+            )
+            logging.info("🤖 Используем RandomForest (мало данных)")
 
         # 📊 Разделение на train/test
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y, test_size=test_size, stratify=y, random_state=42
+        X_train, X_test, y_train, y_test, weights_train, weights_test = train_test_split(
+            X_selected, y, sample_weights, test_size=0.25, stratify=(y > 0.5).astype(int), random_state=42
         )
 
-        model.fit(X_train, y_train)
-        train_score = model.score(X_train, y_train)
-        test_score = model.score(X_test, y_test)
+        # 🏋️ Обучение с весами
+        model.fit(X_train, y_train > 0.5, sample_weight=weights_train)
 
-        # 📈 Кросс-валидация
-        cv_scores = cross_val_score(model, X_scaled, y, cv=cv_folds, scoring='accuracy')
-        cv_mean = cv_scores.mean()
-        cv_std = cv_scores.std()
+        # 📈 Предсказания
+        y_pred_proba = model.predict_proba(X_test)[:, 1]
+        y_pred = (y_pred_proba > 0.5).astype(int)
+        y_test_binary = (y_test > 0.5).astype(int)
 
-        # 🔍 Анализ переобучения
-        overfitting_ratio = train_score / max(test_score, 0.001)
+        train_score = accuracy_score(y_train > 0.5, model.predict(X_train))
+        test_score = accuracy_score(y_test_binary, y_pred)
 
-        logging.info(f"📊 ML метрики: Train={train_score:.3f} | Test={test_score:.3f} | Overfit={overfitting_ratio:.2f}")
-        logging.info(f"🎯 CV: {cv_mean:.3f} ± {cv_std:.3f}")
+        # 🔍 Дополнительные метрики
+        f1 = f1_score(y_test_binary, y_pred, zero_division=0)
+        precision = precision_score(y_test_binary, y_pred, zero_division=0)
+        recall = recall_score(y_test_binary, y_pred, zero_division=0)
 
-        # 💾 Сохраняем модель и статистику
-        ml_model = model
-        ml_scaler = scaler
-        joblib.dump(ml_model, "ml_model.pkl")
-        joblib.dump(ml_scaler, "ml_scaler.pkl")
+        logging.info(f"📊 ML метрики: Train={train_score:.3f} | Test={test_score:.3f}")
+        logging.info(f"🎯 F1={f1:.3f} | Precision={precision:.3f} | Recall={recall:.3f}")
 
-        # 🔧 ИСПРАВЛЕНИЕ: инициализируем model_info как словарь если он не словарь
+        # 💾 AutoSave Quality Gate - сохраняем только если улучшилась точность
+        current_best = train_ml_model_enhanced.best_test_score
+        improvement = test_score - current_best
+        
+        if test_score > current_best or current_best == 0:
+            # Сохраняем модель только если точность улучшилась
+            ml_model = model
+            ml_scaler = scaler
+            
+            joblib.dump(ml_model, "ml_model.pkl")
+            joblib.dump(ml_scaler, "ml_scaler.pkl")
+            
+            # Сохраняем информацию о выбранных фичах
+            with open("ml_features_selected.pkl", "wb") as f:
+                pickle.dump(selected_features, f)
+            
+            train_ml_model_enhanced.best_test_score = test_score
+            logging.info(f"💾 Модель сохранена (новый лучший результат: {test_score:.3f}, улучшение: {improvement:.3f})")
+            model_saved = True
+        else:
+            logging.warning(f"🚫 Модель НЕ сохранена (текущий {test_score:.3f} <= лучший {current_best:.3f})")
+            model_saved = False
+
+        # 📊 Сохраняем статистику
         if not isinstance(model_info, dict):
             model_info = {}
 
         model_info.update({
             "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "n_features": len(feature_names),
+            "n_features_original": len(feature_names),
+            "n_features_selected": len(selected_features),
             "trades_used": len(X),
             "train_accuracy": round(train_score * 100, 2),
             "test_accuracy": round(test_score * 100, 2),
-            "cv_accuracy": round(cv_mean * 100, 2),
-            "cv_std": round(cv_std * 100, 2),
-            "overfitting_ratio": round(overfitting_ratio, 2),
-            "feature_names": feature_names,
-            "train_samples": len(y_train),
-            "test_samples": len(y_test),
-            "win_rate": round(float(np.mean(y)) * 100, 2),
-            "model_params": model_params
+            "f1_score": round(f1 * 100, 2),
+            "precision": round(precision * 100, 2),
+            "recall": round(recall * 100, 2),
+            "selected_features": selected_features,
+            "win_rate": round(float(np.mean(y > 0.5)) * 100, 2),
+            "model_type": "Stacking" if len(X) > 100 else "RandomForest",
+            "model_saved": model_saved,
+            "improvement": round(improvement * 100, 2) if improvement > 0 else 0
         })
 
-        # 💾 Сохраняем историю всех переобучений в ml_info.json
+        # 💾 Сохраняем историю
         try:
             old_data = []
             if os.path.exists("ml_info.json"):
                 with open("ml_info.json", "r", encoding="utf-8") as f:
                     try:
                         old_data = json.load(f)
-                        # если раньше был один объект, превращаем в список
                         if isinstance(old_data, dict):
                             old_data = [old_data]
                     except json.JSONDecodeError:
                         old_data = []
 
-            # Добавляем новое обучение
             old_data.append(model_info)
-
-            # Перезаписываем обновлённый список
             with open("ml_info.json", "w", encoding="utf-8") as f:
                 json.dump(old_data, f, ensure_ascii=False, indent=2)
 
             logging.info(f"💾 ML история обновлена: всего записей {len(old_data)}")
-            logging.info(f"✅ ML модель успешно обучена на {len(feature_names)} признаках ({len(X)} сделок)")
+            logging.info(f"✅ ML модель успешно обучена на {len(selected_features)} признаках")
 
         except Exception as e:
             logging.error(f"❌ Ошибка сохранения истории ML: {e}", exc_info=True)
 
-        # 🔧 ДОБАВЛЯЕМ ВОЗВРАТ ПРИ УСПЕШНОМ ОБУЧЕНИИ
         return model_info
 
     except Exception as e:
         logging.error(f"❌ Ошибка обучения ML: {e}", exc_info=True)
-        # 🔧 ИСПРАВЛЕНИЕ: инициализируем model_info как словарь если он не словарь
         if not isinstance(model_info, dict):
             model_info = {}
         model_info["error"] = str(e)
         return model_info
+
+def load_ml_model():
+    """Загружает ML модель и scaler при запуске"""
+    global ml_model, ml_scaler
+    try:
+        if os.path.exists("ml_model.pkl") and os.path.exists("ml_scaler.pkl"):
+            ml_model = joblib.load("ml_model.pkl")
+            ml_scaler = joblib.load("ml_scaler.pkl")
+            logging.info("✅ ML модель и scaler загружены")
+            return True
+        else:
+            logging.warning("⚠ ML модель или scaler не найдены")
+            return False
+    except Exception as e:
+        logging.error(f"❌ Ошибка загрузки ML модели: {e}")
+        return False
+
+def repair_ml_features():
+    """Помечает сделки для пересчета ml_features, но НЕ создает случайные данные"""
+    try:
+        needs_repair_count = 0
+        
+        # 🔧 ЗАМЕНИТЕ НА ВАШИ ПЕРЕМЕННЫЕ
+        MULTI_USER_MODE = False
+        users = {}
+        single_user_data = {'trade_history': []}
+        
+        if MULTI_USER_MODE:
+            for user_id, user_data in users.items():
+                for trade in user_data.get('trade_history', []):
+                    if not trade.get('ml_features') and trade.get('pair'):
+                        # 🔧 ТОЛЬКО помечаем, что нужны реальные данные
+                        trade['needs_ml_recalculation'] = True
+                        needs_repair_count += 1
+        else:
+            for trade in single_user_data.get('trade_history', []):
+                if not trade.get('ml_features') and trade.get('pair'):
+                    trade['needs_ml_recalculation'] = True
+                    needs_repair_count += 1
+        
+        if needs_repair_count > 0:
+            # save_users_data()  # Раскомментируйте если у вас есть эта функция
+            logging.info(f"🔧 Помечено {needs_repair_count} сделок для пересчета ml_features")
+        
+        return needs_repair_count
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка восстановления ml_features: {e}")
+        return 0
     
+# 🔧 Инициализация при импорте
+def init_ml_module():
+    """Инициализация ML модуля при запуске"""
+    load_ml_model()
+    logging.info("🤖 ML модуль инициализирован")
+
+# Автоматическая инициализация при импорте
+init_ml_module()
+
 # ===================== GPT ANALYSIS =====================
 def gpt_full_market_read(pair: str, df_m1: pd.DataFrame, df_m5: pd.DataFrame):
     """GPT-анализ с улучшенной логикой времени экспирации (1-4 минуты)"""
@@ -2788,24 +2979,6 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
         else:  # SELL
             result = 'WIN' if current_price < entry_price else 'LOSS'
 
-        # 🔄 ОБРАБОТКА СИСТЕМЫ ДОГОНОВ
-        martingale_data = user_data.get('martingale', {})
-        is_martingale_trade = martingale_data.get('active') and martingale_data.get('current_level', 0) > 0
-        
-        if is_martingale_trade:
-            # Сделка была частью догона
-            current_level = martingale_data['current_level']
-            if result == 'LOSS':
-                # 🚨 ПРОИГРЫШ В ДОГОНЕ - запускаем следующий уровень
-                await handle_martingale_loss(user_id, user_data, context, pair, direction, current_level)
-            else:
-                # ✅ ВЫИГРЫШ В ДОГОНЕ - завершаем серию успехом
-                await handle_martingale_win(user_id, user_data, context, pair, current_level)
-        
-        elif result == 'LOSS' and not is_martingale_trade:
-            # 🎯 ПЕРВЫЙ ПРОИГРЫШ - запускаем систему догонов
-            await start_martingale_series(user_id, user_data, context, pair, direction)
-
         # Сумма ставки
         stake = current_trade.get('stake', STAKE_AMOUNT)
         profit = WIN_PROFIT if result == 'WIN' else -stake
@@ -2826,8 +2999,7 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
             'confidence': current_trade.get('confidence', 0),
             'source': current_trade.get('source', 'UNKNOWN'),
             'expiry_minutes': current_trade.get('expiry_minutes', 1),
-            'ml_features': current_trade.get('ml_features', None),
-            'martingale_level': current_level if is_martingale_trade else 0
+            'ml_features': current_trade.get('ml_features', None)
         }
 
         # ✅ Добавляем сделку в историю пользователя
@@ -2855,31 +3027,21 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
         losses = sum(1 for t in user_data['trade_history'] if t.get('result') == 'LOSS')
         win_rate = round(wins / total * 100, 1) if total > 0 else 0
 
-        # 🔥 ПРОВЕРКА СЕРИИ ВЫИГРЫШЕЙ
-        current_streak = check_win_streak(user_data)
-        if current_streak in [5, 10, 15]:
-            await send_streak_notification(context, user_id, current_streak)
-
         # 📢 Уведомление пользователя
         result_emoji = "🟢" if result == "WIN" else "🔴"
-        
-        if is_martingale_trade:
-            result_text = await format_martingale_result(user_id, result, pair, direction, entry_price, current_price, 
-                                                       current_level, total, wins, losses, win_rate)
-        else:
-            result_text = (
-                f"{result_emoji} СДЕЛКА #{trade_id} ЗАВЕРШЕНА\n\n"
-                f"💼 Пара: {pair}\n"
-                f"📊 Направление: {direction}\n"
-                f"💰 Вход: {entry_price:.5f}\n"
-                f"💰 Выход: {current_price:.5f}\n"
-                f"🎯 Результат: {result}\n\n"
-                f"📊 Общая статистика:\n"
-                f"• Всего: {total}\n"
-                f"• 🟢 Выигрыши: {wins}\n"
-                f"• 🔴 Проигрыши: {losses}\n"
-                f"• 🎯 Win Rate: {win_rate}%"
-            )
+        result_text = (
+            f"{result_emoji} СДЕЛКА #{trade_id} ЗАВЕРШЕНА\n\n"
+            f"💼 Пара: {pair}\n"
+            f"📊 Направление: {direction}\n"
+            f"💰 Вход: {entry_price:.5f}\n"
+            f"💰 Выход: {current_price:.5f}\n"
+            f"🎯 Результат: {result}\n\n"
+            f"📊 Общая статистика:\n"
+            f"• Всего: {total}\n"
+            f"• 🟢 Выигрыши: {wins}\n"
+            f"• 🔴 Проигрыши: {losses}\n"
+            f"• 🎯 Win Rate: {win_rate}%"
+        )
 
         try:
             await context.bot.send_message(
@@ -2893,7 +3055,6 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logging.error(f"💥 Критическая ошибка в check_trade_result: {e}", exc_info=True)
-
 # ===================== 🤖 PROCESS AUTO TRADE =====================
 async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE):
     """Авто-трейдинг: анализ, открытие сделки и отложенная запись после закрытия"""
@@ -2903,35 +3064,11 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
             logging.info(f"⏸ Вне рабочего времени — пользователь {user_id}, цикл пропущен")
             return
 
-        # 🔄 ПРОВЕРКА АКТИВНОГО ДОГОНА
-        martingale_data = user_data.get('martingale', {})
-        if martingale_data.get('active') and martingale_data.get('current_level', 0) > 0:
-            # ДОГОН: открываем сделку по существующей паре
-            pair = martingale_data['original_pair']
-            direction = martingale_data['original_direction']
-            current_level = martingale_data['current_level']
-            
-            logging.info(f"🔄 Догон #{current_level} для пользователя {user_id}: {pair} {direction}")
-            
-            # 📊 Получаем актуальные данные для догона
-            df = get_mt5_data(pair, 300, mt5.TIMEFRAME_M1)
-            if df is None or len(df) < 50:
-                logging.error(f"❌ Не удалось получить данные для догона {pair}")
-                return
-
-            entry_price = df['close'].iloc[-1]
-            trade_number = user_data['trade_counter'] + 1
-            
-            # ⚡ ОТКРЫТИЕ СДЕЛКИ ДОГОНА
-            await open_martingale_trade(user_id, user_data, context, pair, direction, entry_price, df, trade_number, current_level)
-            return
-
-        # ⏸ Проверка на уже открытую сделку (обычный режим)
+        # ⏸ Проверка на уже открытую сделку
         if user_data.get('current_trade'):
             logging.info(f"⏸ Пользователь {user_id} уже имеет открытую сделку — пропуск")
             return
 
-        # 🚀 ОБЫЧНЫЙ РЕЖИМ: поиск сигналов
         logging.info(f"🚀 [AUTO] Старт автоанализа для user_id={user_id}")
         random.shuffle(PAIRS)
 
@@ -2974,12 +3111,14 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
             user_markup = get_trading_keyboard(user_id)
             try:
                 if chart_stream:
+                    # 🔥 ПРАВИЛЬНАЯ ОТПРАВКА BytesIO ИЗ ПАМЯТИ
                     await context.bot.send_photo(
                         chat_id=user_id, 
-                        photo=chart_stream, 
+                        photo=chart_stream,  # Отправляем BytesIO напрямую
                         caption=signal_text, 
                         reply_markup=user_markup
                     )
+                    # 🔥 НЕ НУЖНО УДАЛЯТЬ ФАЙЛ - его нет!
                     logging.info(f"✅ График отправлен из памяти пользователю {user_id}")
                 else:
                     await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=user_markup)
@@ -3024,327 +3163,7 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
 
     except Exception as e:
         logging.error(f"❌ Ошибка process_auto_trade_for_user: {e}", exc_info=True)
-
-# ===================== 🔄 СИСТЕМА ДОГОНОВ =====================
-
-async def start_martingale_series(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, pair: str, direction: str):
-    """Запуск серии догонов после первого проигрыша"""
-    try:
-        martingale_data = user_data.get('martingale', {})
         
-        # Активируем систему догонов
-        martingale_data.update({
-            'active': True,
-            'current_level': 1,
-            'original_pair': pair,
-            'original_direction': direction,
-            'trades': [{
-                'level': 1,
-                'timestamp': datetime.now().isoformat(),
-                'result': 'LOSS'
-            }]
-        })
-        
-        save_users_data()
-        
-        # Уведомление о запуске догона
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"🔄 ЗАПУСК СИСТЕМЫ ДОГОНОВ\n\n"
-                 f"💼 Пара: {pair}\n"
-                 f"📊 Направление: {direction}\n"
-                 f"⚡ Уровень: 1/3\n"
-                 f"📈 Коэффициент: 1.0x\n\n"
-                 f"⚠️ Следующая сделка будет открыта автоматически",
-            reply_markup=get_trading_keyboard(user_id)
-        )
-        
-        logging.info(f"🔄 Запущена серия догонов для пользователя {user_id}: {pair} {direction}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка запуска серии догонов: {e}")
-
-async def handle_martingale_loss(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, 
-                               pair: str, direction: str, current_level: int):
-    """Обработка проигрыша в системе догонов"""
-    try:
-        martingale_data = user_data.get('martingale', {})
-        
-        if current_level >= 3:
-            # 🏁 Достигнут максимум догонов - завершаем серию
-            await finish_martingale_series(user_id, user_data, context, pair, False)
-            return
-        
-        # 🔄 Переход на следующий уровень
-        next_level = current_level + 1
-        martingale_data['current_level'] = next_level
-        martingale_data['trades'].append({
-            'level': next_level,
-            'timestamp': datetime.now().isoformat(),
-            'result': 'LOSS'
-        })
-        
-        save_users_data()
-        
-        # Коэффициенты для каждого уровня
-        multipliers = {1: "1.0x", 2: "2.0x", 3: "2.5x"}
-        next_multiplier = multipliers.get(next_level, "2.5x")
-        
-        # Уведомление о переходе на следующий уровень
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"🔄 ПЕРЕХОД НА ДОГОН #{next_level}\n\n"
-                 f"💼 Пара: {pair}\n"
-                 f"📊 Направление: {direction}\n"
-                 f"⚡ Уровень: {next_level}/3\n"
-                 f"📈 Коэффициент: {next_multiplier}\n"
-                 f"⚠️ Риск: {'Повышенный' if next_level == 2 else 'Максимальный'}\n\n"
-                 f"🎯 Цель: Полное восстановление",
-            reply_markup=get_trading_keyboard(user_id)
-        )
-        
-        logging.info(f"🔄 Переход на догон #{next_level} для пользователя {user_id}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка обработки проигрыша догона: {e}")
-
-async def handle_martingale_win(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, 
-                              pair: str, current_level: int):
-    """Обработка выигрыша в системе догонов"""
-    try:
-        # ✅ Успешное завершение серии догонов
-        await finish_martingale_series(user_id, user_data, context, pair, True)
-        
-        logging.info(f"✅ Догон #{current_level} успешен для пользователя {user_id}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка обработки выигрыша догона: {e}")
-
-async def finish_martingale_series(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, 
-                                 pair: str, success: bool):
-    """Завершение серии догонов"""
-    try:
-        martingale_data = user_data.get('martingale', {})
-        current_level = martingale_data.get('current_level', 0)
-        
-        # Сбрасываем систему догонов
-        martingale_data.update({
-            'active': False,
-            'current_level': 0,
-            'original_pair': None,
-            'original_direction': None,
-            'trades': []
-        })
-        
-        save_users_data()
-        
-        # Уведомление о результате серии
-        if success:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"✅ СЕРИЯ ДОГОНОВ УСПЕШНО ЗАВЕРШЕНА\n\n"
-                     f"💼 Пара: {pair}\n"
-                     f"📊 Уровень: {current_level}/3\n"
-                     f"🎯 Результат: ✅ Полное восстановление\n\n"
-                     f"💫 Система догонов отключена",
-                reply_markup=get_trading_keyboard(user_id)
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"🏁 СЕРИЯ ДОГОНОВ ЗАВЕРШЕНА\n\n"
-                     f"💼 Пара: {pair}\n"
-                     f"📊 Уровень: {current_level}/3\n"
-                     f"🎯 Результат: ❌ Неудача\n"
-                     f"⚠️ Статус: Авто-остановка\n\n"
-                     f"🛑 Рекомендация: Оцените риски перед следующим догоном",
-                reply_markup=get_trading_keyboard(user_id)
-            )
-        
-        logging.info(f"🏁 Завершена серия догонов для пользователя {user_id}: {'УСПЕХ' if success else 'НЕУДАЧА'}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка завершения серии догонов: {e}")
-
-async def open_martingale_trade(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE, 
-                              pair: str, direction: str, entry_price: float, df: pd.DataFrame, 
-                              trade_number: int, current_level: int):
-    """Открытие сделки в системе догонов"""
-    try:
-        # Коэффициенты для каждого уровня
-        multipliers = {1: "1.0x", 2: "2.0x", 3: "2.5x"}
-        current_multiplier = multipliers.get(current_level, "2.5x")
-        
-        # Определяем экспирацию (можно сделать динамической)
-        expiry = 1  # минута
-        
-        # 📝 Текст сигнала догона
-        signal_text = (
-            f"🔄 ДОГОН #{current_level} | {pair}\n\n"
-            f"🎯 СДЕЛКА #{trade_number} (Догон {current_level}/3)\n"
-            f"📊 Сигнал: {direction}\n"
-            f"💰 Цена входа: {entry_price:.5f}\n"
-            f"⚡ Коэффициент: {current_multiplier}\n"
-            f"⏰ Экспирация: {expiry} мин\n"
-            f"🎯 Уверенность: 10/10\n\n"
-            f"⚠️ Риск: {'Повышенный' if current_level == 2 else 'Максимальный' if current_level == 3 else 'Стандартный'}"
-        )
-
-        # 📈 Отправка графика
-        chart_stream = enhanced_plot_chart(df, pair, entry_price, direction)
-        user_markup = get_trading_keyboard(user_id)
-        
-        try:
-            if chart_stream:
-                await context.bot.send_photo(
-                    chat_id=user_id, 
-                    photo=chart_stream, 
-                    caption=signal_text, 
-                    reply_markup=user_markup
-                )
-                logging.info(f"✅ График догона отправлен пользователю {user_id}")
-            else:
-                await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=user_markup)
-        except Exception as tg_err:
-            logging.error(f"⚠ Ошибка отправки сигнала догона пользователю {user_id}: {tg_err}")
-
-        # 📌 Сохраняем сделку догона
-        trade = {
-            'id': trade_number,
-            'pair': pair,
-            'direction': direction,
-            'entry_price': float(entry_price),
-            'expiry_minutes': int(expiry),
-            'stake': float(STAKE_AMOUNT),
-            'timestamp': datetime.now().isoformat(),
-            'ml_features': prepare_ml_features(df) or {},
-            'source': 'MARTINGALE',
-            'confidence': 10,
-            'martingale_level': current_level
-        }
-
-        user_data['current_trade'] = trade
-        user_data['trade_counter'] += 1
-        save_users_data()
-
-        # ⏱ Планируем проверку результата
-        check_delay = (expiry * 60) + 5
-        context.job_queue.run_once(
-            check_trade_result,
-            check_delay,
-            data={'user_id': user_id, 'pair': pair, 'trade_id': trade_number}
-        )
-
-        logging.info(f"✅ Догон #{current_level} открыт для пользователя {user_id}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка открытия сделки догона: {e}")
-
-async def format_martingale_result(user_id: int, result: str, pair: str, direction: str, 
-                                 entry_price: float, current_price: float, current_level: int,
-                                 total: int, wins: int, losses: int, win_rate: float):
-    """Форматирование результата для сделки догона"""
-    
-    result_emoji = "🟢" if result == "WIN" else "🔴"
-    
-    if result == "WIN":
-        return (
-            f"✅ ДОГОН #{current_level} УСПЕШЕН!\n\n"
-            f"💼 Пара: {pair}\n"
-            f"📊 Уровень: {current_level}/3\n"
-            f"📊 Направление: {direction}\n"
-            f"💰 Вход: {entry_price:.5f}\n"
-            f"💰 Выход: {current_price:.5f}\n"
-            f"🎯 Результат: {result}\n\n"
-            f"💫 Серия догона завершена успешно!\n"
-            f"📊 Общая статистика:\n"
-            f"• Всего: {total}\n"
-            f"• 🟢 Выигрыши: {wins}\n"
-            f"• 🔴 Проигрыши: {losses}\n"
-            f"• 🎯 Win Rate: {win_rate}%"
-        )
-    else:
-        return (
-            f"{result_emoji} ДОГОН #{current_level} ЗАВЕРШЕН\n\n"
-            f"💼 Пара: {pair}\n"
-            f"📊 Уровень: {current_level}/3\n"
-            f"📊 Направление: {direction}\n"
-            f"💰 Вход: {entry_price:.5f}\n"
-            f"💰 Выход: {current_price:.5f}\n"
-            f"🎯 Результат: {result}\n\n"
-            f"📊 Общая статистика:\n"
-            f"• Всего: {total}\n"
-            f"• 🟢 Выигрыши: {wins}\n"
-            f"• 🔴 Проигрыши: {losses}\n"
-            f"• 🎯 Win Rate: {win_rate}%"
-        )
-
-def check_win_streak(user_data: Dict) -> int:
-    """Проверка текущей серии выигрышей"""
-    try:
-        trade_history = user_data.get('trade_history', [])
-        if len(trade_history) < 5:
-            return 0
-        
-        # Считаем последние результаты (исключая текущие догоны)
-        recent_trades = [t for t in trade_history[-20:] if t.get('martingale_level', 0) == 0]
-        if not recent_trades:
-            return 0
-            
-        current_streak = 0
-        
-        # Идем с конца до первого проигрыша
-        for trade in reversed(recent_trades):
-            if trade.get('result') == 'WIN':
-                current_streak += 1
-            else:
-                break
-        
-        return current_streak
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка проверки серии выигрышей: {e}")
-        return 0
-
-async def send_streak_notification(context: ContextTypes.DEFAULT_TYPE, user_id: int, streak: int):
-    """Отправка уведомления о серии выигрышей"""
-    try:
-        if streak == 5:
-            message = (
-                f"🔥 СЕРИЯ ИЗ 5 ВЫИГРЫШЕЙ ПОДРЯД!\n\n"
-                f"📈 Текущая статистика:\n"
-                f"• Активная серия: 5 ✅ подряд\n"
-                f"• Тренд: 📈 Восходящий\n\n"
-                f"💫 Идеальные условия для торговли!"
-            )
-        elif streak == 10:
-            message = (
-                f"🎯 ИСТОРИЧЕСКАЯ СЕРИЯ - 10 ВЫИГРЫШЕЙ!\n\n"
-                f"🏆 Новый рекорд: 10 ✅ подряд\n"
-                f"📈 Эффективность: Выдающаяся\n\n"
-                f"🚀 Ваша стратегия показывает превосходные результаты!"
-            )
-        elif streak == 15:
-            message = (
-                f"🌟 ЛЕГЕНДАРНАЯ СЕРИЯ - 15 ВЫИГРЫШЕЙ!\n\n"
-                f"💫 АБСОЛЮТНЫЙ РЕКОРД: 15 ✅ подряд\n"
-                f"🏆 Статус: Топ-трейдер\n\n"
-                f"🎯 Вы достигли максимальной эффективности!"
-            )
-        else:
-            return
-            
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=message,
-            reply_markup=get_trading_keyboard(user_id)
-        )
-        
-        logging.info(f"🎯 Отправлено уведомление о серии {streak} выигрышей пользователю {user_id}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка отправки уведомления о серии: {e}")
-
 # ===================== TELEGRAM COMMANDS =====================
 # -------- WHITELIST MANAGEMENT COMMANDS --------
 async def whitelist_add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
