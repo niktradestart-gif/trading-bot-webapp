@@ -7,8 +7,9 @@ import logging
 import os
 import json
 import random
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta,  time
 from typing import Optional, Dict, List
+from functools import wraps
 
 # Market & math
 import MetaTrader5 as mt5
@@ -18,45 +19,184 @@ import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
 import mplfinance as mpf
 from matplotlib.patches import Rectangle
+from apscheduler.events import EVENT_JOB_MISSED, EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+
+# ===================== JOB QUEUE LISTENER =====================
+def job_listener(event):
+    """Обработчик событий job queue"""
+    if event.code == EVENT_JOB_MISSED:
+        logging.warning(f"⏰ Job {event.job_id} был пропущен!")
+    elif event.code == EVENT_JOB_ERROR:
+        logging.error(f"❌ Job {event.job_id} завершился ошибкой: {event.exception}")
+    elif event.code == EVENT_JOB_EXECUTED:
+        logging.debug(f"✅ Job {event.job_id} выполнен успешно")
+
+# ===================== FIXED BOT WORKING HOURS =====================
+from datetime import datetime, time, timedelta
 
 # Telegram
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, ContextTypes, filters
 )
-
 # ML
 import talib as ta
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split, cross_val_score  # ✅ cross_val_score добавлен
-import joblib  # для загрузки/сохранения модели
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+import joblib
+import pickle
 
 # OpenAI
 from openai import OpenAI
 
 
 # ===================== FIXED BOT WORKING HOURS =====================
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
-# 🕒 Локальное время (например, Молдова UTC+2)
-TRADING_START = time(4, 0)    # 04:00
-TRADING_END   = time(23, 59)  # 23:59
+# 🕒 Рабочие часы по локальному времени (например, Молдова UTC+2)
+TRADING_START = time(4, 0)    # Начало торговли: 04:00
+TRADING_END   = time(23, 59)  # Конец торговли: 23:59
+
+# 🗓️ Выходные (суббота и воскресенье)
+WEEKEND_DAYS = {5, 6}  # 5 = суббота, 6 = воскресенье
 
 def is_trading_time() -> bool:
-    """⏰ Проверяет, разрешено ли торговать по локальному фиксированному времени"""
-    now = datetime.now().time()
-    return TRADING_START <= now <= TRADING_END
+    """⏰ Проверяет, находится ли текущее время в рабочих часах бота с уведомлениями"""
+    global BOT_LAST_STATUS, BOT_STATUS_NOTIFIED
+    
+    try:
+        now = datetime.now()
+        current_time = now.time()
+        current_weekday = now.weekday()
+        
+        # 🗓️ Проверяем выходные (суббота и воскресенье)
+        if current_weekday in WEEKEND_DAYS:
+            is_working_time = False
+        else:
+            # 🕒 Проверяем рабочие часы
+            is_working_time = TRADING_START <= current_time <= TRADING_END
+        
+        # 🔔 ПРОВЕРЯЕМ ИЗМЕНЕНИЕ СТАТУСА ДЛЯ УВЕДОМЛЕНИЙ
+        if BOT_LAST_STATUS is None:
+            BOT_LAST_STATUS = is_working_time
+            BOT_STATUS_NOTIFIED = True
+        elif BOT_LAST_STATUS != is_working_time:
+            # Статус изменился - сбрасываем флаг уведомления
+            BOT_LAST_STATUS = is_working_time
+            BOT_STATUS_NOTIFIED = False
+        
+        if not is_working_time:
+            # Расчет времени до следующего открытия для уведомления
+            if current_weekday in WEEKEND_DAYS:
+                days_until_monday = (7 - current_weekday) % 7
+                next_work_day = now + timedelta(days=days_until_monday)
+                next_open = datetime.combine(next_work_day.date(), TRADING_START)
+            elif current_time < TRADING_START:
+                next_open = datetime.combine(now.date(), TRADING_START)
+            else:
+                next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+            
+            time_until = next_open - now
+            hours = time_until.seconds // 3600
+            minutes = (time_until.seconds % 3600) // 60
+            
+            logging.info(f"⏰ Вне рабочего времени. До открытия: {hours}ч {minutes}мин")
+            return False
+        else:
+            return True
+            
+    except Exception as e:
+        logging.error(f"❌ Ошибка проверки времени: {e}")
+        return False
 
+# ==================== TIME FILTERS (TRADE HOURS) ====================
+import json
+from datetime import datetime
+
+def load_time_filters():
+    """Загружает файл time_filters.json"""
+    try:
+        with open("time_filters.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+            print(f"✅ Загружено {len(data)} фильтров по парам.")
+            return data
+    except Exception as e:
+        print(f"⚠️ Не удалось загрузить time_filters.json: {e}")
+        return {}
+
+TIME_FILTERS = load_time_filters()
+TIME_FILTERS_LAST_UPDATE = datetime.now()
+
+def auto_reload_filters():
+    """Автоматически перезагружает фильтр при изменении файла (без рестарта)"""
+    global TIME_FILTERS, TIME_FILTERS_LAST_UPDATE
+    try:
+        import os
+        mtime = datetime.fromtimestamp(os.path.getmtime("time_filters.json"))
+        if mtime > TIME_FILTERS_LAST_UPDATE:
+            TIME_FILTERS = load_time_filters()
+            TIME_FILTERS_LAST_UPDATE = datetime.now()
+            print("♻️ Файл фильтров обновлён на лету.")
+    except Exception:
+        pass
+
+def is_trade_allowed(pair: str, ts: datetime = None) -> bool:
+    """Проверяет, можно ли торговать выбранную пару в данный момент"""
+    ts = ts or datetime.utcnow()
+    hour = ts.hour
+    auto_reload_filters()  # 🔄 Проверяем актуальность фильтра
+    allowed_hours = TIME_FILTERS.get(pair, TIME_FILTERS.get("DEFAULT", list(range(24))))
+    return hour in allowed_hours
 
 # ================== ML MODEL LOAD ==================
 import joblib
+import json
+import logging
+import os
 
+def load_latest_ml_info():
+    """Загружает последний объект из ml_info.json (поддерживает список и dict)"""
+    try:
+        if not os.path.exists("ml_info.json"):
+            logging.warning("⚠️ Файл ml_info.json не найден")
+            return {}
+
+        with open("ml_info.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if isinstance(data, list):
+            if data:
+                latest = data[-1]
+                logging.info(f"📚 Найдено {len(data)} записей обучения, используем последнюю ({latest.get('trained_at', 'N/A')})")
+                return latest
+            else:
+                logging.warning("⚠️ ml_info.json пуст (список без записей)")
+                return {}
+        elif isinstance(data, dict):
+            return data
+        else:
+            logging.warning(f"⚠️ Неподдерживаемый формат ml_info.json: {type(data)}")
+            return {}
+
+    except Exception as e:
+        logging.error(f"Ошибка чтения ml_info.json: {e}", exc_info=True)
+        return {}
+
+# Загрузка модели, скейлера и информации
 try:
     ml_model = joblib.load("ml_model.pkl")
-    ml_scaler = joblib.load("ml_scaler.pkl")  # ДОБАВИТЬ ЭТУ СТРОКУ
-    with open("ml_info.json", "r", encoding="utf-8") as f:
-        model_info = json.load(f)
+    ml_scaler = joblib.load("ml_scaler.pkl")  # обязательная строка для нормализации входных данных
+    model_info = load_latest_ml_info()
+
+    if model_info:
+        logging.info(f"✅ ML модель загружена ({model_info.get('trained_at', 'N/A')})")
+    else:
+        logging.warning("⚠️ ML модель загружена, но информация о ней отсутствует или повреждена")
+
 except Exception as e:
     logging.warning(f"Не удалось загрузить ML модель: {e}")
     ml_model, ml_scaler, model_info = None, None, {}
@@ -109,6 +249,13 @@ PAIRS: List[str] = [
     "EURCHF","EURGBP","EURJPY","GBPAUD","GBPCAD",
     "GBPCHF","GBPJPY","GBPUSD","USDCAD","USDCHF","USDJPY"
 ]
+
+
+# ===================== BOT STATUS TRACKING =====================
+BOT_LAST_STATUS = None  # Последний статус бота (True - работает, False - остановлен)
+BOT_STATUS_NOTIFIED = False  # Флаг чтобы не спамить уведомлениями
+
+
 # ===================== POCKET OPTION WHITELIST SYSTEM =====================
 import json
 import os
@@ -218,7 +365,7 @@ WHITELIST = load_whitelist()
 
 
 # ===================== SETTINGS =====================
-USE_GPT = False
+USE_GPT = True
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 ML_ENABLED = True
@@ -257,7 +404,7 @@ from telegram import ReplyKeyboardMarkup
 main_keyboard = [
     ["📊 Торговля", "⚙️ Управление"],
     ["📈 Статистика", "🧠 Модели"],
-    ["📋 Помощь"]
+    ["📅 Расписание", "📋 Помощь"]
 ]
 main_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
 
@@ -357,6 +504,7 @@ def get_user_data(user_id: int = None) -> Dict:
 def is_admin(user_id: int) -> bool:
     """Проверяет, является ли пользователь админом"""
     return user_id == ADMIN_USER_ID
+
 
 # ===================== УНИВЕРСАЛЬНЫЙ ФЛЕТТЕР ML ФИЧЕЙ =====================
 def flatten_ml_features(features_dict, parent_key='', sep='_'):
@@ -478,7 +626,22 @@ def save_users_data():
                     if not os.path.exists(backup_filename):
                         shutil.copy2(final_filename, backup_filename)
                         logging.info(f"💾 Часовой бэкап создан: {backup_filename}")
-                    os.remove(final_filename)
+
+                        # 🧹 Удаляем старые бэкапы, если их больше 4
+                        backups = sorted(
+                            [f for f in os.listdir("backups") if f.startswith("users_data_backup_")],
+                            key=lambda x: os.path.getmtime(os.path.join("backups", x)),
+                            reverse=True
+                        )
+                        if len(backups) > 4:
+                            for old_backup in backups[4:]:
+                                try:
+                                    os.remove(os.path.join("backups", old_backup))
+                                    logging.info(f"🗑 Удалён старый бэкап: {old_backup}")
+                                except Exception as del_err:
+                                    logging.warning(f"⚠ Не удалось удалить {old_backup}: {del_err}")
+                    
+                os.remove(final_filename)
   
                 # 🔄 Атомарная замена временного файла на основной
                 os.rename(temp_filename, final_filename)
@@ -1438,30 +1601,65 @@ def enhanced_smart_money_analysis(df):
     except Exception as e:
         logging.error(f"💥 Ошибка SMC анализа: {e}")
         return None, None, 0, "SMC_ERROR"
-
-
+    
 # ===================== ML =====================
 ml_model = None
 ml_scaler = None
 model_info = {}
 
 def prepare_ml_features(df):
-    """Готовит полный словарь из 42 ML-признаков для сделки и обучения"""
+    """Готовит полный словарь из 50+ ML-признаков для сделки и обучения"""
     try:
         if df is None or len(df) < 100:
             return None
 
         close, high, low, volume = df['close'], df['high'], df['low'], df['tick_volume']
-
         features = {}
 
-        # ===================== 📌 БАЗОВЫЕ ПРИЗНАКИ =====================
+        # ===================== 📌 БАЗОВЫЕ ПРИЗНАКИ (УЛУЧШЕННЫЕ) =====================
         features['price'] = float(close.iloc[-1])
         features['volume'] = float(volume.iloc[-1]) if not volume.isna().all() else 0.0
-        features['rsi'] = float(ta.RSI(close, timeperiod=14).iloc[-1]) if len(close) >= 14 else 50.0
-        features['atr'] = float(ta.ATR(high, low, close, timeperiod=14).iloc[-1]) if len(close) >= 14 else 0.0
+        
+        # 📈 RSI с несколькими периодами
+        for period in [14, 21]:
+            rsi = ta.RSI(close, timeperiod=period)
+            features[f'rsi_{period}'] = float(rsi.iloc[-1]) if len(close) >= period and not rsi.isna().all() else 50.0
+        
+        # 📊 ATR с ratio (новый признак)
+        atr = ta.ATR(high, low, close, timeperiod=14)
+        if len(close) >= 14 and not atr.isna().all():
+            features['atr'] = float(atr.iloc[-1])
+            # ATR Ratio - отношение текущего ATR к среднему за 50 периодов
+            atr_50 = atr.rolling(50).mean()
+            features['atr_ratio'] = float(atr.iloc[-1] / atr_50.iloc[-1]) if len(atr_50) > 0 and not pd.isna(atr_50.iloc[-1]) else 1.0
+        else:
+            features['atr'] = 0.0
+            features['atr_ratio'] = 1.0
+        
+        # 📈 OBV (On-Balance Volume) - новый признак
+        try:
+            obv = ta.OBV(close, volume)
+            features['obv'] = float(obv.iloc[-1]) if not obv.isna().all() else 0.0
+            # OBV тренд (производная)
+            if len(obv) > 5:
+                obv_trend = obv.diff(5).iloc[-1]
+                features['obv_trend'] = float(obv_trend) if not pd.isna(obv_trend) else 0.0
+            else:
+                features['obv_trend'] = 0.0
+        except Exception:
+            features['obv'] = 0.0
+            features['obv_trend'] = 0.0
+        
         features['adx'] = float(ta.ADX(high, low, close, timeperiod=14).iloc[-1]) if len(close) >= 14 else 0.0
-        features['price_change_1h'] = float((close.iloc[-1] - close.iloc[-60]) / close.iloc[-60] * 100) if len(close) >= 60 else 0.0
+        
+        # 📊 Ценовые изменения с разными периодами
+        for period in [15, 30, 60]:  # M1, M2, M4
+            if len(close) >= period:
+                price_change = (close.iloc[-1] - close.iloc[-period]) / close.iloc[-period] * 100
+                features[f'price_change_{period}m'] = float(price_change)
+            else:
+                features[f'price_change_{period}m'] = 0.0
+        
         features['volatility'] = float(close.pct_change().std() * 100)
 
         # ===================== 📈 MACD =====================
@@ -1482,7 +1680,75 @@ def prepare_ml_features(df):
         except Exception:
             features['bb_position'] = 0.5
 
-        # ===================== 🧠 SMC признаки =====================
+        # ===================== 🕯️ СВЕЧНЫЕ ПАТТЕРНЫ (УЛУЧШЕННЫЕ) =====================
+        try:
+            # Определяем свечные паттерны более надежно
+            current_open = df['open'].iloc[-1]
+            current_high = df['high'].iloc[-1] 
+            current_low = df['low'].iloc[-1]
+            current_close = df['close'].iloc[-1]
+            
+            prev_open = df['open'].iloc[-2] if len(df) > 1 else current_open
+            prev_high = df['high'].iloc[-2] if len(df) > 1 else current_high
+            prev_low = df['low'].iloc[-2] if len(df) > 1 else current_low
+            prev_close = df['close'].iloc[-2] if len(df) > 1 else current_close
+            
+            # Bullish Engulfing
+            features['bullish_engulfing'] = 1 if (
+                prev_close < prev_open and  # предыдущая медвежья
+                current_close > current_open and  # текущая бычья
+                current_open < prev_close and  # открытие ниже закрытия предыдущей
+                current_close > prev_open  # закрытие выше открытия предыдущей
+            ) else 0
+            
+            # Bearish Engulfing  
+            features['bearish_engulfing'] = 1 if (
+                prev_close > prev_open and  # предыдущая бычья
+                current_close < current_open and  # текущая медвежья
+                current_open > prev_close and  # открытие выше закрытия предыдущей
+                current_close < prev_open  # закрытие ниже открытия предыдущей
+            ) else 0
+            
+            # Three White Soldiers (упрощенная версия)
+            if len(df) >= 4:
+                soldiers = all([
+                    df['close'].iloc[-3] > df['open'].iloc[-3],  # 3 свечи назад бычья
+                    df['close'].iloc[-2] > df['open'].iloc[-2],  # 2 свечи назад бычья  
+                    df['close'].iloc[-1] > df['open'].iloc[-1],  # текущая бычья
+                    df['close'].iloc[-1] > df['close'].iloc[-2],  # каждая следующая выше
+                    df['close'].iloc[-2] > df['close'].iloc[-3]
+                ])
+                features['three_white_soldiers'] = 1 if soldiers else 0
+            else:
+                features['three_white_soldiers'] = 0
+                
+        except Exception:
+            features['bullish_engulfing'] = 0
+            features['bearish_engulfing'] = 0  
+            features['three_white_soldiers'] = 0
+
+        # ===================== 📏 РАССТОЯНИЕ ДО HIGH/LOW (НОВОЕ) =====================
+        try:
+            # Расстояние до дневного high/low в %
+            daily_high = high.tail(1440).max()  # 24 часа
+            daily_low = low.tail(1440).min()
+            
+            features['distance_to_daily_high'] = float((daily_high - close.iloc[-1]) / daily_high * 100) if daily_high > 0 else 50.0
+            features['distance_to_daily_low'] = float((close.iloc[-1] - daily_low) / close.iloc[-1] * 100) if close.iloc[-1] > 0 else 50.0
+            
+            # Позиция в дневном диапазоне (0-1)
+            daily_range = daily_high - daily_low
+            if daily_range > 0:
+                features['daily_range_position'] = float((close.iloc[-1] - daily_low) / daily_range)
+            else:
+                features['daily_range_position'] = 0.5
+                
+        except Exception:
+            features['distance_to_daily_high'] = 50.0
+            features['distance_to_daily_low'] = 50.0
+            features['daily_range_position'] = 0.5
+
+        # ===================== 🧠 SMC ПРИЗНАКИ =====================
         try:
             zones = find_supply_demand_zones(df)
             structure = find_market_structure(df)
@@ -1516,7 +1782,7 @@ def prepare_ml_features(df):
             ]:
                 features[key] = 0
 
-        # ===================== 📐 Горизонтальные уровни =====================
+        # ===================== 📐 ГОРИЗОНТАЛЬНЫЕ УРОВНИ =====================
         try:
             horizontal_levels = find_horizontal_levels(df)
             features['horizontal_levels_count'] = len(horizontal_levels)
@@ -1535,7 +1801,7 @@ def prepare_ml_features(df):
             features['horizontal_level_strength'] = 0
             features['is_near_horizontal_level'] = 0
 
-        # ===================== 🕒 Время и свечи =====================
+        # ===================== 🕒 ВРЕМЯ И СВЕЧИ =====================
         try:
             candle_time = get_candle_time_info()
 
@@ -1562,10 +1828,12 @@ def prepare_ml_features(df):
             ]:
                 features[key] = 0
 
-        # ===================== 🧮 Контекстные =====================
-        features['exhaustion_rsi_extreme'] = 1 if (features['rsi'] < 25 or features['rsi'] > 75) else 0
+        # ===================== 🧮 КОНТЕКСТНЫЕ (УЛУЧШЕННЫЕ) =====================
+        features['exhaustion_rsi_extreme'] = 1 if (features.get('rsi_14', 50) < 25 or features.get('rsi_14', 50) > 75) else 0
 
-        price_change_1h = features['price_change_1h']
+        # Используем самый короткий доступный период для импульса
+        price_change_key = 'price_change_15m' if 'price_change_15m' in features else 'price_change_60m'
+        price_change_1h = features.get(price_change_key, 0)
         if price_change_1h == 0 and len(df) >= 15:
             price_change_1h = (close.iloc[-1] - close.iloc[-15]) / close.iloc[-15] * 100
         features['strong_impulse'] = 1 if abs(price_change_1h) > 0.3 else 0
@@ -1577,21 +1845,21 @@ def prepare_ml_features(df):
         features['signal_vs_trend_conflict'] = 0
         features['signal_vs_rsi_conflict'] = 0
 
-        # ===================== 🧹 Очистка NaN =====================
+        # ===================== 🧹 ОЧИСТКА NaN =====================
         for k, v in features.items():
             if pd.isna(v):
                 features[k] = 0
 
+        logging.debug(f"✅ Подготовлено {len(features)} ML признаков")
         return features
 
     except Exception as e:
         logging.error(f"Ошибка ML features: {e}", exc_info=True)
         return None
-
+    
 def ml_predict_enhanced(features_dict: dict, pair: str, current_price: float):
     """
-    ML прогноз под 42 признака.
-    features_dict — словарь фич от prepare_ml_features()
+    ML прогноз для 50+ признаков - автоматическая синхронизация с моделью
     """
     global ml_model, ml_scaler
     try:
@@ -1599,15 +1867,73 @@ def ml_predict_enhanced(features_dict: dict, pair: str, current_price: float):
             logging.warning(f"⚠ ML модель не загружена — предикт {pair} невозможен")
             return {"probability": 0.5, "confidence": 0, "signal": None}
 
-        # ✅ Жёстко фиксируем порядок признаков
-        feature_names = list(features_dict.keys())
-        features_array = np.array([features_dict[f] for f in feature_names]).reshape(1, -1)
+        # 🔧 ЗАГРУЖАЕМ ОТОБРАННЫЕ ПРИЗНАКИ (если есть)
+        selected_features = []
+        try:
+            with open("ml_features_selected.pkl", "rb") as f:
+                selected_features = pickle.load(f)
+            logging.info(f"📊 Используем {len(selected_features)} отобранных признаков")
+        except FileNotFoundError:
+            logging.info("📝 Файл отбора признаков не найден, используем все признаки")
+            selected_features = list(features_dict.keys())
+        except Exception as e:
+            logging.warning(f"⚠ Ошибка загрузки отобранных признаков: {e}")
+            selected_features = list(features_dict.keys())
 
+        # 🎯 АВТОМАТИЧЕСКАЯ СИНХРОНИЗАЦИЯ ПРИЗНАКОВ
+        expected_features = getattr(ml_scaler, 'n_features_in_', len(selected_features))
+        
+        # Если используем отобранные признаки, проверяем размерность
+        if selected_features and len(selected_features) == expected_features:
+            # ✅ Случай 1: Используем отобранные признаки (идеальное совпадение)
+            final_features = selected_features
+            logging.debug(f"🎯 Используем {len(final_features)} отобранных признаков")
+            
+        elif selected_features and len(selected_features) != expected_features:
+            # ⚠️ Случай 2: Размерность не совпадает - используем пересечение
+            available_features = [f for f in selected_features if f in features_dict]
+            if len(available_features) >= expected_features:
+                final_features = available_features[:expected_features]
+                logging.warning(f"🔧 Размерности не совпадают: используем первые {len(final_features)} признаков")
+            else:
+                logging.error(f"❌ Недостаточно признаков: нужно {expected_features}, доступно {len(available_features)}")
+                return {"probability": 0.5, "confidence": 0, "signal": None}
+                
+        else:
+            # 🔄 Случай 3: Нет отобранных признаков - используем все из features_dict
+            all_features = list(features_dict.keys())
+            if len(all_features) >= expected_features:
+                final_features = all_features[:expected_features]
+                logging.info(f"📝 Используем первые {len(final_features)} из {len(all_features)} признаков")
+            else:
+                logging.error(f"❌ Недостаточно признаков: нужно {expected_features}, доступно {len(all_features)}")
+                return {"probability": 0.5, "confidence": 0, "signal": None}
+
+        # ✅ ПРОВЕРЯЕМ ЧТО ВСЕ ПРИЗНАКИ ЕСТЬ В FEATURES_DICT
+        missing_features = [f for f in final_features if f not in features_dict]
+        if missing_features:
+            logging.error(f"❌ Отсутствуют признаки: {missing_features}")
+            # Убираем отсутствующие признаки
+            final_features = [f for f in final_features if f in features_dict]
+            if len(final_features) < expected_features:
+                logging.error(f"❌ После фильтрации осталось только {len(final_features)} признаков")
+                return {"probability": 0.5, "confidence": 0, "signal": None}
+
+        # ✅ ФИНАЛЬНАЯ ПРОВЕРКА РАЗМЕРНОСТИ
+        if len(final_features) != expected_features:
+            logging.error(f"❌ Критическое несоответствие: {len(final_features)} != {expected_features}")
+            return {"probability": 0.5, "confidence": 0, "signal": None}
+
+        # 🎯 ПОДГОТОВКА ДАННЫХ ДЛЯ ПРОГНОЗА
+        features_array = np.array([features_dict[f] for f in final_features]).reshape(1, -1)
+
+        # 🔧 МАСШТАБИРОВАНИЕ И ПРОГНОЗ
         features_scaled = ml_scaler.transform(features_array)
         probabilities = ml_model.predict_proba(features_scaled)[0]
         win_probability = float(probabilities[1])
         confidence_score = abs(win_probability - 0.5) * 2
 
+        # 📊 ОПРЕДЕЛЕНИЕ СИГНАЛА
         signal = None
         if win_probability >= ML_PROBABILITY_THRESHOLD:
             signal = "BUY"
@@ -1616,14 +1942,16 @@ def ml_predict_enhanced(features_dict: dict, pair: str, current_price: float):
 
         logging.info(
             f"🤖 ML прогноз {pair}: WIN={win_probability:.3f}, "
-            f"уверенность={confidence_score:.3f}, сигнал={signal}"
+            f"уверенность={confidence_score:.3f}, сигнал={signal}, "
+            f"признаков={len(final_features)}"
         )
 
         return {
             "probability": win_probability,
             "confidence": confidence_score,
             "signal": signal,
-            "price": current_price
+            "price": current_price,
+            "features_used": len(final_features)
         }
 
     except Exception as e:
@@ -1790,10 +2118,14 @@ def ensure_ml_features_in_new_trades():
     # Эта функция будет вызываться при создании новой сделки
     pass
 
-# ===================== УЛУЧШЕННОЕ ОБУЧЕНИЕ ML МОДЕЛИ =====================
 def train_ml_model():
-    """Улучшенная версия обучения ML модели с адаптацией под объем данных"""
+    """Улучшенная версия обучения ML модели с обработкой постоянных признаков"""
     global ml_model, ml_scaler, model_info
+    
+    # 🔧 Инициализация лучшего результата для AutoSave Quality Gate
+    if not hasattr(train_ml_model, 'best_test_score'):
+        train_ml_model.best_test_score = 0
+    
     try:
         # 🧠 Сбор сделок
         all_trades = []
@@ -1817,12 +2149,14 @@ def train_ml_model():
         
         if len(completed_trades) < 30:
             logging.warning(f"⚠ Недостаточно данных для обучения: {len(completed_trades)} < 30")
+            if not isinstance(model_info, dict):
+                model_info = {}
             model_info["error"] = f"Недостаточно данных: {len(completed_trades)} сделок"
             return
 
         # 🧭 Определяем признаки
         feature_names = None
-        for t in completed_trades[-100:]:  # Анализируем последние сделки
+        for t in completed_trades[-100:]:
             feats = t.get('ml_features')
             if isinstance(feats, dict) and len(feats) >= 30:
                 feature_names = list(feats.keys())
@@ -1834,7 +2168,7 @@ def train_ml_model():
 
         logging.info(f"🔍 ML: обнаружено {len(feature_names)} признаков для обучения")
 
-        # 📊 Формируем X и y
+        # 📊 Формируем X и y с Target Smoothing
         X, y = [], []
         for trade in completed_trades:
             feats = trade.get('ml_features')
@@ -1842,77 +2176,108 @@ def train_ml_model():
                 row = [feats.get(f, 0.0) for f in feature_names]
                 if len(row) == len(feature_names) and all(isinstance(x, (int, float)) for x in row):
                     X.append(row)
-                    y.append(1 if trade.get('result') == "WIN" else 0)
+                    # 🔧 Target Smoothing вместо бинарных 0/1
+                    result = trade.get('result')
+                    if result == "WIN":
+                        profit = trade.get('profit_pips', 0)
+                        if profit > 20:  # сильная сделка
+                            y.append(1.0)
+                        else:  # слабая сделка
+                            y.append(0.7)
+                    else:  # LOSS
+                        loss = abs(trade.get('profit_pips', 0))
+                        if loss > 20:  # сильный убыток
+                            y.append(0.0)
+                        else:  # небольшой убыток
+                            y.append(0.3)
 
         if len(X) < 30:
             logging.warning(f"⚠ Недостаточно данных для обучения ML: {len(X)}")
             return
 
         X = np.array(X, dtype=float)
-        y = np.array(y, dtype=int)
+        y = np.array(y, dtype=float)
+        y_binary = (y > 0.5).astype(int)  # Бинарные метки для кросс-валидации
+        
         logging.info(f"🤖 ML: подготовлено {len(X)} образцов с {X.shape[1]} фичами")
-        logging.info(f"📊 Win/Loss: {sum(y)}/{len(y)-sum(y)}")
+        logging.info(f"📊 Target distribution: mean={np.mean(y):.3f}")
 
-        # 🎯 Динамическое разделение данных
-        if len(X) > 2000:
-            test_size = 0.15
-            cv_folds = 5
-        elif len(X) > 1000:
-            test_size = 0.2  
-            cv_folds = 5
-        else:
-            test_size = 0.25
-            cv_folds = 3
+        # 🎯 Time Decay - веса для последних сделок
+        sample_weights = np.ones(len(X))
+        if len(X) > 50:
+            recent_count = max(7, len(X) // 4)
+            sample_weights[-recent_count:] = 1.4
+            logging.info(f"⏰ Time decay: {recent_count} последних сделок с весом 1.4x")
 
         # 🧪 Масштабирование
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        # 🌲 Динамические параметры модели
-        if len(X) > 2000:
-            model_params = {
-                'n_estimators': 200,
-                'max_depth': 12,
-                'min_samples_split': 5,
-                'min_samples_leaf': 2,
-                'max_features': 'sqrt',
-                'random_state': 42,
-                'class_weight': 'balanced'
-            }
-        elif len(X) > 1000:
-            model_params = {
-                'n_estimators': 150, 
-                'max_depth': 10,
-                'min_samples_split': 8,
-                'min_samples_leaf': 3,
-                'max_features': 'sqrt',
-                'random_state': 42,
-                'class_weight': 'balanced'
-            }
+        # 🌲 Feature Selection - отбираем топ-25 признаков (но не меньше 15)
+        X_selected = X_scaled
+        selected_features = feature_names
+        logging.info(f"📊 Используем ВСЕ {len(selected_features)} признаков (без feature selection)")
+
+        # 🎯 Model Stacking: RandomForest + LogisticRegression
+        if len(X) > 100:
+            base_models = [
+                ('rf', RandomForestClassifier(
+                    n_estimators=150,  # Увеличили для лучшего качества
+                    max_depth=12,
+                    min_samples_split=8,
+                    min_samples_leaf=3,
+                    random_state=42,
+                    class_weight='balanced'
+                )),
+                ('lr', LogisticRegression(
+                    C=0.01,  # Увеличили регуляризацию против переобучения
+                    random_state=42,
+                    class_weight='balanced',
+                    max_iter=1000
+                ))
+            ]
+            
+            model = VotingClassifier(
+                estimators=base_models,
+                voting='soft',
+                weights=[3, 1]  # Больший вес для RandomForest
+            )
+            logging.info("🤖 Используем Model Stacking (RF + LR) с улучшенными параметрами")
         else:
-            model_params = {
-                'n_estimators': 100,
-                'max_depth': 8,
-                'min_samples_split': 10,
-                'min_samples_leaf': 4,
-                'max_features': 'sqrt',
-                'random_state': 42,
-                'class_weight': 'balanced'
-            }
+            # Для малого количества данных используем только RandomForest
+            model = RandomForestClassifier(
+                n_estimators=100,
+                max_depth=8,
+                min_samples_split=15,
+                random_state=42,
+                class_weight='balanced'
+            )
+            logging.info("🤖 Используем RandomForest (мало данных)")
 
-        model = RandomForestClassifier(**model_params)
-
-        # 📊 Разделение на train/test
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y, test_size=test_size, stratify=y, random_state=42
+        # 📊 Разделение на train/test с весами
+        X_train, X_test, y_train, y_test, weights_train, weights_test = train_test_split(
+            X_selected, y, sample_weights, test_size=0.25, stratify=y_binary, random_state=42
         )
 
-        model.fit(X_train, y_train)
-        train_score = model.score(X_train, y_train)
-        test_score = model.score(X_test, y_test)
+        # 🏋️ Обучение с весами
+        model.fit(X_train, y_train > 0.5, sample_weight=weights_train)
 
-        # 📈 Кросс-валидация
-        cv_scores = cross_val_score(model, X_scaled, y, cv=cv_folds, scoring='accuracy')
+        # 📈 Предсказания и метрики
+        y_pred_proba = model.predict_proba(X_test)[:, 1]
+        y_pred = (y_pred_proba > 0.5).astype(int)
+        y_test_binary = (y_test > 0.5).astype(int)
+
+        train_score = accuracy_score(y_train > 0.5, model.predict(X_train))
+        test_score = accuracy_score(y_test_binary, y_pred)
+        
+        # 🔍 Дополнительные метрики
+        f1 = f1_score(y_test_binary, y_pred, zero_division=0)
+        precision = precision_score(y_test_binary, y_pred, zero_division=0)
+        recall = recall_score(y_test_binary, y_pred, zero_division=0)
+
+        # 🎯 КРОСС-ВАЛИДАЦИЯ
+        cv_folds = 5
+        cv_scores = cross_val_score(model, X_selected, y_binary, cv=cv_folds, scoring='accuracy')
         cv_mean = cv_scores.mean()
         cv_std = cv_scores.std()
 
@@ -1920,307 +2285,89 @@ def train_ml_model():
         overfitting_ratio = train_score / max(test_score, 0.001)
 
         logging.info(f"📊 ML метрики: Train={train_score:.3f} | Test={test_score:.3f} | Overfit={overfitting_ratio:.2f}")
-        logging.info(f"🎯 CV: {cv_mean:.3f} ± {cv_std:.3f}")
+        logging.info(f"🎯 F1={f1:.3f} | Precision={precision:.3f} | Recall={recall:.3f}")
+        logging.info(f"📈 CV: {cv_mean:.3f} ± {cv_std:.3f}")
 
-        # 💾 Сохраняем модель и статистику
-        ml_model = model
-        ml_scaler = scaler
-        joblib.dump(ml_model, "ml_model.pkl")
-        joblib.dump(ml_scaler, "ml_scaler.pkl")
+        # 💾 AutoSave Quality Gate - сохраняем только если улучшилась точность
+        current_best = train_ml_model.best_test_score
+        improvement = test_score - current_best
+        
+        if test_score >= current_best or current_best == 0:
+            ml_model = model
+            ml_scaler = scaler
+            joblib.dump(ml_model, "ml_model.pkl")
+            joblib.dump(ml_scaler, "ml_scaler.pkl")
+            
+            # Сохраняем информацию о выбранных фичах
+            with open("ml_features_selected.pkl", "wb") as f:
+                pickle.dump(selected_features, f)
+            
+            train_ml_model.best_test_score = test_score
+            logging.info(f"💾 Модель сохранена (новый лучший результат: {test_score:.3f}, улучшение: {improvement:.3f})")
+            model_saved = True
+        else:
+            logging.warning(f"🚫 Модель НЕ сохранена (текущий {test_score:.3f} <= лучший {current_best:.3f})")
+            model_saved = False
+
+        # 📊 Сохраняем статистику
+        if not isinstance(model_info, dict):
+            model_info = {}
 
         model_info.update({
             "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "n_features": len(feature_names),
+            "n_features": len(selected_features),
             "trades_used": len(X),
             "train_accuracy": round(train_score * 100, 2),
             "test_accuracy": round(test_score * 100, 2),
             "cv_accuracy": round(cv_mean * 100, 2),
             "cv_std": round(cv_std * 100, 2),
             "overfitting_ratio": round(overfitting_ratio, 2),
-            "feature_names": feature_names,
+            "f1_score": round(f1 * 100, 2),
+            "precision": round(precision * 100, 2),
+            "recall": round(recall * 100, 2),
+            "feature_names": selected_features,
             "train_samples": len(y_train),
             "test_samples": len(y_test),
-            "win_rate": round(float(np.mean(y)) * 100, 2),
-            "model_params": model_params
+            "win_rate": round(float(np.mean(y_binary)) * 100, 2),
+            "model_type": "Stacking" if len(X) > 100 else "RandomForest",
+            "model_saved": model_saved,
+            "improvement": round(improvement * 100, 2) if improvement > 0 else 0,
+            "constant_features_removed": 0
         })
 
-        # 💾 Сохраняем в файл
-        with open("ml_info.json", "w", encoding="utf-8") as f:
-            json.dump(model_info, f, ensure_ascii=False, indent=2)
+        # 💾 Сохраняем историю всех переобучений в ml_info.json
+        try:
+            old_data = []
+            if os.path.exists("ml_info.json"):
+                with open("ml_info.json", "r", encoding="utf-8") as f:
+                    try:
+                        old_data = json.load(f)
+                        if isinstance(old_data, dict):
+                            old_data = [old_data]
+                    except json.JSONDecodeError:
+                        old_data = []
 
-        logging.info(f"✅ ML модель успешно обучена на {len(feature_names)} признаках ({len(X)} сделок)")
+            old_data.append(model_info)
+            with open("ml_info.json", "w", encoding="utf-8") as f:
+                json.dump(old_data, f, ensure_ascii=False, indent=2)
+
+            logging.info(f"💾 ML история обновлена: всего записей {len(old_data)}")
+            logging.info(f"✅ ML модель успешно обучена на {len(selected_features)} признаках ({len(X)} сделок)")
+
+        except Exception as e:
+            logging.error(f"❌ Ошибка сохранения истории ML: {e}", exc_info=True)
+
+        return model_info
 
     except Exception as e:
         logging.error(f"❌ Ошибка обучения ML: {e}", exc_info=True)
+        if not isinstance(model_info, dict):
+            model_info = {}
         model_info["error"] = str(e)
-
-# ===================== WEB APP INTEGRATION =====================
-async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает данные от Telegram Web App с реальными данными"""
-    try:
-        data = json.loads(update.effective_message.web_app_data.data)
-        action = data.get('action')
-        user_id = update.effective_user.id
-
-        # ===================== POCKET OPTION AUTH HANDLERS =====================
-        if action == 'check_pocket_id':
-            pocket_id = data.get('pocket_id')
-            telegram_id = data.get('telegram_id')
-            
-            if not pocket_id:
-                await update.message.reply_text("❌ ID не указан")
-                return
-                
-            # Проверяем Pocket ID
-            if is_valid_pocket_id(pocket_id):
-                user_info = get_pocket_user_info(pocket_id)
-                await update.message.reply_text(
-                    f"✅ **ID подтвержден!**\n\n"
-                    f"👤 Добро пожаловать, {user_info['name']}!\n"
-                    f"🆔 Pocket ID: `{pocket_id}`\n"
-                    f"🛡️ Роль: `{'Администратор' if user_info['role'] == 'admin' else 'Пользователь'}`\n\n"
-                    f"Теперь вы можете использовать торговую систему.",
-                    parse_mode='Markdown'
-                )
-            else:
-                await update.message.reply_text(
-                    f"❌ **ID не найден**\n\n"
-                    f"Pocket ID `{pocket_id}` не зарегистрирован в реферальной системе.\n\n"
-                    f"📝 **Что делать:**\n"
-                    f"1. Зарегистрируйтесь по ссылке: {REFERRAL_LINK}\n"
-                    f"2. После регистрации ваш ID будет добавлен в систему\n"
-                    f"3. Вернитесь и попробуйте снова\n\n"
-                    f"🆘 Если возникли проблемы - свяжитесь с поддержкой.",
-                    parse_mode='Markdown'
-                )
-            return
-        # ===================== END POCKET OPTION AUTH =====================
-         
-        logging.info(f"🌐 Web App: user {user_id}, action: {action}")
-        
-        user_data = get_user_data(user_id)
-        
-        if action == 'get_signal':
-            await next_signal_command(update, context)
-            
-        elif action == 'show_stats':
-            await statistics_command(update, context)
-            
-        elif action == 'history':
-            await history_command(update, context)
-            
-        elif action == 'status':
-            await status_command(update, context)
-            
-        elif action == 'get_user_data':
-            # Отправляем реальные данные пользователя
-            wins = len([t for t in user_data.get('trade_history', []) if t.get('result') == "WIN"])
-            losses = len([t for t in user_data.get('trade_history', []) if t.get('result') == "LOSS"])
-            total = wins + losses
-            win_rate = (wins / total * 100) if total > 0 else 0
-            
-            response_text = (
-                f"📊 **РЕАЛЬНАЯ СТАТИСТИКА**\n\n"
-                f"• Всего сделок: `{user_data['trade_counter']}`\n"
-                f"• Win Rate: `{win_rate:.1f}%`\n"
-                f"• Активных сделок: `{1 if user_data.get('current_trade') else 0}`\n"
-                f"• Авто-трейдинг: `{'🟢 ВКЛ' if user_data.get('auto_trading', False) else '🔴 ВЫКЛ'}`\n"
-                f"• ML анализ: `{'🟢 ВКЛ' if user_data.get('ml_enabled', ML_ENABLED) else '🔴 ВЫКЛ'}`\n"
-                f"• GPT анализ: `{'🟢 ВКЛ' if user_data.get('gpt_enabled', USE_GPT) else '🔴 ВЫКЛ'}`"
-            )
-            
-            await update.message.reply_text(response_text, parse_mode='Markdown')
-            
-        elif action == 'get_admin_data':
-            if not is_admin(user_id):
-                await update.message.reply_text("❌ Недостаточно прав")
-                return
-                
-            # Отправляем реальные данные админа
-            if not MULTI_USER_MODE:
-                await update.message.reply_text("❌ Режим не мультипользовательский")
-                return
-                
-            total_users = len(users)
-            active_trades = sum(1 for ud in users.values() if ud.get('current_trade'))
-            
-            all_trades = []
-            for ud in users.values():
-                all_trades.extend(ud.get('trade_history', []))
-                
-            wins = len([t for t in all_trades if t.get('result') == "WIN"])
-            losses = len([t for t in all_trades if t.get('result') == "LOSS"])
-            total = wins + losses
-            system_win_rate = (wins / total * 100) if total > 0 else 0
-            
-            response_text = (
-                f"🛡️ **АДМИН СТАТИСТИКА**\n\n"
-                f"• Пользователей: `{total_users}`\n"
-                f"• Активных сделок: `{active_trades}`\n"
-                f"• Общий Win Rate: `{system_win_rate:.1f}%`\n"
-                f"• ML модель: `{'🟢 Обучена' if ml_model else '🔴 Не обучена'}`\n"
-                f"• GPT анализ: `{'🟢 ВКЛ' if USE_GPT else '🔴 ВЫКЛ'}`\n"
-                f"• Режим: `{'👥 Мультипользовательский' if MULTI_USER_MODE else '👤 Однопользовательский'}`"
-            )
-            
-            await update.message.reply_text(response_text, parse_mode='Markdown')
-            
-        elif action == 'toggle_auto_trading':
-            user_data['auto_trading'] = not user_data.get('auto_trading', False)
-            status = "🟢 ВКЛЮЧЕН" if user_data['auto_trading'] else "🔴 ВЫКЛЮЧЕН"
-            await update.message.reply_text(f"🤖 Авто-трейдинг {status}")
-            save_users_data()
-            
-        elif action == 'toggle_ml':
-            user_data['ml_enabled'] = not user_data.get('ml_enabled', ML_ENABLED)
-            status = "🟢 ВКЛЮЧЕН" if user_data['ml_enabled'] else "🔴 ВЫКЛЮЧЕН"
-            await update.message.reply_text(f"🧠 ML анализ {status}")
-            save_users_data()
-            
-        elif action == 'toggle_gpt':
-            user_data['gpt_enabled'] = not user_data.get('gpt_enabled', USE_GPT)
-            status = "🟢 ВКЛЮЧЕН" if user_data['gpt_enabled'] else "🔴 ВЫКЛЮЧЕН"
-            await update.message.reply_text(f"💬 GPT анализ {status}")
-            save_users_data()
-            
-        # Админские команды
-        elif action == 'modelstats':
-            await model_stats_command(update, context)
-            
-        elif action == 'retrain':
-            await retrain_model_command(update, context)
-            
-        elif action == 'checkdata':
-            await check_data_command(update, context)
-            
-        elif action == 'restorecounter':
-            await restore_counter_command(update, context)
-            
-        elif action == 'clearalltrades':
-            await clear_all_trades_command(update, context)
-            
-        elif action == 'repairml':
-            await repair_ml_command(update, context)
-            
-        elif action == 'forceml':
-            await force_enable_ml_command(update, context)
-            
-    except Exception as e:
-        logging.error(f"❌ Web App error: {e}")
-        await update.message.reply_text("❌ Ошибка обработки запроса от веб-приложения")
-
-# ===================== WEB APP REAL DATA =====================
-async def send_user_data_to_webapp(user_id: int, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляет реальные данные пользователя в веб-приложение"""
-    try:
-        user_data = get_user_data(user_id)
-        
-        # Статистика сделок
-        wins = len([t for t in user_data.get('trade_history', []) if t.get('result') == "WIN"])
-        losses = len([t for t in user_data.get('trade_history', []) if t.get('result') == "LOSS"])
-        total = wins + losses
-        win_rate = (wins / total * 100) if total > 0 else 0
-        
-        # Активные сделки
-        open_trades = 1 if user_data.get('current_trade') else 0
-        
-        # Данные для веб-приложения
-        webapp_data = {
-            'type': 'user_data',
-            'data': {
-                'trade_count': user_data.get('trade_counter', 0),
-                'win_rate': round(win_rate, 1),
-                'open_trades': open_trades,
-                'auto_trading': user_data.get('auto_trading', False),
-                'ml_enabled': user_data.get('ml_enabled', ML_ENABLED),
-                'gpt_enabled': user_data.get('gpt_enabled', USE_GPT),
-                'last_signal': user_data.get('last_signal_time', 'Никогда')
-            }
-        }
-        
-        # В реальном Mini App данные отправляются через специальный метод
-        # Пока просто логируем
-        logging.info(f"📊 WebApp данные для {user_id}: {webapp_data}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка подготовки данных WebApp: {e}")
-
-async def send_admin_data_to_webapp(user_id: int, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляет реальные данные админа в веб-приложение"""
-    try:
-        if not MULTI_USER_MODE:
-            return
-            
-        # Статистика системы
-        total_users = len(users)
-        active_trades = sum(1 for user_data in users.values() if user_data.get('current_trade'))
-        
-        # Общая статистика по всем пользователям
-        all_trades = []
-        for user_data in users.values():
-            all_trades.extend(user_data.get('trade_history', []))
-            
-        wins = len([t for t in all_trades if t.get('result') == "WIN"])
-        losses = len([t for t in all_trades if t.get('result') == "LOSS"])
-        total = wins + losses
-        system_win_rate = (wins / total * 100) if total > 0 else 0
-        
-        # Данные для админ панели
-        webapp_data = {
-            'type': 'admin_data',
-            'data': {
-                'total_users': total_users,
-                'active_trades': active_trades,
-                'system_win_rate': round(system_win_rate, 1),
-                'system_status': 'online',
-                'bot_status': 'running',
-                'ml_model': 'trained' if ml_model else 'not_trained',
-                'gpt_status': 'enabled' if USE_GPT else 'disabled'
-            }
-        }
-        
-        logging.info(f"📊 WebApp админ данные: {webapp_data}")
-        
-    except Exception as e:
-        logging.error(f"❌ Ошибка подготовки админ данных WebApp: {e}")
-
-       
-# ===================== TELEGRAM HANDLERS =====================
-async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает данные от веб-приложения"""
-    try:
-        data = json.loads(update.effective_message.web_app_data.data)
-        action = data.get('action')
-        user_id = update.effective_user.id
-        
-        if action == 'get_signal':
-            await next_signal_command(update, context)
-        elif action == 'show_stats':
-            await statistics_command(update, context)
-        elif action == 'train_model':
-            await retrain_model_command(update, context)
-        elif action == 'get_data':
-            user_data = get_user_data(user_id)
-            wins = len([t for t in user_data['trade_history'] if t.get('result') == "WIN"])
-            losses = len([t for t in user_data['trade_history'] if t.get('result') == "LOSS"])
-            total = wins + losses
-            win_rate = (wins / total * 100) if total > 0 else 0
-            
-            # ИСПРАВЛЕНИЕ: используем правильную клавиатуру
-            user_markup = get_trading_keyboard(user_id)
-            
-            await update.message.reply_text(
-                f"💰 Баланс: {user_data['virtual_balance']:.2f}\n"
-                f"📊 Сделок: {user_data['trade_counter']}\n"
-                f"🎯 Win Rate: {win_rate:.0f}%",
-                reply_markup=user_markup
-            )
-    except Exception as e:
-        logging.error(f"Ошибка обработки веб-приложения: {e}")
-
+        return model_info
 # ===================== GPT ANALYSIS =====================
 def gpt_full_market_read(pair: str, df_m1: pd.DataFrame, df_m5: pd.DataFrame):
-    """GPT-анализ последних свечей (400 M1 свечей = ~6.5 часов)"""
+    """GPT-анализ с улучшенной логикой времени экспирации (1-4 минуты)"""
     try:
         if df_m1 is None or len(df_m1) < 100:
             return None, None
@@ -2229,17 +2376,37 @@ def gpt_full_market_read(pair: str, df_m1: pd.DataFrame, df_m5: pd.DataFrame):
         candles = df_m1.tail(400)[['open','high','low','close','tick_volume']].round(5)
         candles = candles.to_dict(orient='records')
         
+        # Анализируем волатильность для определения времени экспирации
+        current_price = df_m1['close'].iloc[-1]
+        atr = ta.ATR(df_m1['high'], df_m1['low'], df_m1['close'], timeperiod=14).iloc[-1]
+        volatility_percent = (atr / current_price) * 100 if current_price > 0 else 0
+        
+        # Определяем базовое время экспирации по волатильности (как в SMC)
+        if volatility_percent >= 0.035:
+            base_expiry = 1
+        elif volatility_percent >= 0.02:
+            base_expiry = 2
+        elif volatility_percent >= 0.01:
+            base_expiry = 3
+        else:
+            base_expiry = 4
+            
+        # Ограничиваем 1-4 минутами как в SMC
+        base_expiry = max(1, min(base_expiry, 4))
+
         prompt = f"""
 Ты профессиональный трейдер бинарных опционов. Проанализируй последние 400 свечей M1 (6.5 часа данных) для пары {pair}.
 
 КРИТЕРИИ АНАЛИЗА:
 1. Определи общий тренд (бычий/медвежий/флэт)
-2. Найди ключевые уровни поддержки/сопротивления
+2. Найди ключевые уровни поддержки/сопротивления  
 3. Проанализируй объемы на ключевых движениях
 4. Оцени силу текущего движения
 5. Определи потенциальные точки входа
 
-Ответ строго в формате JSON: {{"decision":"BUY/SELL/WAIT","expiry":1-5,"confidence":1-10,"reason":"краткое обоснование"}}
+ВАЖНО: Время экспирации должно быть от 1 до 4 минут. Текущая волатильность: {volatility_percent:.4f}% - рекомендуется {base_expiry} мин.
+
+Ответ строго в формате JSON: {{"decision":"BUY/SELL/WAIT","expiry":1-4,"confidence":1-10,"reason":"краткое обоснование"}}
 
 Данные свечей (первые 50 из 400): {json.dumps(candles[:50], ensure_ascii=False)}
 """
@@ -2260,8 +2427,11 @@ def gpt_full_market_read(pair: str, df_m1: pd.DataFrame, df_m5: pd.DataFrame):
             try:
                 data = json.loads(json_str)
                 decision = data.get("decision")
-                expiry = data.get("expiry", 2)
+                expiry = data.get("expiry", base_expiry)
                 confidence = data.get("confidence", 5)
+                
+                # Ограничиваем экспирацию 1-4 минутами как в SMC
+                expiry = max(1, min(expiry, 4))
                 
                 if decision in ["BUY","SELL"] and confidence >= 6:
                     return decision, expiry
@@ -2447,6 +2617,9 @@ def analyze_trend(df, timeframe_name="M1"):
 
 def analyze_pair(pair: str):
     try:
+
+        global ml_model, ml_scaler, ml_features_count
+        # 🕒 ПРОВЕРЯЕМ ФИКСИРОВАННЫЙ ГРАФИК РАБОТЫ БОТА
         if not is_trading_time():
             logging.info(f"⏸ Вне рабочего времени бота — пропускаем анализ {pair}")
             return None, None, 0, "OUT_OF_SCHEDULE", None
@@ -2516,8 +2689,22 @@ def analyze_pair(pair: str):
         # --- ML ---
         if ml_enabled_for_this_pair and feats_array is not None:
             try:
-                # Масштабируем признаки и получаем вероятность WIN
+                # 🔧 ДОБАВЬ ЭТОТ БЛОК ДЛЯ ИСПРАВЛЕНИЯ SCALER
+                current_feature_count = feats_array.shape[1]
+                if (ml_scaler is not None and 
+                    hasattr(ml_scaler, 'n_features_in_') and 
+                    ml_scaler.n_features_in_ != current_feature_count):
+            
+                    logging.warning(f"🔄 Размерность не совпадает: scaler={ml_scaler.n_features_in_}, данные={current_feature_count}")
+                    logging.info("🔄 Пересоздаю scaler с правильной размерностью...")
+            
+                    # ПЕРЕСОЗДАЕМ SCALER С ПРАВИЛЬНОЙ РАЗМЕРНОСТЬЮ
+                    ml_scaler = StandardScaler()
+                    ml_scaler.fit(feats_array)  # Обучаем на текущих данных
+        
+                # ✅ ТЕПЕРЬ ЭТА СТРОКА БУДЕТ РАБОТАТЬ БЕЗ ОШИБОК
                 feats_scaled = ml_scaler.transform(feats_array)
+        
                 ml_pred = ml_model.predict_proba(feats_scaled)[0][1]
                 ml_confidence = round(ml_pred * 100, 1)
                 ml_signal = "BUY" if ml_pred >= 0.5 else "SELL"
@@ -2525,7 +2712,7 @@ def analyze_pair(pair: str):
                 ml_result = {
                     "signal": ml_signal,
                     "confidence": ml_pred,
-                    "validated": True  # позже проверяется трендом
+                    "validated": True
                 }
 
                 ml_result = validate_ml_signal_with_context(ml_result, trend_analysis, pair)
@@ -2575,6 +2762,7 @@ def analyze_pair(pair: str):
         # 6️⃣ Возврат
         if final_signal:
             logging.info(f"🚀 {pair}: Окончательный сигнал = {final_signal} ({final_source}, conf={final_confidence})")
+            
             return final_signal, final_expiry, final_confidence, final_source, ml_features_data
 
         logging.info(f"❌ {pair}: сигналов нет или они отфильтрованы")
@@ -2583,163 +2771,170 @@ def analyze_pair(pair: str):
     except Exception as e:
         logging.error(f"💥 Ошибка анализа пары {pair}: {e}", exc_info=True)
         return None, None, 0, "ERROR", None
+    
+# ===================== FAST CHART (MATPLOTLIB) =====================
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from io import BytesIO
+import pandas as pd
+import logging
+from datetime import datetime
 
+# 🔥 ГЛОБАЛЬНЫЙ КЭШ ГРАФИКОВ В ПАМЯТИ
+CHART_CACHE = {}
+CACHE_EXPIRY = 300  # 5 минут
 
-# ===================== ENHANCED CHART =====================
 def enhanced_plot_chart(df, pair, entry_price, direction):
-    """Улучшенный график с зонами, OB и уровнями Фибоначчи"""
+    """СУПЕР-БЫСТРЫЙ TradingView-стиль график со свечами (1-2 секунды)"""
+    
     try:
         if df is None or len(df) < 100:
             return None
+
+        # 🔥 ПРОВЕРКА КЭША В ПАМЯТИ
+        cache_key = f"{pair}_{direction}_{entry_price:.5f}"
+        current_time = datetime.now()
+        
+        if cache_key in CHART_CACHE:
+            cached_time, chart_bytes = CHART_CACHE[cache_key]
+            if (current_time - cached_time).total_seconds() < CACHE_EXPIRY:
+                logging.info(f"📊 Используем кэшированный график из памяти для {pair}")
+                chart_stream = BytesIO(chart_bytes)
+                chart_stream.name = f"chart_{pair}.png"
+                return chart_stream
+
+        # Используем только последние 80 свечей для скорости и читаемости
+        df_plot = df.tail(80).copy()
+        
+        # Создаем график
+        plt.style.use('dark_background')
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), 
+                                      gridspec_kw={'height_ratios': [3, 1]})
+        fig.patch.set_facecolor('#0a1120')
+        
+        # ======== СВЕЧНОЙ ГРАФИК ========
+        # Цвета TradingView
+        green_color = '#00ff88'  # Бычий
+        red_color = '#ff4444'    # Медвежий
+        
+        # Рисуем свечи вручную
+        for i in range(len(df_plot)):
+            open_price = df_plot['open'].iloc[i]
+            close_price = df_plot['close'].iloc[i]
+            high_price = df_plot['high'].iloc[i]
+            low_price = df_plot['low'].iloc[i]
             
-        df_plot = df.tail(300).copy()
+            # Определяем цвет свечи
+            color = green_color if close_price >= open_price else red_color
+            alpha = 0.8
+            
+            # Тело свечи
+            body_bottom = min(open_price, close_price)
+            body_top = max(open_price, close_price)
+            body_height = body_top - body_bottom
+            
+            if body_height > 0:
+                ax1.bar(i, body_height, bottom=body_bottom, color=color, alpha=alpha, width=0.8)
+            
+            # Тени свечи
+            ax1.plot([i, i], [low_price, body_bottom], color=color, linewidth=1, alpha=alpha)
+            ax1.plot([i, i], [body_top, high_price], color=color, linewidth=1, alpha=alpha)
         
-        if 'tick_volume' in df_plot.columns and 'volume' not in df_plot.columns:
-            df_plot = df_plot.rename(columns={'tick_volume': 'volume'})
+        # SMA20
+        sma20 = df_plot['close'].rolling(20).mean()
+        ax1.plot(range(len(sma20)), sma20, color='#ffaa00', linewidth=2, label='SMA 20', alpha=0.9)
         
-        supply_demand_zones = find_supply_demand_zones(df)
-        order_blocks = calculate_order_blocks_advanced(df)
-        structure_points = find_market_structure(df)
-        fibonacci = calculate_fibonacci_levels(df)
-        trend_analysis = enhanced_trend_analysis(df)
-        liquidity_levels = liquidity_analysis(df)
-        pa_patterns = price_action_patterns(df)
+        # ======== КЛЮЧЕВЫЕ ЛИНИИ ========
+        # Линия входа (белая пунктирная)
+        ax1.axhline(y=entry_price, color='white', linestyle='--', 
+                   linewidth=2, label=f'Entry: {entry_price:.5f}')
+        
+        # Текущая цена (голубая точечная)
         current_price = df_plot['close'].iloc[-1]
-
-
-        sma_20 = df_plot['close'].rolling(20).mean()
-        sma_50 = df_plot['close'].rolling(50).mean()
+        ax1.axhline(y=current_price, color='#00ffff', linestyle=':', 
+                   linewidth=1.5, label=f'Current: {current_price:.5f}')
         
-        mc = mpf.make_marketcolors(
-            up='#00ff88', down='#ff4444',
-            edge='inherit', wick={'up':'#00ff88','down':'#ff4444'},
-            volume='in'
-        )
+        # ======== ОФОРМЛЕНИЕ ========
+        # 🔥 ИСПРАВЛЕНИЕ ШРИФТОВ - убираем эмодзи из заголовка
+        title_text = f"{pair} - SMART MONEY - {direction}"
+        ax1.set_title(title_text, color='white', fontsize=16, fontweight='bold', pad=20)
         
-        s = mpf.make_mpf_style(
-            marketcolors=mc, 
-            gridstyle='-', 
-            gridcolor='#333333',
-            facecolor='#1a1a2e', 
-            figcolor='#1a1a2e',
-            rc={'font.size': 10}
-        )
+        ax1.legend(loc='upper left', facecolor='#1e2a3a')
+        ax1.grid(True, alpha=0.3, color='#1e2a3a')
+        ax1.set_facecolor('#0a1120')
+        ax1.tick_params(colors='white')
         
-        fig, ax = mpf.plot(
-            df_plot, 
-            type="candle", 
-            style=s, 
-            volume=True,
-            returnfig=True, 
-            figsize=(12, 6),
-            volume_panel=1,
-            panel_ratios=(3, 1)
-        )
-        
-        main_ax = ax[0] if isinstance(ax, list) else ax
-        volume_ax = ax[1] if isinstance(ax, list) and len(ax) > 1 else None
-        
-        main_ax.set_title(f'{pair} - Smart Money Analysis - {direction}', 
-                         fontsize=16, fontweight='bold', color='white', pad=10)
-
-        # SMA линии
-        main_ax.plot(range(len(sma_20)), sma_20, color='#ffaa00', linewidth=2, 
-                    alpha=0.8, label='SMA 20')
-        main_ax.plot(range(len(sma_50)), sma_50, color='#ff6600', linewidth=2, 
-                    alpha=0.8, label='SMA 50')
-
-        # Supply/Demand зоны
-        strong_zones = [z for z in supply_demand_zones if z.get('volume_ratio', 0) > 2.0]
-        for zone in strong_zones[:3]:
-            color = '#ff6b6b' if zone['type'] == 'SUPPLY' else '#4ecdc4'
-            alpha = 0.25
-            rect = Rectangle(
-                (0, zone['bottom']), len(df_plot), zone['top'] - zone['bottom'],
-                facecolor=color, alpha=alpha, edgecolor=color, linewidth=1.5
-            )
-            main_ax.add_patch(rect)
-
-        # Ордер-блоки
-        recent_obs = order_blocks[-2:] if len(order_blocks) >= 2 else order_blocks
-        for ob in recent_obs:
-            color = '#ff4444' if 'BEARISH' in ob['type'] else '#00ff88'
-            alpha = 0.35
-            block_width = len(df_plot) - ob['index'] - 5
-            rect = Rectangle(
-                (ob['index'], ob['low']), block_width, ob['high'] - ob['low'],
-                facecolor=color, alpha=alpha, edgecolor=color, linewidth=2
-            )
-            main_ax.add_patch(rect)
-
-        # ✅ Уровни Фибоначчи
-        for fib in fibonacci:
-            fib_color = '#8888ff' if fib["ratio"] in [38, 50, 61] else '#555577'
-            main_ax.axhline(y=fib["level"], color=fib_color, linestyle='--', linewidth=1)
-            main_ax.text(len(df_plot)-5, fib["level"], f"{fib['ratio']}%", 
-                        color=fib_color, fontsize=8, ha='right', va='center',
-                        bbox=dict(boxstyle="round,pad=0.2", facecolor='#1a1a2e', alpha=0.6))
-
-        # Линия входа
-        entry_color = '#ffffff'
-        main_ax.axhline(y=entry_price, color=entry_color, linestyle='-', 
-                       linewidth=3, alpha=0.9, label=f'Entry: {entry_price:.5f}')
-
-        # Информационная панель
-        trend_direction = 'BULL' if sma_20.iloc[-1] > sma_50.iloc[-1] else 'BEAR'
-        info_text = (
-            f"Price: {current_price:.5f}\n"
-            f"Trend: {trend_analysis['direction']}\n"
-            f"Strength: {trend_analysis['strength']}\n"
-            f"RSI: {trend_analysis['rsi_state']}\n"
-            f"OB: {len(recent_obs)}\n"
-            f"Zones: {len(strong_zones)}\n"
-            f"Patterns: {len(pa_patterns)}"
-        )
-        
-        info_bg_color = '#00cc66' if direction == 'BUY' else '#ff4444'
-        main_ax.text(0.02, 0.95, info_text, 
-                    color='white', fontsize=10, ha='left', va='top',
-                    transform=main_ax.transAxes,
-                    bbox=dict(boxstyle="round,pad=0.4", facecolor=info_bg_color, 
-                            edgecolor='white', alpha=0.9, linewidth=1))
-
-        # Оформление
-        main_ax.set_facecolor('#1a1a2e')
-        main_ax.tick_params(colors='white', labelsize=10)
-        main_ax.grid(True, alpha=0.3, color='#444444')
-        
-        if volume_ax:
-            volume_ax.set_facecolor('#1a1a2e')
-            volume_ax.tick_params(colors='white', labelsize=9)
-            volume_ax.grid(True, alpha=0.2, color='#444444')
-
-        # ИСПРАВЛЕНИЕ: убрали tight_layout и используем subplots_adjust
-        plt.subplots_adjust(left=0.06, right=0.96, bottom=0.08, top=0.94, hspace=0.1)
-
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        path = f"smc_chart_{pair}_{timestamp}.png"
-        
-        fig.savefig(path, dpi=120, bbox_inches='tight', pad_inches=0.1,
-                   facecolor='#1a1a2e', edgecolor='none', format='png')
-        plt.close(fig)
-        
-        try:
-            file_size = os.path.getsize(path)
-            if file_size > 1.8 * 1024 * 1024:
-                from PIL import Image
-                img = Image.open(path)
-                img.save(path, "PNG", optimize=True, quality=85)
-        except Exception as e:
-            logging.warning(f"Не удалось сжать изображение: {e}")
+        # ======== ОБЪЕМЫ ========
+        if 'volume' in df_plot.columns or 'tick_volume' in df_plot.columns:
+            volumes = df_plot['volume'] if 'volume' in df_plot.columns else df_plot['tick_volume']
             
-        return path
+            # Цвета объемов как в TradingView (зеленый/красный)
+            volume_colors = []
+            for i in range(len(df_plot)):
+                if df_plot['close'].iloc[i] >= df_plot['open'].iloc[i]:
+                    volume_colors.append(green_color)
+                else:
+                    volume_colors.append(red_color)
+            
+            ax2.bar(range(len(volumes)), volumes, color=volume_colors, alpha=0.7)
+        
+        ax2.set_ylabel('Volume', color='white')
+        ax2.grid(True, alpha=0.3, color='#1e2a3a')
+        ax2.set_facecolor('#0a1120')
+        ax2.tick_params(colors='white')
+        
+        # ======== ИНФО-ПАНЕЛЬ ========
+        trend_analysis = enhanced_trend_analysis(df)
+        info_bg = '#00cc66' if direction == 'BUY' else '#ff4444'
+        
+        # 🔥 ИСПРАВЛЕНИЕ ШРИФТОВ - простой текст без спецсимволов
+        info_text = (f"PRICE: {current_price:.5f}\n"
+                    f"TREND: {trend_analysis['direction']}\n"
+                    f"STRENGTH: {trend_analysis['strength']}\n"
+                    f"SIGNAL: {direction}")
+        
+        ax1.text(0.02, 0.98, info_text, transform=ax1.transAxes, 
+                fontsize=10, verticalalignment='top', color='white',
+                bbox=dict(boxstyle='round', facecolor=info_bg, alpha=0.9, edgecolor='white'))
+
+        plt.tight_layout()
+        
+        # ======== СОХРАНЕНИЕ В ПАМЯТЬ ========
+        chart_stream = BytesIO()
+        
+        # 🔥 ИСПРАВЛЕНИЕ ШРИФТОВ - убираем эмодзи из настроек сохранения
+        plt.savefig(chart_stream, format='png', dpi=100, bbox_inches='tight', 
+                   facecolor='#0a1120', edgecolor='none')
+        plt.close()
+        
+        chart_bytes = chart_stream.getvalue()
+        
+        # 🔥 СОХРАНЯЕМ В КЭШ ПАМЯТИ
+        CHART_CACHE[cache_key] = (current_time, chart_bytes)
+        
+        # 🔥 СОЗДАЕМ НОВЫЙ BytesIO для отправки
+        chart_stream = BytesIO(chart_bytes)
+        chart_stream.name = f"chart_{pair}.png"
+        
+        logging.info(f"⚡ БЫСТРЫЙ график создан в памяти: {pair} (1-2 сек)")
+        return chart_stream
         
     except Exception as e:
-        logging.error(f"Ошибка создания графика: {e}")
+        logging.error(f"❌ Ошибка создания быстрого графика: {e}")
         return None
+
+# ===================== GLOBAL SIGNAL VARIABLES =====================
+CURRENT_SIGNAL = None
+CURRENT_SIGNAL_TIMESTAMP = None
+SIGNAL_EXPIRY_MINUTES = 2  # Сигнал действителен 2 минуты
+
+from datetime import datetime  # Убедитесь что этот импорт есть в начале файла
+
 # ===================== AUTO TRADING LOOP - ФИНАЛ =====================
 async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
-    """Финальная версия торгового цикла с проверкой фиксированного рабочего времени бота"""
+    """Финальная версия торгового цикла с ПАРАЛЛЕЛЬНОЙ проверкой фиксированного рабочего времени бота"""
+    start_time = datetime.now()  # ⏱️ ОБЯЗАТЕЛЬНО ДОБАВИТЬ ЭТУ СТРОКУ В НАЧАЛО ФУНКЦИИ
+    
     try:
         logging.info("🔄 ===== ЗАПУСК АВТО-ТРЕЙДИНГ ЦИКЛА =====")
 
@@ -2755,7 +2950,10 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
             logging.warning("⚠ База пользователей пуста")
             return
 
-        # 🚀 Обрабатываем всех пользователей по очереди
+        # 🚀 ПАРАЛЛЕЛЬНАЯ обработка всех пользователей
+        tasks = []
+        user_tasks = []
+
         for user_id, user_data in users.copy().items():
             try:
                 uid = int(user_id)
@@ -2765,16 +2963,36 @@ async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
                     logging.info(f"⏸ Пользователь {uid}: авто-трейдинг отключён")
                     continue
                     
-                logging.info(f"🚀 Пользователь {uid}: поиск сигналов...")
-                await process_auto_trade_for_user(uid, user_data, context)
-                
-            except Exception as user_err:
-                logging.error(f"❌ Ошибка обработки пользователя {user_id}: {user_err}", exc_info=True)
+                logging.info(f"🚀 Пользователь {uid}: добавляем в параллельную обработку...")
+                # Создаем задачу для каждого пользователя
+                task = asyncio.create_task(
+                    process_auto_trade_for_user(uid, user_data, context),
+                    name=f"user_{uid}"
+                )
+                tasks.append(task)
+                user_tasks.append(uid)
 
-        logging.info("✅ ===== АВТО-ТРЕЙДИНГ ЦИКЛ ЗАВЕРШЕН =====\n")
+            except Exception as user_err:
+                logging.error(f"❌ Ошибка подготовки пользователя {user_id}: {user_err}", exc_info=True)
+
+        # 🔥 ЗАПУСК ВСЕХ ЗАДАЧ ПАРАЛЛЕЛЬНО
+        processed_users = 0
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logging.error(f"❌ Ошибка у пользователя {user_tasks[i]}: {result}")
+                else:
+                    processed_users += 1
+
+        logging.info(f"✅ АВТО-ТРЕЙДИНГ ЦИКЛ ЗАВЕРШЕН. Обработано пользователей: {processed_users}/{len(users)}")
 
     except Exception as e:
         logging.error(f"💥 Критическая ошибка авто-трейдинга: {e}", exc_info=True)
+    
+    finally:
+        execution_time = (datetime.now() - start_time).total_seconds()
+        logging.info(f"⏱️ Авто-трейдинг выполнен за {execution_time:.1f} сек")
 
 # ===================== TRADE RESULT CHECKER =====================
 async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
@@ -2944,14 +3162,20 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
                 f"Сделка открыта! Результат через {expiry} минут..."
             )
 
-            # 📈 Отправка графика или сообщения
-            chart_path = enhanced_plot_chart(df, pair, entry_price, signal)
+            # 📈 Отправка графика ИЗ ПАМЯТИ (BytesIO)
+            chart_stream = enhanced_plot_chart(df, pair, entry_price, signal)
             user_markup = get_trading_keyboard(user_id)
             try:
-                if chart_path:
-                    with open(chart_path, 'rb') as photo:
-                        await context.bot.send_photo(chat_id=user_id, photo=photo, caption=signal_text, reply_markup=user_markup)
-                    os.remove(chart_path)
+                if chart_stream:
+                    # 🔥 ПРАВИЛЬНАЯ ОТПРАВКА BytesIO ИЗ ПАМЯТИ
+                    await context.bot.send_photo(
+                        chat_id=user_id, 
+                        photo=chart_stream,  # Отправляем BytesIO напрямую
+                        caption=signal_text, 
+                        reply_markup=user_markup
+                    )
+                    # 🔥 НЕ НУЖНО УДАЛЯТЬ ФАЙЛ - его нет!
+                    logging.info(f"✅ График отправлен из памяти пользователю {user_id}")
                 else:
                     await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=user_markup)
             except Exception as tg_err:
@@ -2995,29 +3219,8 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
 
     except Exception as e:
         logging.error(f"❌ Ошибка process_auto_trade_for_user: {e}", exc_info=True)
-
+        
 # ===================== TELEGRAM COMMANDS =====================
-
-# -------- WEB APP COMMANDS --------
-async def webapp_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает кнопку для открытия Mini App"""
-    web_app_url = "https://niktradestart-gif.github.io/trading-bot-webapp/login.html"
-    
-    # Создаем кнопку с Web App
-    keyboard = [
-        [{
-            "text": "📱 Открыть торговую панель", 
-            "web_app": {"url": web_app_url}
-        }]
-    ]
-    
-    await update.message.reply_text(
-        "🌐 *Торговая Панель*\n\n"
-        "Нажмите кнопку ниже чтобы открыть продвинутую панель управления:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
-        parse_mode='Markdown'
-    )
-
 # -------- WHITELIST MANAGEMENT COMMANDS --------
 async def whitelist_add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Добавляет пользователя в белый список (только админ)"""
@@ -3113,6 +3316,92 @@ async def whitelist_show_command(update: Update, context: ContextTypes.DEFAULT_T
     
     await update.message.reply_text(message, parse_mode='Markdown')
 
+# -------- BOT STATUS NOTIFICATIONS --------
+async def send_bot_status_notification(context: ContextTypes.DEFAULT_TYPE):
+    """Отправляет уведомления о изменении статуса бота всем пользователям"""
+    global BOT_LAST_STATUS, BOT_STATUS_NOTIFIED
+    
+    try:
+        if BOT_STATUS_NOTIFIED:
+            return  # Уже уведомили
+            
+        now = datetime.now()
+        current_time = now.time()
+        current_weekday = now.weekday()
+        weekday_name = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][current_weekday]
+        
+        if BOT_LAST_STATUS:  # Бот начал работу
+            message = (
+                "🚀 **БОТ НАЧАЛ РАБОТУ!**\n\n"
+                f"🕐 Время: {now.strftime('%H:%M:%S')}\n"
+                f"📅 День: {weekday_name}\n\n"
+                "🤖 Авто-трейдинг активирован\n"
+                "📊 Поиск сигналов запущен\n"
+                "🎯 Готов к торговле!"
+            )
+            
+        else:  # Бот остановился
+            # Расчет времени до следующего открытия
+            if current_weekday in WEEKEND_DAYS:
+                days_until_monday = (7 - current_weekday) % 7
+                next_work_day = now + timedelta(days=days_until_monday)
+                next_open = datetime.combine(next_work_day.date(), TRADING_START)
+                reason = "выходной день"
+            else:
+                next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+                reason = "окончание рабочего дня"
+            
+            time_until = next_open - now
+            hours = time_until.seconds // 3600
+            minutes = (time_until.seconds % 3600) // 60
+            
+            message = (
+                "⏸ **БОТ ОСТАНОВЛЕН**\n\n"
+                f"🕐 Время: {now.strftime('%H:%M:%S')}\n"
+                f"📅 День: {weekday_name}\n"
+                f"📋 Причина: {reason}\n\n"
+                f"🔄 **Возобновление работы:**\n"
+                f"⏰ {next_open.strftime('%d.%m.%Y в %H:%M')}\n"
+                f"⏳ Через: {hours}ч {minutes}мин\n\n"
+                "📊 Торговля приостановлена до утра"
+            )
+        
+        # Отправляем уведомление всем пользователям с авто-трейдингом
+        notified_users = 0
+        for user_id, user_data in users.items():
+            try:
+                if user_data.get('auto_trading', False):
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=message,
+                        parse_mode='Markdown',
+                        reply_markup=main_markup
+                    )
+                    notified_users += 1
+                    
+                    # При старте дополнительно отправляем приветственное сообщение
+                    if BOT_LAST_STATUS:
+                        welcome_text = (
+                            f"👋 С возвращением! Рабочий день начался.\n\n"
+                            f"📊 Статус: 🟢 АКТИВЕН\n"
+                            f"🤖 Авто-трейдинг: {'🟢 ВКЛ' if user_data.get('auto_trading', False) else '🔴 ВЫКЛ'}\n"
+                            f"🎯 Режим: Поиск сигналов"
+                        )
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=welcome_text,
+                            reply_markup=get_trading_keyboard(user_id)
+                        )
+                        
+            except Exception as e:
+                logging.error(f"❌ Ошибка уведомления пользователя {user_id}: {e}")
+        
+        BOT_STATUS_NOTIFIED = True
+        logging.info(f"🔔 Уведомления о статусе отправлены {notified_users} пользователям")
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка отправки уведомлений о статусе: {e}")
+
 # -------- START & STATUS --------
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Приветственное сообщение и показ главного меню"""
@@ -3178,6 +3467,51 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(status_text, reply_markup=main_markup)
 
+# -------- НОВАЯ КОМАНДА РАСПИСАНИЯ --------
+async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает текущий статус расписания работы бота"""
+    now = datetime.now()
+    current_time = now.time()
+    current_weekday = now.weekday()
+    weekday_name = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][current_weekday]
+    
+    is_working_time = is_trading_time()
+    status = "🟢 РАБОТАЕТ" if is_working_time else "🔴 ОТКЛЮЧЕН"
+    
+    # Расчет времени до следующего открытия
+    if not is_working_time:
+        if current_weekday in WEEKEND_DAYS:
+            days_until_monday = (7 - current_weekday) % 7
+            next_work_day = now + timedelta(days=days_until_monday)
+            next_open = datetime.combine(next_work_day.date(), TRADING_START)
+        elif current_time < TRADING_START:
+            next_open = datetime.combine(now.date(), TRADING_START)
+        else:
+            next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+        
+        time_until = next_open - now
+        hours = time_until.seconds // 3600
+        minutes = (time_until.seconds % 3600) // 60
+        until_text = f"⏰ До открытия: {hours}ч {minutes}мин"
+    else:
+        time_until_close = datetime.combine(now.date(), TRADING_END) - now
+        hours = time_until_close.seconds // 3600
+        minutes = (time_until_close.seconds % 3600) // 60
+        until_text = f"⏰ До закрытия: {hours}ч {minutes}мин"
+    
+    schedule_text = (
+        f"📅 РАСПИСАНИЕ РАБОТЫ БОТА\n\n"
+        f"🕐 Текущее время: {now.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"📅 День недели: {weekday_name}\n"
+        f"📊 Статус: {status}\n"
+        f"{until_text}\n\n"
+        f"🕒 Рабочие часы:\n"
+        f"• Ежедневно: {TRADING_START.strftime('%H:%M')} - {TRADING_END.strftime('%H:%M')}\n"
+        f"• Выходные: Суббота, Воскресенье\n\n"
+        f"🌐 Часовой пояс: Локальное время системы"
+    )
+    
+    await update.message.reply_text(schedule_text)
 
 # -------- ИСТОРИЯ & СИГНАЛЫ --------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3216,6 +3550,38 @@ async def next_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     user_data = get_user_data(user_id)
 
+    # 🕒 ПРОВЕРКА РАБОЧЕГО ВРЕМЕНИ ДЛЯ РУЧНЫХ СИГНАЛОВ
+    if not is_trading_time():
+        now = datetime.now()
+        current_weekday = now.weekday()
+        
+        # Расчет времени до следующего открытия
+        if current_weekday in WEEKEND_DAYS:
+            days_until_monday = (7 - current_weekday) % 7
+            next_work_day = now + timedelta(days=days_until_monday)
+            next_open = datetime.combine(next_work_day.date(), TRADING_START)
+            reason = "выходной день"
+        else:
+            next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+            reason = "окончание рабочего дня"
+        
+        time_until = next_open - now
+        hours = time_until.seconds // 3600
+        minutes = (time_until.seconds % 3600) // 60
+        
+        await update.message.reply_text(
+            f"⏸ **Сейчас нерабочее время бота**\n\n"
+            f"📋 Причина: {reason}\n"
+            f"🔄 **Бот начнет работу:**\n"
+            f"⏰ {next_open.strftime('%d.%m.%Y в %H:%M')}\n"
+            f"⏳ Через: {hours}ч {minutes}мин\n\n"
+            f"🕒 Рабочие часы:\n"
+            f"• {TRADING_START.strftime('%H:%M')}-{TRADING_END.strftime('%H:%M')}\n"
+            f"• Без выходных (кроме субботы, воскресенья)",
+            parse_mode='Markdown',
+            reply_markup=get_trading_keyboard(user_id)
+        )
+        return
     if user_data.get('current_trade'):
         await update.message.reply_text(
             "⏳ У вас уже есть активная сделка! Дождитесь её завершения.",
@@ -3228,6 +3594,12 @@ async def next_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     random.shuffle(PAIRS)
 
     for pair in PAIRS:
+
+        # ⏰ Проверяем фильтр по разрешённым часам из time_filters.json
+        if not is_trade_allowed(pair):
+            logging.info(f"⏰ Пропуск {pair} — неразрешённое время торговли (ручной поиск сигнала).")
+            continue
+        
         # ИСПРАВЛЕНИЕ: убрали user_id из вызова
         result = analyze_pair(pair)
         if len(result) >= 4:
@@ -3311,6 +3683,10 @@ async def model_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         if os.path.exists("ml_info.json"):
             with open("ml_info.json", "r", encoding="utf-8") as f:
                 info = json.load(f)
+
+            # ✅ Исправление: если это список (история переобучений), берём последнюю запись
+            if isinstance(info, list):
+                info = info[-1] if info else {}
         else:
             info = model_info  # fallback на глобальную переменную
 
@@ -3330,13 +3706,18 @@ async def model_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             cv_std = info.get("cv_std", 0)
 
             # Если вдруг проценты >1, не умножаем ещё раз
-            if train_acc > 1: train_acc = train_acc / 100
-            if test_acc > 1: test_acc = test_acc / 100
-            if cv_acc > 1: cv_acc = cv_acc / 100
-            if cv_std > 1: cv_std = cv_std / 100
+            if train_acc > 1:
+                train_acc = train_acc / 100
+            if test_acc > 1:
+                test_acc = test_acc / 100
+            if cv_acc > 1:
+                cv_acc = cv_acc / 100
+            if cv_std > 1:
+                cv_std = cv_std / 100
 
             win_rate = info.get("win_rate", 0)
-            if win_rate > 1: win_rate = win_rate / 100
+            if win_rate > 1:
+                win_rate = win_rate / 100
 
             overfit_ratio = 1.0
             if test_acc > 0:
@@ -3369,6 +3750,8 @@ async def model_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             "❌ Ошибка получения статистики модели",
             reply_markup=get_models_keyboard(update.effective_user.id)
         )
+
+
 async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Переобучает ML модель (только админ)"""
     user_id = update.effective_user.id
@@ -3386,33 +3769,38 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
     try:
-        train_ml_model()
+        # Запускаем обучение и получаем результат
+        result = train_ml_model()
 
-        if model_info and not model_info.get("error"):
-            test_acc = model_info.get("test_accuracy", 0)
+        # 🔧 ИСПРАВЛЕНИЕ: проверяем результат обучения
+        if result and not result.get("error"):
+            test_acc = result.get("test_accuracy", 0)
             if test_acc > 1:
                 test_acc = test_acc / 100
-            trades_used = model_info.get("trades_used", 0)
+            trades_used = result.get("trades_used", 0)
+            cv_accuracy = result.get("cv_accuracy", 0)
+            
             await update.message.reply_text(
                 f"✅ ML модель успешно переобучена!\n"
-                f"📊 Точность (тест): {test_acc*100:.2f}%\n"
+                f"📊 Точность (тест): {test_acc:.2f}%\n"
+                f"🎯 Кросс-валидация: {cv_accuracy:.2f}%\n"
                 f"📈 Сделок использовано: {trades_used}",
                 reply_markup=get_models_keyboard(user_id)
             )
         else:
-            error_msg = model_info.get("error", "Неизвестная ошибка") if model_info else "Неизвестная ошибка"
+            # 🔧 ИСПРАВЛЕНИЕ: получаем ошибку из результата
+            error_msg = result.get("error", "Неизвестная ошибка") if result else "Неизвестная ошибка"
             await update.message.reply_text(
                 f"❌ Ошибка переобучения: {error_msg}",
                 reply_markup=get_models_keyboard(user_id)
             )
+            
     except Exception as e:
         logging.error(f"Ошибка retrain_model_command: {e}", exc_info=True)
         await update.message.reply_text(
-            "❌ Произошла ошибка при переобучении модели",
+            f"❌ Произошла ошибка при переобучении модели: {str(e)}",
             reply_markup=get_models_keyboard(user_id)
         )
-
-
 # -------- TOGGLE FUNCTIONS (ML / GPT / SMC) --------
 async def toggle_ml(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -3690,18 +4078,28 @@ async def restore_from_backup_command(update: Update, context: ContextTypes.DEFA
 
 
 async def recalculate_real_ml_features_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пересчитывает ML фичи на РЕАЛЬНЫХ данных для всех сделок"""
+    """Пересчитывает ML фичи на РЕАЛЬНЫХ данных для всех сделок с новыми фичами"""
     user_id = update.effective_user.id
     
     if MULTI_USER_MODE and not is_admin(user_id):
         await update.message.reply_text("❌ Эта команда доступна только администратору")
         return
         
-    await update.message.reply_text("🔄 Пересчет РЕАЛЬНЫХ ML фичей для всех сделок...")
+    await update.message.reply_text("🔄 Пересчет РЕАЛЬНЫХ ML фичей для всех сделок с новыми фичами...")
     
     try:
         recalculated_count = 0
         failed_count = 0
+        total_trades = 0
+        
+        # Считаем общее количество сделок для прогресса
+        if MULTI_USER_MODE:
+            for user_id, user_data in users.items():
+                total_trades += len(user_data.get('trade_history', []))
+        else:
+            total_trades = len(all_trades)
+        
+        processed = 0
         
         if MULTI_USER_MODE:
             for user_id, user_data in users.items():
@@ -3712,26 +4110,70 @@ async def recalculate_real_ml_features_command(update: Update, context: ContextT
                         df_m1 = get_mt5_data(pair, 400, mt5.TIMEFRAME_M1)
                         
                         if df_m1 is not None and len(df_m1) > 100:
+                            # ⬇️⬇️⬇️ ВАЖНО: Используем новую функцию prepare_ml_features() ⬇️⬇️⬇️
                             feats = prepare_ml_features(df_m1)
                             if feats is not None:
-                                feature_names = [
-                                    'price', 'volume', 'rsi', 'atr', 'adx',
-                                    'price_change_1h', 'volatility', 'macd', 'bb_position'
-                                ]
-                                trade['ml_features'] = dict(zip(feature_names, feats.flatten()))
+                                # ⬇️⬇️⬇️ ВАЖНО: Сохраняем ВСЕ фичи, а не только 9 ⬇️⬇️⬇️
+                                trade['ml_features'] = feats  # Сохраняем все фичи как есть
                                 recalculated_count += 1
-                                logging.info(f"✅ Пересчитаны фичи для {pair}")
+                                logging.info(f"✅ Пересчитаны фичи для {pair} (фичей: {len(feats)})")
                             else:
                                 failed_count += 1
+                                logging.warning(f"❌ prepare_ml_features вернул None для {pair}")
                         else:
                             failed_count += 1
+                            
+                    processed += 1
+                    # Прогресс каждые 20 сделок
+                    if processed % 20 == 0:
+                        await update.message.reply_text(f"📊 Обработано {processed}/{total_trades} сделок...")
+        
+        else:
+            # Режим одного пользователя
+            for i, trade in enumerate(all_trades):
+                if trade.get('pair'):
+                    pair = trade['pair']
+                    df_m1 = get_mt5_data(pair, 400, mt5.TIMEFRAME_M1)
+                    
+                    if df_m1 is not None and len(df_m1) > 100:
+                        feats = prepare_ml_features(df_m1)
+                        if feats is not None:
+                            trade['ml_features'] = feats  # Сохраняем все фичи
+                            recalculated_count += 1
+                            logging.info(f"✅ Пересчитаны фичи для {pair} (фичей: {len(feats)})")
+                        else:
+                            failed_count += 1
+                    else:
+                        failed_count += 1
+                
+                processed += 1
+                if processed % 20 == 0 and processed > 0:
+                    await update.message.reply_text(f"📊 Обработано {processed}/{total_trades} сделок...")
         
         if recalculated_count > 0:
             save_users_data()
+            # Проверяем количество фич в первой успешной сделке
+            sample_features_count = 0
+            if MULTI_USER_MODE:
+                for user_id, user_data in users.items():
+                    for trade in user_data.get('trade_history', []):
+                        if trade.get('ml_features'):
+                            sample_features_count = len(trade['ml_features'])
+                            break
+                    if sample_features_count > 0:
+                        break
+            else:
+                for trade in all_trades:
+                    if trade.get('ml_features'):
+                        sample_features_count = len(trade['ml_features'])
+                        break
+            
             await update.message.reply_text(
-                f"✅ Пересчитано РЕАЛЬНЫХ ML фичей: {recalculated_count} сделок\n"
-                f"❌ Не удалось: {failed_count} сделок\n"
-                f"🚀 Теперь пробуйте /forcetrain снова!"
+                f"✅ Пересчет завершен!\n"
+                f"• Успешно: {recalculated_count} сделок\n"
+                f"• Ошибок: {failed_count}\n"
+                f"• Новое количество фич: {sample_features_count}\n"
+                f"💡 Теперь можно использовать /retrain"
             )
         else:
             await update.message.reply_text("❌ Не удалось пересчитать ни одной сделки")
@@ -3739,6 +4181,51 @@ async def recalculate_real_ml_features_command(update: Update, context: ContextT
     except Exception as e:
         logging.error(f"Ошибка пересчета ML фичей: {e}")
         await update.message.reply_text(f"❌ Ошибка: {e}")
+
+async def recalculate_ml_features_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Пересчитывает ML фичи для ВСЕХ сделок"""
+    await update.message.reply_text("🔄 Начинаю пересчет ML фичей для всех сделок...")
+    
+    recalculated = 0
+    errors = 0
+    total = len(all_trades)
+    
+    for i, trade in enumerate(all_trades):
+        try:
+            # Пропускаем сделки без пары
+            if not trade.get('pair'):
+                continue
+                
+            # Получаем исторические данные
+            df = get_historical_data(trade['pair'])
+            if df is None or df.empty:
+                errors += 1
+                continue
+            
+            # Пересчитываем фичи
+            new_features = prepare_ml_features(df)
+            if new_features:
+                trade['ml_features'] = new_features
+                recalculated += 1
+                
+            # Прогресс каждые 10 сделок
+            if i % 10 == 0:
+                await update.message.reply_text(f"📊 Обработано {i}/{total} сделок...")
+                
+        except Exception as e:
+            errors += 1
+            logging.error(f"Ошибка пересчета фич для сделки {trade.get('pair')}: {e}")
+    
+    save_users_data()
+    
+    message = (
+        f"✅ Пересчет завершен!\n"
+        f"• Всего сделок: {total}\n"
+        f"• Успешно пересчитано: {recalculated}\n"
+        f"• Ошибок: {errors}\n"
+        f"• Новое количество фич: {len(new_features) if recalculated > 0 else 'N/A'}"
+    )
+    await update.message.reply_text(message)
 
 async def reset_ml_features_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Удаляет случайные ML фичи и готовит для пересчета"""
@@ -3794,7 +4281,7 @@ async def force_enable_ml_command(update: Update, context: ContextTypes.DEFAULT_
 from telegram import Update
 from telegram.ext import ContextTypes
 
-ADMIN_IDS = [5129282647]  # 🛠️ Замени на свой Telegram user_id, если другой
+ADMIN_IDS = [5129282647]  
 
 async def clear_all_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Принудительно очищает все открытые сделки у всех пользователей (только для админа)"""
@@ -3896,6 +4383,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "📋 Помощь":
         await help_command(update, context)
 
+    elif text == "📅 Расписание":  # ← ДОБАВЬТЕ ЭТОТ БЛОК
+        await schedule_command(update, context)
 
     # ---------- ⬅️ ВОЗВРАТ В МЕНЮ ----------
     elif text in ["◀️ Главное меню", "◀️ Назад", "◀️ Назад в главное меню"]:
@@ -3984,6 +4473,22 @@ def main():
         print(f"❌ Ошибка доступа к лог-файлу: {e}")
         return
     
+    # 🔧 6. ИНИЦИАЛИЗАЦИЯ СТАТУСА БОТА ПРИ ЗАПУСКЕ
+    global BOT_LAST_STATUS, BOT_STATUS_NOTIFIED
+    BOT_LAST_STATUS = is_trading_time()
+    BOT_STATUS_NOTIFIED = False
+    
+    # Логируем начальный статус
+    status_text = "🟢 РАБОТАЕТ" if BOT_LAST_STATUS else "🔴 ОСТАНОВЛЕН (вне рабочего времени)"
+    logging.info(f"🤖 Статус бота при запуске: {status_text}")
+    print(f"🤖 Статус бота при запуске: {status_text}")
+    
+    # Если бот запущен в нерабочее время - предупреждаем
+    if not BOT_LAST_STATUS:
+        now = datetime.now()
+        logging.warning(f"⏸ Бот запущен в нерабочее время: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+        print("⚠ ВНИМАНИЕ: Бот запущен в нерабочее время и будет ожидать начала рабочего дня")
+    
     # Подключение к MT5
     if not mt5.initialize(path=MT5_PATH, login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
         logging.error(f"❌ Ошибка инициализации MT5: {mt5.last_error()}")
@@ -3991,20 +4496,17 @@ def main():
     logging.info("✅ MT5 подключен успешно")
     print("✅ MT5 подключен успешно")
     
-    # (ML отключён у тебя, оставим как есть)
-    
     # Создание приложения Telegram
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     
     # Обработчики команд
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("status", status_command))
+    app.add_handler(CommandHandler("schedule", schedule_command))
     app.add_handler(CommandHandler("whitelist_add", whitelist_add_command))
     app.add_handler(CommandHandler("whitelist_remove", whitelist_remove_command))
     app.add_handler(CommandHandler("whitelist_stats", whitelist_stats_command))
-    app.add_handler(CommandHandler("whitelist_show", whitelist_show_command))
-    app.add_handler(CommandHandler("panel", webapp_command))  
-    app.add_handler(CommandHandler("web", webapp_command))     
+    app.add_handler(CommandHandler("whitelist_show", whitelist_show_command))    
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("next", next_signal_command))
     app.add_handler(CommandHandler("stats", statistics_command))
@@ -4024,16 +4526,16 @@ def main():
     app.add_handler(CommandHandler("marketstatus", market_status_command))
     app.add_handler(CommandHandler("clearalltrades", clear_all_trades_command))
     app.add_handler(CommandHandler("debug", debug_user_data))
-    
-    # Обработчики сообщений
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # ===================== JOB QUEUE =====================
     job_queue = app.job_queue
     if job_queue:
-        job_queue.run_repeating(auto_trading_loop, interval=30, first=5)
-        logging.info("📅 JobQueue инициализирован — автоцикл каждые 30 сек")
+        job_queue.run_repeating(auto_trading_loop, interval=60, first=10)  # 60 секунд вместо 30
+        job_queue.scheduler.add_listener(job_listener, 
+                                   EVENT_JOB_MISSED | EVENT_JOB_ERROR | EVENT_JOB_EXECUTED)
+        logging.info("📅 JobQueue инициализирован — автоцикл каждые 60 сек с мониторингом")
+        
     else:
         logging.error("❌ JobQueue не инициализирован — автоцикл не запущен")
         return
@@ -4049,64 +4551,6 @@ def main():
     mt5.shutdown()
     logging.info("💾 Данные сохранены, MT5 отключен")
     print("💾 Данные сохранены, MT5 отключен")
-
-# ===================== SIMPLE HTTP API FOR WEBAPP =====================
-import threading
-from flask import Flask, jsonify, send_file
-from io import BytesIO
-import base64
-
-app_web = Flask("ASPIRE_TRADE_WEB_API")
-
-@app_web.route("/api/last_signal.json")
-def api_last_signal():
-    try:
-        with open("last_signal.json", "r", encoding="utf-8") as f:
-            return jsonify(json.load(f))
-    except Exception:
-        return jsonify({"error": "no data"})
-
-@app_web.route("/api/last_result.json")
-def api_last_result():
-    try:
-        with open("last_result.json", "r", encoding="utf-8") as f:
-            return jsonify(json.load(f))
-    except Exception:
-        return jsonify({"error": "no data"})
-
-@app_web.route("/api/system_status.json")
-def api_system_status():
-    try:
-        with open("system_status.json", "r", encoding="utf-8") as f:
-            return jsonify(json.load(f))
-    except Exception:
-        return jsonify({"error": "no data"})
-
-@app_web.route("/api/ml_info.json")
-def api_ml_info():
-    try:
-        with open("ml_info.json", "r", encoding="utf-8") as f:
-            return jsonify(json.load(f))
-    except Exception:
-        return jsonify({"error": "no data"})
-
-@app_web.route("/api/chart.png")
-def api_chart():
-    try:
-        # если бот сохраняет график как байты (см. enhanced_plot_chart)
-        with open("latest_chart.png", "rb") as f:
-            data = f.read()
-        return send_file(BytesIO(data), mimetype="image/png")
-    except Exception:
-        return jsonify({"error": "no chart"})
-
-def run_web_api():
-    app_web.run(host="0.0.0.0", port=8080, debug=False)
-
-# Запускаем HTTP API в отдельном потоке, чтобы не мешал Telegram-боту
-threading.Thread(target=run_web_api, daemon=True).start()
-print("🌐 API сервер запущен: http://127.0.0.1:8080")
-
 
 
 if __name__ == "__main__":
