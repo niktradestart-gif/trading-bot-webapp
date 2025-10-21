@@ -406,54 +406,7 @@ WIN_PROBABILITY = 0.6
 WIN_PROFIT = 18  
 LOSS_AMOUNT = 10  
 
-# ===================== KEYBOARDS =====================
-from telegram import ReplyKeyboardMarkup
 
-# Главное меню
-main_keyboard = [
-    ["📊 Торговля", "⚙️ Управление"],
-    ["📈 Статистика", "🧠 Модели"],
-    ["📅 Расписание", "📋 Помощь"]
-]
-main_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
-
-# 📊 Торговля
-def get_trading_keyboard(user_id: int) -> ReplyKeyboardMarkup:
-    """Динамическая клавиатура торговли"""
-    user_data = get_user_data(user_id)
-    auto_status = "🟢 Авто-торговля: ВКЛ" if user_data.get('auto_trading', False) else "🔴 Авто-торговля: ВЫКЛ"
-    
-    keyboard = [
-        ["🔄 Следующий сигнал", "📈 История"],
-        [auto_status],
-        ["◀️ Главное меню"]
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-# ⚙️ Управление
-management_keyboard = [
-    ["🎯 Изменить ставку", "📊 Статус системы"],
-    ["🛑 Остановить бота"],
-    ["◀️ Главное меню"]
-]
-management_markup = ReplyKeyboardMarkup(management_keyboard, resize_keyboard=True)
-
-# 🧠 Модели
-def get_models_keyboard(user_id: int) -> ReplyKeyboardMarkup:
-    """Динамическая клавиатура для моделей с текущим состоянием"""
-    user_data = get_user_data(user_id)
-    
-    ml_status = "🟢 ML: ВКЛ" if user_data.get('ml_enabled', ML_ENABLED) else "🔴 ML: ВЫКЛ"
-    gpt_status = "🟢 GPT: ВКЛ" if user_data.get('gpt_enabled', USE_GPT) else "🔴 GPT: ВЫКЛ"
-    smc_status = "🟢 SMC: ВКЛ" if user_data.get('smc_enabled', True) else "🔴 SMC: ВЫКЛ"
-    
-    keyboard = [
-        ["📊 ML Статистика", "🔄 Обучить ML"],
-        [ml_status, gpt_status],
-        [smc_status],
-        ["◀️ Главное меню"]
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 # ===================== ENHANCED LOGGING =====================
 def setup_logging():
@@ -3535,37 +3488,59 @@ async def send_bot_status_notification(context: ContextTypes.DEFAULT_TYPE):
 
 # -------- START & STATUS --------
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Приветственное сообщение и показ главного меню"""
-    user = update.effective_user
-    user_id = user.id
-
-    user_data = get_user_data(user_id)
-    user_data['first_name'] = user.first_name or ""
-    user_data['username'] = user.username or ""
-
-    # Получаем актуальную статистику
-    history = user_data.get('trade_history', [])
-    finished_trades = [t for t in history if t.get('result') in ("WIN", "LOSS")]
-    total = len(finished_trades)
-    wins = len([t for t in finished_trades if t.get('result') == "WIN"])
-    winrate = round(wins / total * 100, 1) if total > 0 else 0
-
-    welcome_text = (
-        f"👋 Привет, {user.first_name}!\n\n"
-        f"🤖 Я — AI Trading Bot с технологией Smart Money Concepts.\n\n"
-        f"📊 Мои возможности:\n"
-        f"• Smart Money анализ (SMC)\n"
-        f"• Машинное обучение (ML)\n"
-        f"• GPT-анализ рынка\n"
-        f"• Автоматическая торговля\n"
-        f"• Подробные графики\n\n"
-        f"📈 Сделок: {total}\n"
-        f"🎯 Win Rate: {winrate}%\n\n"
-        f"📋 Используй кнопки меню ниже 👇"
-    )
-
-    await update.message.reply_text(welcome_text, reply_markup=main_markup)
-    save_users_data()
+    """Обработчик команды /start - ОДИНАКОВЫЕ КНОПКИ ДЛЯ ВСЕХ"""
+    try:
+        user_id = update.effective_user.id
+        username = update.effective_user.username or "Unknown"
+        
+        logging.info(f"👋 Команда /start от {user_id} ({username})")
+        
+        # 🔥 ОДИНАКОВАЯ КЛАВИАТУРА ДЛЯ ВСЕХ (только 2 кнопки)
+        keyboard = [
+            ["❓ Помощь", "🕒 Расписание"]
+        ]
+        
+        # Разный текст приветствия для админа и пользователей
+        if user_id in ADMIN_IDS:
+            welcome_text = (
+                "🛠️ **Панель администратора**\n\n"
+                "📋 **Доступные команды:**\n"
+                "• /stats - статистика\n"
+                "• /settings - настройки\n" 
+                "• /next - следующий сигнал\n"
+                "• /retrain - переобучить ML\n"
+                "• /stop - остановить бота\n"
+                "• /start - запустить бота\n"
+                "• /logs - просмотр логов\n"
+                "• /cleartrade - очистить сделки\n\n"
+                "📱 **Кнопки меню:**\n"
+                "• ❓ Помощь - справка\n"
+                "• 🕒 Расписание - график работы"
+            )
+        else:
+            welcome_text = (
+                "🎯 **Добро пожаловать в ASPIRE TRADE!**\n\n"
+                "🤖 **О боте:**\n"
+                "• Автоматический торговый бот\n" 
+                "• Анализ рынка в реальном времени\n"
+                "• Умные сигналы на основе SMC анализа\n"
+                "• Работает 24/7 в установленные часы\n\n"
+                "📱 **Доступные функции:**\n"
+                "• ❓ Помощь - инструкция и поддержка\n"
+                "• 🕒 Расписание - график работы бота\n\n"
+                "⚡ **Бот работает автоматически** - вы будете получать сигналы согласно расписанию!"
+            )
+        
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, selective=True)
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
+        
+        # Регистрация/обновление пользователя
+        await register_or_update_user(user_id, username, context)
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка в start_command: {e}")
+        await update.message.reply_text("❌ Произошла ошибка при запуске бота")
+    
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global users
     """Показывает системный статус"""
@@ -3600,49 +3575,43 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------- НОВАЯ КОМАНДА РАСПИСАНИЯ --------
 async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает текущий статус расписания работы бота"""
-    now = datetime.now()
-    current_time = now.time()
-    current_weekday = now.weekday()
-    weekday_name = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][current_weekday]
-    
-    is_working_time = is_trading_time()
-    status = "🟢 РАБОТАЕТ" if is_working_time else "🔴 ОТКЛЮЧЕН"
-    
-    # Расчет времени до следующего открытия
-    if not is_working_time:
-        if current_weekday in WEEKEND_DAYS:
-            days_until_monday = (7 - current_weekday) % 7
-            next_work_day = now + timedelta(days=days_until_monday)
-            next_open = datetime.combine(next_work_day.date(), TRADING_START)
-        elif current_time < TRADING_START:
-            next_open = datetime.combine(now.date(), TRADING_START)
-        else:
-            next_open = datetime.combine(now.date() + timedelta(days=1), TRADING_START)
+    """Команда показа расписания работы бота"""
+    try:
+        schedule_text = (
+            "🕒 **РАСПИСАНИЕ РАБОТЫ БОТА**\n\n"
+            
+            "⏰ **Рабочие часы:**\n"
+            "• Начало: 04:00 (по вашему времени)\n"
+            "• Окончание: 23:59 (по вашему времени)\n"
+            "• Ежедневно, кроме выходных\n\n"
+            
+            "🗓️ **Выходные дни:**\n"
+            "• Суббота - не работает\n" 
+            "• Воскресенье - не работает\n\n"
+            
+            "📈 **Когда бот активен:**\n"
+            "• Анализирует валютные пары\n"
+            "• Ищет торговые сигналы\n"
+            "• Автоматически открывает сделки\n"
+            "• Отправляет уведомления\n\n"
+            
+            "💤 **Когда бот неактивен:**\n"
+            "• Вне рабочих часов\n"
+            "• В выходные дни\n"
+            "• При техническом обслуживании\n\n"
+            
+            "🔔 **Статус работы:**\n"
+            f"• Сейчас бот {'🟢 АКТИВЕН' if is_trading_time() else '🔴 НЕАКТИВЕН'}\n"
+            f"• Текущее время: {datetime.now().strftime('%H:%:%S')}\n\n"
+            
+            "⚡ Бот автоматически возобновит работу согласно расписанию!"
+        )
         
-        time_until = next_open - now
-        hours = time_until.seconds // 3600
-        minutes = (time_until.seconds % 3600) // 60
-        until_text = f"⏰ До открытия: {hours}ч {minutes}мин"
-    else:
-        time_until_close = datetime.combine(now.date(), TRADING_END) - now
-        hours = time_until_close.seconds // 3600
-        minutes = (time_until_close.seconds % 3600) // 60
-        until_text = f"⏰ До закрытия: {hours}ч {minutes}мин"
-    
-    schedule_text = (
-        f"📅 РАСПИСАНИЕ РАБОТЫ БОТА\n\n"
-        f"🕐 Текущее время: {now.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"📅 День недели: {weekday_name}\n"
-        f"📊 Статус: {status}\n"
-        f"{until_text}\n\n"
-        f"🕒 Рабочие часы:\n"
-        f"• Ежедневно: {TRADING_START.strftime('%H:%M')} - {TRADING_END.strftime('%H:%M')}\n"
-        f"• Выходные: Суббота, Воскресенье\n\n"
-        f"🌐 Часовой пояс: Локальное время системы"
-    )
-    
-    await update.message.reply_text(schedule_text)
+        await update.message.reply_text(schedule_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка в schedule_command: {e}")
+        await update.message.reply_text("❌ Произошла ошибка при показе расписания")
 
 # -------- ИСТОРИЯ & СИГНАЛЫ --------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4017,27 +3986,43 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("Бот остановлен пользователем")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает справку по командам"""
-    help_text = (
-        "📋 СПРАВКА ПО КОМАНДАМ\n\n"
-        "Основные команды:\n"
-        "• /start - Запуск бота\n"
-        "• /status - Статус системы\n"
-        "• /stats - Статистика торговли\n"
-        "• /history - История сделок\n"
-        "• /next - Следующий сигнал\n"
-        "• /settings - Настройки\n\n"
-        "Для ML модели:\n"
-        "• /modelstats - Статистика ML\n"
-        "• /retrain - Переобучить ML\n\n"
-        "Управление:\n"
-        "• /stake <сумма> - Изменить ставку\n"
-        "• /resetbalance - Сбросить баланс\n"
-        "• /stop - Остановить бота (админ)\n\n"
-        "Используйте кнопки меню для удобства! 🎯"
-    )
-    
-    await update.message.reply_text(help_text, reply_markup=main_markup)
+    """Команда помощи с обновленной информацией"""
+    try:
+        help_text = (
+            "🆘 **ПОМОЩЬ И ПОДДЕРЖКА**\n\n"
+            
+            "🎯 **Как работает бот:**\n"
+            "• Автоматически анализирует рынок 24/7\n"
+            "• Использует Smart Money Concepts (SMC)\n" 
+            "• Ищет зоны спроса/предложения\n"
+            "• Определяет ордер-блоки и уровни\n"
+            "• Генерирует сигналы с уверенностью\n\n"
+            
+            "📊 **Типы сигналов:**\n"
+            "• 🎯 ENHANCED_SMART_MONEY - основные сигналы\n"
+            "• 🤖 ML_VALIDATED - машинное обучение\n"
+            "• 💬 GPT - анализ искусственного интеллекта\n\n"
+            
+            "⏰ **График работы:**\n"
+            "• Бот работает по установленному расписанию\n"
+            "• Используйте кнопку '🕒 Расписание' для деталей\n"
+            "• Вне рабочего времени анализ приостанавливается\n\n"
+            
+            "⚠️ **Важно:**\n"
+            "• Всегда используйте управление рисками\n"
+            "• Не инвестируйте больше, чем можете потерять\n"
+            "• Сигналы не являются финансовой рекомендацией\n\n"
+            
+            "📞 **Поддержка:**\n"
+            "По вопросам работы бота обращайтесь в группу поддержки:\n"
+            "👉 https://t.me/+hKC6n9WrE6pkMzEy"
+        )
+        
+        await update.message.reply_text(help_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка в help_command: {e}")
+        await update.message.reply_text("❌ Произошла ошибка при показе помощи")
 
 async def toggle_auto_trading(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Переключает авто-трейдинг для пользователя"""
@@ -4517,102 +4502,53 @@ async def debug_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===================== HANDLE MESSAGE =====================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Главный обработчик нажатий на кнопки меню"""
-    text = update.message.text
-    user_id = update.effective_user.id
+    """Обработка текстовых сообщений и кнопок - ОДИНАКОВО ДЛЯ ВСЕХ"""
+    try:
+        user_id = update.effective_user.id
+        text = update.message.text
+        
+        logging.info(f"📨 Сообщение от {user_id}: {text}")
+        
+        # 🔥 ОБРАБОТКА КНОПОК ДЛЯ ВСЕХ (только 2 кнопки)
+        if text == "❓ Помощь":
+            await help_command(update, context)
+        elif text == "🕒 Расписание":
+            await schedule_command(update, context)
+        else:
+            # Если нажата неизвестная кнопка
+            await update.message.reply_text(
+                "❓ Используйте кнопки меню:\n"
+                "• ❓ Помощь - справка по боту\n" 
+                "• 🕒 Расписание - график работы",
+                reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+            )
+            
+    except Exception as e:
+        logging.error(f"❌ Ошибка в handle_message: {e}")
+        await update.message.reply_text("❌ Произошла ошибка при обработке сообщения")
 
-    # ---------- 📌 ГЛАВНОЕ МЕНЮ ----------
-    if text == "📊 Торговля":
-        await trading_menu(update, context)
+# ===================== 🚀 ЗАГЛУШКИ ДЛЯ КОМАНД АДМИНА =====================
 
-    elif text == "⚙️ Управление":
-        await management_menu(update, context)
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📊 Статистика - функция доступна только администратору")
 
-    elif text == "📈 Статистика":
-        await statistics_command(update, context)
+async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚙️ Настройки - функция доступна только администратору")
 
-    elif text == "🧠 Модели":
-        await models_menu(update, context)
+async def retrain_ml_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔄 Переобучить ML - функция доступна только администратору")
 
-    elif text == "📋 Помощь":
-        await help_command(update, context)
+async def stop_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🛑 Стоп Бот - функция доступна только администратору")
 
-    elif text == "📅 Расписание":  # ← ДОБАВЬТЕ ЭТОТ БЛОК
-        await schedule_command(update, context)
+async def start_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("▶️ Старт Бот - функция доступна только администратору")
 
-    # ---------- ⬅️ ВОЗВРАТ В МЕНЮ ----------
-    elif text in ["◀️ Главное меню", "◀️ Назад", "◀️ Назад в главное меню"]:
-        await update.message.reply_text("🏠 Главное меню", reply_markup=main_markup)
+async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📋 Логи - функция доступна только администратору")
 
-
-    # ---------- 📊 МЕНЮ ТОРГОВЛИ ----------
-    elif text == "🔄 Следующий сигнал":
-        await next_signal_command(update, context)
-
-    elif text == "📈 История":
-        await history_command(update, context)
-
-    elif "Авто-торговля" in text:
-        await toggle_auto_trading(update, context)
-
-
-    # ---------- 🧠 МЕНЮ МОДЕЛЕЙ ----------
-    elif text == "📊 ML Статистика":
-        await model_stats_command(update, context)
-
-    elif text == "🔄 Обучить ML":
-        await retrain_model_command(update, context)
-
-    elif "ML:" in text:
-        await toggle_ml(update, context)
-
-    elif "GPT:" in text:
-        await toggle_gpt(update, context)
-
-    elif "SMC:" in text:
-        await toggle_smc(update, context)
-
-
-    # ---------- ❓ НЕИЗВЕСТНЫЙ ВВОД ----------
-    else:
-        await update.message.reply_text("❓ Используйте кнопки меню", reply_markup=main_markup)
-
-
-
-# ===================== МЕНЮ ПОДРАЗДЕЛОВ =====================
-async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """📊 Меню торговли"""
-    user_id = update.effective_user.id
-    await update.message.reply_text(
-        "📊 МЕНЮ ТОРГОВЛИ\n\nУправляйте сигналами и авто-торговлей 👇",
-        reply_markup=get_trading_keyboard(user_id)
-    )
-
-
-async def models_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """🧠 Меню моделей"""
-    user_id = update.effective_user.id
-    user_data = get_user_data(user_id)
-
-    ml_state = "включено" if user_data.get('ml_enabled', ML_ENABLED) else "отключено"
-    gpt_state = "включено" if user_data.get('gpt_enabled', USE_GPT) else "отключено"
-    smc_state = "включено" if user_data.get('smc_enabled', True) else "отключено"
-
-    await update.message.reply_text(
-        f"🧠 УПРАВЛЕНИЕ МОДЕЛЯМИ\n\n"
-        f"🤖 ML: {ml_state}\n"
-        f"💬 GPT: {gpt_state}\n"
-        f"📊 SMC: {smc_state}\n\n"
-        f"Включайте или отключайте нужные анализаторы 👇",
-        reply_markup=get_models_keyboard(user_id)
-    )
-
-async def management_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """⚙️ Меню управления ботом"""
-    await update.message.reply_text(
-        "⚙️ УПРАВЛЕНИЕ СИСТЕМОЙ\n\nНастройки и контроль бота 👇",
-        reply_markup=management_markup
-    )
+async def clear_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🧹 Очистить сделки - функция доступна только администратору")
 
 # ===================== MAIN =====================
 def main():
