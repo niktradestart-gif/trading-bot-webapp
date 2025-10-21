@@ -18,6 +18,11 @@ if sys.platform.startswith("win"):
 # ===================== 📊 БИБЛИОТЕКИ ДЛЯ АНАЛИТИКИ И МАТЕМАТИКИ =====================
 import numpy as np
 import pandas as pd
+
+# ВАЖНО: до любого импорта pyplot/ mplfinance — выключаем GUI-бэкенд (TkAgg) для потоков/async
+import matplotlib
+matplotlib.use("Agg")  # ✅ безопасный headless-режим, никаких вызовов Tkinter
+
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 from scipy.signal import argrelextrema
@@ -46,12 +51,12 @@ from telegram.ext import (
 
 # ===================== 🧠 МАШИННОЕ ОБУЧЕНИЕ (ML) =====================
 import talib as ta
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
-
 # ===================== 🧠 OPENAI API =====================
 from openai import OpenAI
 
@@ -2268,6 +2273,10 @@ def train_ml_model():
         ml_model, ml_scaler = model, scaler2
 
         win_rate_overall = float(np.mean(y)) * 100.0
+        
+        # 🔍 Определяем тип модели автоматически
+        model_type = type(model).__name__
+
         model_info = {
             "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "n_features": len(selected_features),
@@ -2284,6 +2293,7 @@ def train_ml_model():
             "train_samples": int(len(y_train)),
             "test_samples": int(len(y_test)),
             "win_rate": round(win_rate_overall, 2),
+            "model_type": model_type,
             "model_params": model.get_params()
         }
         with open(ML_INFO_LAST, "w", encoding="utf-8") as f:
