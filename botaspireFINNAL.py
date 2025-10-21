@@ -3187,7 +3187,7 @@ async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 chat_id=user_id,
                 text=result_text,
-                reply_markup=get_trading_keyboard(user_id)
+                reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
             )
             logging.info(f"✅ Сделка #{trade_id} закрыта: {result}")
         except Exception as e:
@@ -3459,7 +3459,7 @@ async def send_bot_status_notification(context: ContextTypes.DEFAULT_TYPE):
                         chat_id=user_id,
                         text=message,
                         parse_mode='Markdown',
-                        reply_markup=main_markup
+                        reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
                     )
                     notified_users += 1
                     
@@ -3474,7 +3474,7 @@ async def send_bot_status_notification(context: ContextTypes.DEFAULT_TYPE):
                         await context.bot.send_message(
                             chat_id=user_id,
                             text=welcome_text,
-                            reply_markup=get_trading_keyboard(user_id)
+                            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
                         )
                         
             except Exception as e:
@@ -3571,7 +3571,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
          f"🤖 GPT: {'✅ Активен' if USE_GPT else '⚠ Выключен'}"
     )
 
-    await update.message.reply_text(status_text, reply_markup=main_markup)
+    await update.message.reply_text(status_text, reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
 
 # -------- НОВАЯ КОМАНДА РАСПИСАНИЯ --------
 async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3679,17 +3679,17 @@ async def next_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"• {TRADING_START.strftime('%H:%M')}-{TRADING_END.strftime('%H:%M')}\n"
             f"• Без выходных (кроме субботы, воскресенья)",
             parse_mode='Markdown',
-            reply_markup=get_trading_keyboard(user_id)
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
         return
     if user_data.get('current_trade'):
         await update.message.reply_text(
-            "⏳ У вас уже есть активная сделка! Дождитесь её завершения.",
-            reply_markup=get_trading_keyboard(user_id)
+            "⏳ У вас уже есть активная сделка! ождитесь её завершения.",
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
         return
 
-    await update.message.reply_text("🔍 Ищу лучшие торговые сигналы...", reply_markup=get_trading_keyboard(user_id))
+    await update.message.reply_text("🔍 Ищу лучшие торговые сигналы...", reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
 
     random.shuffle(PAIRS)
 
@@ -3727,13 +3727,18 @@ async def next_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
                 if chart_path:
                     with open(chart_path, 'rb') as photo:
-                        await update.message.reply_photo(photo=photo, caption=signal_text, reply_markup=get_trading_keyboard(user_id))
+                        await update.message.reply_photo(
+                            photo=photo, 
+                            caption=signal_text,
+                            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+                        )
                     try:
                         os.remove(chart_path)
                     except:
                         pass
+                    
                 else:
-                    await update.message.reply_text(signal_text, reply_markup=get_trading_keyboard(user_id))
+                    await update.message.reply_text(signal_text, reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
 
                 context.user_data['last_signal'] = {
                     'pair': pair,
@@ -3745,7 +3750,10 @@ async def next_signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 }
                 return
 
-    await update.message.reply_text("⚠ Сигналы не найдены. Попробуйте позже.", reply_markup=get_trading_keyboard(user_id))
+    await update.message.reply_text(
+        "⚠ Сигналы не найдены. Попробуйте позже.",
+        reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+)
 
 
 # -------- СТАТИСТИКА & МОДЕЛИ --------
@@ -3860,14 +3868,14 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
     if MULTI_USER_MODE and not is_admin(user_id):
         await update.message.reply_text(
             "❌ Эта команда доступна только администратору.",
-            reply_markup=get_models_keyboard(user_id)
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
         return
 
     # 🔄 Сообщение о старте обучения
     await update.message.reply_text(
         "🔄 Запускаю переобучение ML модели... Это может занять несколько минут.",
-        reply_markup=get_models_keyboard(user_id)
+        reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
     )
 
     try:
@@ -3898,7 +3906,7 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
                 f"📊 F1 Score: {f1:.2f}% | Overfit: {overfit:.2f}\n"
             )
 
-            await update.message.reply_text(msg, reply_markup=get_models_keyboard(user_id))
+            await update.message.reply_text(msg, reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
             logging.info(f"[ML] ✅ Модель переобучена: Test={test_acc:.2f}% CV={cv_accuracy:.2f}%")
 
         # ⚠️ ОБРАБОТКА ОШИБОК
@@ -3906,7 +3914,7 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
             error_msg = result.get("error", "Неизвестная ошибка") if result else "Неизвестная ошибка"
             await update.message.reply_text(
                 f"❌ Ошибка переобучения: {error_msg}",
-                reply_markup=get_models_keyboard(user_id)
+                reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
             )
             logging.error(f"[ML] ❌ Ошибка переобучения: {error_msg}")
 
@@ -3915,14 +3923,14 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
         logging.exception(f"[ML] Ошибка при переобучении модели: {e}")
         await update.message.reply_text(
             f"❌ Критическая ошибка при переобучении: {e}",
-            reply_markup=get_models_keyboard(user_id)
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
             
     except Exception as e:
         logging.error(f"Ошибка retrain_model_command: {e}", exc_info=True)
         await update.message.reply_text(
             f"❌ Произошла ошибка при переобучении модели: {str(e)}",
-            reply_markup=get_models_keyboard(user_id)
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
 # -------- TOGGLE FUNCTIONS (ML / GPT / SMC) --------
 async def toggle_ml(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3930,7 +3938,7 @@ async def toggle_ml(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = get_user_data(user_id)
     user_data['ml_enabled'] = not user_data.get('ml_enabled', ML_ENABLED)
     status = "🟢 ML: ВКЛ" if user_data['ml_enabled'] else "🔴 ML: ВЫКЛ"
-    await update.message.reply_text(f"⚙️ ML режим переключен: {status}", reply_markup=get_models_keyboard(user_id))
+    await update.message.reply_text(f"⚙️ ML режим переключен: {status}", reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
 
 
 async def toggle_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3938,7 +3946,7 @@ async def toggle_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = get_user_data(user_id)
     user_data['gpt_enabled'] = not user_data.get('gpt_enabled', USE_GPT)
     status = "🟢 GPT: ВКЛ" if user_data['gpt_enabled'] else "🔴 GPT: ВЫКЛ"
-    await update.message.reply_text(f"⚙️ GPT режим переключен: {status}", reply_markup=get_models_keyboard(user_id))
+    await update.message.reply_text(f"⚙️ GPT режим переключен: {status}", reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
 
 
 async def toggle_smc(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3946,7 +3954,7 @@ async def toggle_smc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = get_user_data(user_id)
     user_data['smc_enabled'] = not user_data.get('smc_enabled', True)
     status = "🟢 SMC: ВКЛ" if user_data['smc_enabled'] else "🔴 SMC: ВЫКЛ"
-    await update.message.reply_text(f"⚙️ SMC анализ переключен: {status}", reply_markup=get_models_keyboard(user_id))
+    await update.message.reply_text(f"⚙️ SMC анализ переключен: {status}", reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
 
 
 # -------- НОВЫЕ КОМАНДЫ (ДОБАВЬТЕ ЭТОТ БЛОК) --------
@@ -3969,7 +3977,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Используйте меню для изменения настроек."
     )
     
-    await update.message.reply_text(settings_text, reply_markup=main_markup)
+    await update.message.reply_text(settings_text, reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
 
 async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Останавливает бота (только для админа)"""
@@ -4034,7 +4042,7 @@ async def toggle_auto_trading(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     await update.message.reply_text(
         f"🤖 Авто-трейдинг: {status}",
-        reply_markup=get_trading_keyboard(user_id)
+        reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
     )
     save_users_data()
     
@@ -4054,12 +4062,12 @@ async def clear_active_trade_command(update: Update, context: ContextTypes.DEFAU
             f"Направление: {trade_info.get('direction')}\n"
             f"Цена: {trade_info.get('entry_price')}\n\n"
             f"Теперь можно получить новый сигнал.",
-            reply_markup=get_trading_keyboard(user_id)
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
     else:
         await update.message.reply_text(
             "✅ Активных сделок нет",
-            reply_markup=get_trading_keyboard(user_id)
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
 
 async def restore_counter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
