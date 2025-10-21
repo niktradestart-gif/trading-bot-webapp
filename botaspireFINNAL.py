@@ -57,6 +57,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.cluster import DBSCAN
+
 # ===================== 🧠 OPENAI API =====================
 from openai import OpenAI
 
@@ -836,229 +838,399 @@ def create_default_single_data():
     }
 # ===================== SMART MONEY ANALYSIS =====================
 def find_market_structure(df, lookback=25):
-    """Определяет структуру рынка - HH, HL, LH, LL"""
-    highs = df['high'].values
-    lows = df['low'].values
-    structure_points = []
-    
-    for i in range(lookback, len(df) - lookback):
-        if (highs[i] > max(highs[i-lookback:i]) and 
-            highs[i] > max(highs[i+1:i+lookback+1])):
-            structure_points.append({
-                'type': 'HH',
-                'price': highs[i],
-                'index': i,
-                'time': df.index[i]
-            })
-        if (lows[i] < min(lows[i-lookback:i]) and 
-            lows[i] < min(lows[i+1:i+lookback+1])):
-            structure_points.append({
-                'type': 'LL',
-                'price': lows[i],
-                'index': i,
-                'time': df.index[i]
-            })
-    
-    return structure_points[-8:]
-
-def find_horizontal_levels(df, threshold_pips=0.0005):
+    """Улучшенное определение структуры рынка с фильтрацией шума"""
     try:
-        levels = []
-        prices = pd.concat([df['high'], df['low'], df['close']]).sort_values()
-        price_values = prices.values
-        clusters = []
+        highs = df['high'].values
+        lows = df['low'].values
+        structure_points = []
         
-        i = 0
-        while i < len(price_values):
-            current_price = price_values[i]
-            cluster = [current_price]
-            
-            j = i + 1
-            while j < len(price_values) and abs(price_values[j] - current_price) <= threshold_pips:
-                cluster.append(price_values[j])
-                j += 1
-            
-            if len(cluster) >= 5:
-                cluster_mean = np.mean(cluster)
+        # Фильтр минимального движения
+        avg_range = (df['high'] - df['low']).tail(50).mean()
+        min_move = avg_range * 0.3
+        
+        for i in range(lookback, len(df) - lookback):
+            # Проверка значимости High
+            if (highs[i] > max(highs[i-lookback:i]) and 
+                highs[i] > max(highs[i+1:i+lookback+1])):
                 
-                touches = 0
-                for idx in range(len(df)):
-                    high = df['high'].iloc[idx]
-                    low = df['low'].iloc[idx]
-                    if (low <= cluster_mean <= high) or \
-                       (abs(high - cluster_mean) <= threshold_pips) or \
-                       (abs(low - cluster_mean) <= threshold_pips):
-                        touches += 1
-                
-                if touches >= 6:
-                    recent_prices = df['close'].tail(20)
-                    above_level = sum(recent_prices > cluster_mean)
-                    below_level = sum(recent_prices < cluster_mean)
-                    
-                    level_type = "RESISTANCE" if above_level > below_level else "SUPPORT"
-                    
-                    levels.append({
-                        'price': cluster_mean,
-                        'touches': touches,
-                        'type': level_type,
-                        'strength': 'STRONG' if touches > 10 else 'MEDIUM',
-                        'cluster_size': len(cluster)
+                # Фильтр по размеру движения от предыдущего HH/HL
+                prev_highs = [p for p in structure_points if p['type'] in ['HH', 'HL']]
+                if prev_highs:
+                    last_high = prev_highs[-1]['price']
+                    if highs[i] - last_high >= min_move:
+                        structure_points.append({
+                            'type': 'HH',
+                            'price': highs[i],
+                            'index': i,
+                            'time': df.index[i]
+                        })
+                else:
+                    structure_points.append({
+                        'type': 'HH', 
+                        'price': highs[i],
+                        'index': i,
+                        'time': df.index[i]
                     })
             
-            i = j
+            # Проверка значимости Low
+            if (lows[i] < min(lows[i-lookback:i]) and 
+                lows[i] < min(lows[i+1:i+lookback+1])):
+                
+                prev_lows = [p for p in structure_points if p['type'] in ['LL', 'LH']]
+                if prev_lows:
+                    last_low = prev_lows[-1]['price']
+                    if last_low - lows[i] >= min_move:
+                        structure_points.append({
+                            'type': 'LL',
+                            'price': lows[i],
+                            'index': i,
+                            'time': df.index[i]
+                        })
+                else:
+                    structure_points.append({
+                        'type': 'LL',
+                        'price': lows[i],
+                        'index': i,
+                        'time': df.index[i]
+                    })
         
-        unique_levels = []
-        for level in levels:
-            is_duplicate = False
-            for existing in unique_levels:
-                if abs(level['price'] - existing['price']) <= threshold_pips:
-                    is_duplicate = True
-                    if level['touches'] > existing['touches']:
-                        unique_levels.remove(existing)
-                        unique_levels.append(level)
-                    break
-            
-            if not is_duplicate:
-                unique_levels.append(level)
-        
-        return sorted(unique_levels, key=lambda x: x['touches'], reverse=True)[:8]
+        return structure_points[-8:] if len(structure_points) > 8 else structure_points
         
     except Exception as e:
-        logging.error(f"Ошибка поиска горизонтальных уровней: {e}")
+        logging.error(f"Ошибка find_market_structure: {e}")
         return []
 
+def find_horizontal_levels(df, threshold_pips=0.0005):
+    """Улучшенный поиск горизонтальных уровней с кластеризацией"""
+    try:
+        levels = []
+        
+        # Используем только значимые экстремумы
+        high_peaks = argrelextrema(df['high'].values, np.greater, order=3)[0]
+        low_peaks = argrelextrema(df['low'].values, np.less, order=3)[0]
+        
+        # Объединяем все значимые точки
+        significant_points = []
+        for idx in high_peaks:
+            significant_points.append(df['high'].iloc[idx])
+        for idx in low_peaks:
+            significant_points.append(df['low'].iloc[idx])
+        
+        if not significant_points:
+            return []
+        
+        # Кластеризация по цене
+        points_array = np.array(significant_points).reshape(-1, 1)
+        clustering = DBSCAN(eps=threshold_pips, min_samples=3).fit(points_array)
+        
+        levels = []
+        unique_labels = set(clustering.labels_)
+        
+        for label in unique_labels:
+            if label != -1:  # Игнорируем шум
+                cluster_points = np.array(significant_points)[clustering.labels_ == label]
+                if len(cluster_points) >= 3:  # Минимум 3 точки в кластере
+                    level_price = np.mean(cluster_points)
+                    
+                    # Подсчет касаний
+                    touches = 0
+                    for i in range(len(df)):
+                        high = df['high'].iloc[i]
+                        low = df['low'].iloc[i]
+                        if abs(high - level_price) <= threshold_pips or \
+                           abs(low - level_price) <= threshold_pips:
+                            touches += 1
+                    
+                    if touches >= 5:  # Минимум 5 касаний
+                        # Определение типа уровня
+                        recent_prices = df['close'].tail(20)
+                        above = sum(recent_prices > level_price)
+                        below = sum(recent_prices < level_price)
+                        
+                        level_type = "RESISTANCE" if above > below else "SUPPORT"
+                        strength = "STRONG" if touches > 12 else "MEDIUM" if touches > 8 else "WEAK"
+                        
+                        levels.append({
+                            'price': level_price,
+                            'touches': touches,
+                            'type': level_type,
+                            'strength': strength,
+                            'cluster_size': len(cluster_points)
+                        })
+        
+        # Сортировка по силе и удаление дубликатов
+        levels.sort(key=lambda x: (x['touches'], x['cluster_size']), reverse=True)
+        
+        # Удаление близких уровней
+        final_levels = []
+        for level in levels:
+            if not any(abs(level['price'] - existing['price']) <= threshold_pips 
+                      for existing in final_levels):
+                final_levels.append(level)
+        
+        return final_levels[:10]  # Возвращаем до 10 сильнейших уровней
+        
+    except Exception as e:
+        logging.error(f"Ошибка find_horizontal_levels: {e}")
+        return []
+
+def validate_zone_quality(zone, df):
+    """Проверка качества зоны - был ли реальный отскок"""
+    try:
+        # Проверяем что zone это словарь, а не строка
+        if not isinstance(zone, dict):
+            logging.error(f"❌ Zone не является словарем: {type(zone)}")
+            return False
+            
+        zone_index = zone.get('index')
+        if zone_index is None:
+            logging.error("❌ Zone не имеет индекса")
+            return False
+        
+        # Проверяем что индекс в пределах данных
+        if zone_index >= len(df) - 8:
+            return False
+            
+        candles_after = df.iloc[zone_index+1:zone_index+8]
+        
+        if len(candles_after) < 3:
+            return False
+            
+        zone_type = zone.get('type')
+        zone_top = zone.get('top')
+        zone_bottom = zone.get('bottom')
+        
+        if not all([zone_type, zone_top, zone_bottom]):
+            logging.error("❌ Zone отсутствуют необходимые поля")
+            return False
+            
+        if zone_type == 'DEMAND':
+            # Для зоны спроса: должен быть отскок ВВЕРХ
+            rebound = any(candle['close'] > zone_top for candle in candles_after)
+            return rebound
+        else:  # SUPPLY
+            # Для зоны предложения: должен быть отскок ВНИЗ  
+            rebound = any(candle['close'] < zone_bottom for candle in candles_after)
+            return rebound
+            
+    except Exception as e:
+        logging.error(f"❌ Ошибка validate_zone_quality: {e}")
+        return False
+
 def find_supply_demand_zones(df, strength=2, lookback=25):
+    """Улучшенный поиск зон спроса/предложения"""
     try:
         highs = df['high'].values
         lows = df['low'].values
         volumes = df['tick_volume'].values
         zones = []
         
+        # Базовые зоны из экстремумов
         high_peaks = argrelextrema(highs, np.greater, order=strength)[0]
         low_peaks = argrelextrema(lows, np.less, order=strength)[0]
         
         avg_volume = np.mean(volumes[-50:]) if len(volumes) > 50 else np.mean(volumes)
+        avg_candle_size = (df['high'] - df['low']).tail(50).mean()
         
-        for peak in high_peaks[-8:]:
-            if peak > 15:
+        # Анализ зон предложения (Supply)
+        for peak in high_peaks[-10:]:
+            if peak >= 20:
                 peak_high = highs[peak]
-                if (peak_high > np.max(highs[max(0, peak-15):peak]) and 
-                    peak_high > np.max(highs[peak+1:min(len(highs), peak+16)])):
+                peak_volume = volumes[peak]
+                
+                left_highs = highs[max(0, peak-20):peak]
+                right_highs = highs[peak+1:min(len(highs), peak+21)]
+                
+                if (len(left_highs) > 0 and len(right_highs) > 0 and
+                    peak_high > np.max(left_highs) and 
+                    peak_high > np.max(right_highs)):
                     
-                    volume_ratio = volumes[peak] / avg_volume if avg_volume > 0 else 1
+                    volume_ratio = peak_volume / avg_volume if avg_volume > 0 else 1
+                    zone_score = 0
                     
-                    if volume_ratio > 1.3:
+                    if volume_ratio > 2.0: zone_score += 3
+                    elif volume_ratio > 1.5: zone_score += 2
+                    elif volume_ratio > 1.2: zone_score += 1
+                    
+                    prev_low = np.min(lows[max(0, peak-10):peak])
+                    move_size = (peak_high - prev_low) / avg_candle_size if avg_candle_size > 0 else 0
+                    if move_size > 3: zone_score += 2
+                    elif move_size > 2: zone_score += 1
+                    
+                    if zone_score >= 2:
                         zones.append({
                             'type': 'SUPPLY',
                             'top': peak_high,
-                            'bottom': peak_high * 0.999,
-                            'strength': 'STRONG' if volume_ratio > 2.0 else 'MEDIUM',
-                            'index': peak,
+                            'bottom': peak_high * 0.998,
+                            'strength': 'STRONG' if zone_score >= 4 else 'MEDIUM',
+                            'score': zone_score,
                             'volume_ratio': volume_ratio,
-                            'source': 'EXTREME'
+                            'source': 'EXTREME',
+                            'index': peak
                         })
         
-        for valley in low_peaks[-8:]:
-            if valley > 15:
+        # Анализ зон спроса (Demand)
+        for valley in low_peaks[-10:]:
+            if valley >= 20:
                 valley_low = lows[valley]
-                if (valley_low < np.min(lows[max(0, valley-15):valley]) and 
-                    valley_low < np.min(lows[valley+1:min(len(lows), valley+16)])):
+                valley_volume = volumes[valley]
+                
+                left_lows = lows[max(0, valley-20):valley]
+                right_lows = lows[valley+1:min(len(lows), valley+21)]
+                
+                if (len(left_lows) > 0 and len(right_lows) > 0 and
+                    valley_low < np.min(left_lows) and 
+                    valley_low < np.min(right_lows)):
                     
-                    volume_ratio = volumes[valley] / avg_volume if avg_volume > 0 else 1
+                    volume_ratio = valley_volume / avg_volume if avg_volume > 0 else 1
+                    zone_score = 0
                     
-                    if volume_ratio > 1.3:
+                    if volume_ratio > 2.0: zone_score += 3
+                    elif volume_ratio > 1.5: zone_score += 2
+                    elif volume_ratio > 1.2: zone_score += 1
+                    
+                    prev_high = np.max(highs[max(0, valley-10):valley])
+                    move_size = (prev_high - valley_low) / avg_candle_size if avg_candle_size > 0 else 0
+                    if move_size > 3: zone_score += 2
+                    elif move_size > 2: zone_score += 1
+                    
+                    if zone_score >= 2:
                         zones.append({
                             'type': 'DEMAND',
-                            'top': valley_low * 1.001,
+                            'top': valley_low * 1.002,
                             'bottom': valley_low,
-                            'strength': 'STRONG' if volume_ratio > 2.0 else 'MEDIUM',
-                            'index': valley,
+                            'strength': 'STRONG' if zone_score >= 4 else 'MEDIUM',
+                            'score': zone_score,
                             'volume_ratio': volume_ratio,
-                            'source': 'EXTREME'
+                            'source': 'EXTREME',
+                            'index': valley
                         })
         
+        # Добавление горизонтальных уровней как зон
         horizontal_levels = find_horizontal_levels(df)
         for level in horizontal_levels:
-            zone_width = 0.0003
-            zones.append({
-                'type': 'SUPPLY' if level['type'] == 'RESISTANCE' else 'DEMAND',
-                'top': level['price'] + zone_width,
-                'bottom': level['price'] - zone_width,
-                'strength': level['strength'],
-                'index': len(df) - 1,
-                'volume_ratio': 1.5,
-                'source': 'HORIZONTAL',
-                'touches': level['touches']
-            })
+            if level['strength'] in ['STRONG', 'MEDIUM']:
+                zone_width = avg_candle_size * 0.3
+                zones.append({
+                    'type': 'SUPPLY' if level['type'] == 'RESISTANCE' else 'DEMAND',
+                    'top': level['price'] + zone_width,
+                    'bottom': level['price'] - zone_width,
+                    'strength': level['strength'],
+                    'score': 3 if level['strength'] == 'STRONG' else 2,
+                    'volume_ratio': 1.5,
+                    'source': 'HORIZONTAL',
+                    'touches': level['touches'],
+                    'index': len(df) - 1
+                })
         
-        zones.sort(key=lambda x: (
-            3 if x['strength'] == 'STRONG' else 2 if x['strength'] == 'MEDIUM' else 1,
-            x.get('touches', 0),
-            x['volume_ratio']
-        ), reverse=True)
+        # 🔥 ВРЕМЕННО ОТКЛЮЧЕНА ФИЛЬТРАЦИЯ - ИСПОЛЬЗУЕМ ВСЕ ЗОНЫ
+        # Сортировка по score
+        zones.sort(key=lambda x: (x['score'], x.get('touches', 0)), reverse=True)
         
-        return zones[:5]
+        # Удаление пересекающихся зон
+        final_zones = []
+        for zone in zones:
+            overlapping = False
+            for existing in final_zones:
+                if (zone['bottom'] <= existing['top'] and 
+                    zone['top'] >= existing['bottom']):
+                    overlapping = True
+                    if zone['score'] > existing['score']:
+                        final_zones.remove(existing)
+                        final_zones.append(zone)
+                    break
+            
+            if not overlapping:
+                final_zones.append(zone)
+        
+        return final_zones[:6]
         
     except Exception as e:
-        logging.error(f"Ошибка поиска зон: {e}")
+        logging.error(f"Ошибка find_supply_demand_zones: {e}")
         return []
     
 def calculate_order_blocks_advanced(df):
-    """Улучшенный поиск ордер-блоков с лучшим обнаружением"""
+    """Улучшенный поиск ордер-блоков с системой подтверждения"""
     order_blocks = []
-    avg_candle_size = df['high'].subtract(df['low']).rolling(50).mean().iloc[-1]
     
-    if pd.isna(avg_candle_size) or avg_candle_size == 0:
-        avg_candle_size = df['high'].subtract(df['low']).mean()
-    
-    for i in range(20, len(df) - 10):
-        current_candle = df.iloc[i]
-        candle_body = abs(current_candle['close'] - current_candle['open'])
-        candle_range = current_candle['high'] - current_candle['low']
+    try:
+        avg_candle_size = df['high'].subtract(df['low']).rolling(50).mean().iloc[-1]
+        if pd.isna(avg_candle_size) or avg_candle_size == 0:
+            avg_candle_size = df['high'].subtract(df['low']).mean()
         
-        is_significant = (candle_body > avg_candle_size * 2.0 or 
-                         candle_range > avg_candle_size * 2.5)
+        # Минимальный размер для значимого OB
+        min_ob_size = avg_candle_size * 1.5
         
-        if not is_significant:
-            continue
+        for i in range(20, len(df) - 15):
+            current_candle = df.iloc[i]
+            candle_body = abs(current_candle['close'] - current_candle['open'])
+            candle_range = current_candle['high'] - current_candle['low']
             
-        # Медвежий OB
-        if (current_candle['close'] < current_candle['open'] and
-            candle_body > avg_candle_size * 1.8):
+            # Проверка значимости свечи
+            is_significant = (candle_body > min_ob_size and 
+                             candle_range > avg_candle_size * 2.0)
             
-            next_candles = df.iloc[i+1:i+8]
-            if len(next_candles) >= 3:
-                touched_ob = any(low < current_candle['close'] for low in next_candles['low'])
-                rebounded = any(close > current_candle['close'] for close in next_candles['close'])
+            if not is_significant:
+                continue
+            
+            next_candles = df.iloc[i+1:i+12]  # Увеличили окно для подтверждения
+            
+            # Медвежий OB (красная свеча)
+            if (current_candle['close'] < current_candle['open'] and
+                candle_body > min_ob_size):
                 
-                if touched_ob and rebounded:
+                # Проверка: цена возвращалась к OB и отскакивала
+                touched = any(low <= current_candle['close'] for low in next_candles['low'])
+                rejected = any(close > current_candle['close'] for close in next_candles['close'])
+                
+                if touched and rejected:
+                    # Дополнительное подтверждение - объем
+                    ob_volume = current_candle['tick_volume']
+                    avg_vol = df['tick_volume'].iloc[max(0,i-20):i].mean()
+                    
+                    strength = "STRONG" if ob_volume > avg_vol * 1.5 else "MEDIUM"
+                    
                     order_blocks.append({
                         'type': 'BEARISH_OB',
                         'high': current_candle['open'],
                         'low': current_candle['close'],
                         'index': i,
-                        'strength': 'STRONG'
+                        'strength': strength,
+                        'volume_ratio': ob_volume / avg_vol if avg_vol > 0 else 1
                     })
-        
-        # Бычий OB
-        elif (current_candle['close'] > current_candle['open'] and
-              candle_body > avg_candle_size * 1.8):
             
-            next_candles = df.iloc[i+1:i+8]
-            if len(next_candles) >= 3:
-                touched_ob = any(high > current_candle['close'] for high in next_candles['high'])
-                rebounded = any(close < current_candle['close'] for close in next_candles['close'])
+            # Бычий OB (зеленая свеча)
+            elif (current_candle['close'] > current_candle['open'] and
+                  candle_body > min_ob_size):
                 
-                if touched_ob and rebounded:
+                touched = any(high >= current_candle['close'] for high in next_candles['high'])
+                rejected = any(close < current_candle['close'] for close in next_candles['close'])
+                
+                if touched and rejected:
+                    ob_volume = current_candle['tick_volume']
+                    avg_vol = df['tick_volume'].iloc[max(0,i-20):i].mean()
+                    
+                    strength = "STRONG" if ob_volume > avg_vol * 1.5 else "MEDIUM"
+                    
                     order_blocks.append({
                         'type': 'BULLISH_OB',
                         'high': current_candle['close'],
                         'low': current_candle['open'],
                         'index': i,
-                        'strength': 'STRONG'
+                        'strength': strength,
+                        'volume_ratio': ob_volume / avg_vol if avg_vol > 0 else 1
                     })
-    
-    return order_blocks[-3:]
+        
+        # Фильтрация: оставляем только сильные OB
+        strong_obs = [ob for ob in order_blocks if ob['strength'] == 'STRONG']
+        medium_obs = [ob for ob in order_blocks if ob['strength'] == 'MEDIUM']
+        
+        # Возвращаем до 2 сильных или 3 средних OB
+        return (strong_obs[:2] if strong_obs else medium_obs[:3])
+        
+    except Exception as e:
+        logging.error(f"Ошибка calculate_order_blocks_advanced: {e}")
+        return []
 
 def calculate_fibonacci_levels(df):
     """Расчёт уровней Фибоначчи по последнему импульсу"""
@@ -1411,13 +1583,14 @@ def is_exhausted_move(df, trend_analysis):
         return False
 
 def enhanced_smart_money_analysis(df):
+    """УЛУЧШЕННАЯ ВЕРСИЯ - сохраняет структуру, но усиливает анализ"""
     if df is None or len(df) < 100:
         return None, None, 0, "NO_DATA"
     
     try:
-        logging.info(f"🔧 SMC анализ запущен для {len(df)} свечей")
+        logging.info(f"🔧 ENHANCED SMC анализ запущен для {len(df)} свечей")
         
-        # =============== АНАЛИТИЧЕСКИЕ БЛОКИ ===============
+        # =============== ОСНОВНОЙ АНАЛИЗ (сохраняем структуру) ===============
         zones = find_supply_demand_zones(df)
         structure = find_market_structure(df)
         order_blocks = calculate_order_blocks_advanced(df)
@@ -1427,186 +1600,152 @@ def enhanced_smart_money_analysis(df):
         pa_patterns = price_action_patterns(df)
         candle_time = get_candle_time_info()
         
-        # =============== НОВЫЙ ФИЛЬТР ИСТОЩЕНИЯ ===============
-        if is_exhausted_move(df, trend_analysis):
-            logging.warning("⏸️ Движение истощено — пропускаем сигналы против импульса")
-            # В случае истощения можно рассматривать сигналы на отскок
-            if trend_analysis['rsi_state'] == 'OVERSOLD':
-                return "BUY", 2, 4, "EXHAUSTION_BOUNCE"
-            elif trend_analysis['rsi_state'] == 'OVERBOUGHT':
-                return "SELL", 2, 4, "EXHAUSTION_BOUNCE"
-            return None, None, 0, "EXHAUSTED_MOVE"
-
-        # =============== ОСНОВНОЙ АНАЛИЗ ===============
-        breakouts = check_level_breakouts(df, df['close'].iloc[-1], zones)
-        logging.info(f"📊 SMC найдено: зон={len(zones)}, пробоев={len(breakouts)}")
-
+        # =============== УЛУЧШЕННАЯ СИСТЕМА СКОРИНГА ===============
         current_price = df['close'].iloc[-1]
-        signal, confidence, signal_type = None, 0, None
+        buy_score = 0
+        sell_score = 0
+        signal_details = []
         
-        buy_signals = 0
-        sell_signals = 0
-        buy_confidence = 0
-        sell_confidence = 0
-
-        bearish_breakouts = [b for b in breakouts if b['type'] == 'BEARISH_BREAKOUT']
-        bullish_breakouts = [b for b in breakouts if b['type'] == 'BULLISH_BREAKOUT']
+        # Базовые веса различных компонентов
+        WEIGHTS = {
+            'ZONE_STRONG': 3,
+            'ZONE_MEDIUM': 2,
+            'OB_STRONG': 3, 
+            'OB_MEDIUM': 2,
+            'TREND_ALIGNED': 2,
+            'PATTERN_STRONG': 2,
+            'PATTERN_MEDIUM': 1,
+            'FIBONACCI': 1,
+            'STRUCTURE': 2,
+            'LIQUIDITY': 1
+        }
         
-        if bearish_breakouts:
-            logging.info(f"📉 Обнаружены медвежьи пробои: {len(bearish_breakouts)}")
-            sell_confidence += len(bearish_breakouts) * 3
-            
-        if bullish_breakouts:
-            logging.info(f"📈 Обнаружены бычьи пробои: {len(bullish_breakouts)}")
-            buy_confidence += len(bullish_breakouts) * 3
-
-        # 🟡 Ранний вход
-        early_signal, early_conf, early_source = early_entry_strategy(df, candle_time, trend_analysis)
-        if early_signal:
-            return early_signal, 1, early_conf + 2, f"EARLY_{early_source}"
-
-        # 🟠 Вход в конце свечи
-        closing_signal, closing_conf, closing_source = closing_candle_strategy(df, candle_time, trend_analysis)
-        if closing_signal:
-            return closing_signal, 1, closing_conf + 2, f"CLOSING_{closing_source}"
-
-        # =============== АНАЛИЗ ЗОН ===============
+        # =============== АНАЛИЗ ЗОН С НОВОЙ СИСТЕМОЙ ===============
         for zone in zones:
-            if zone['strength'] in ['STRONG', 'MEDIUM']:
-                zone_middle = (zone['top'] + zone['bottom']) / 2
-                distance_to_zone = min(abs(current_price - zone['top']), abs(current_price - zone['bottom']))
-                
-                if distance_to_zone <= (zone['top'] - zone['bottom']) * 2:
-                    
-                    if (zone['type'] == 'DEMAND' and 
-                        current_price >= zone['bottom'] and 
-                        not any(b['type'] == 'BEARISH_BREAKOUT' and b['zone'] == zone for b in breakouts)):
-                        
-                        base_confidence = 3
-                        if zone['source'] == 'HORIZONTAL':
-                            base_confidence += 1
-                        if trend_analysis['direction'] == 'BULLISH':
-                            base_confidence += 1
-                        
-                        bull_patterns = [p for p in pa_patterns if 'BULLISH' in p['type']]
-                        if bull_patterns:
-                            base_confidence += 1
-                        
-                        buy_signals += 1
-                        buy_confidence += base_confidence
-                        logging.info(f"✅ SMC зона спроса: BUY +{base_confidence}")
-                        
-                    elif (zone['type'] == 'SUPPLY' and 
-                          current_price <= zone['top'] and
-                          not any(b['type'] == 'BULLISH_BREAKOUT' and b['zone'] == zone for b in breakouts)):
-                        
-                        base_confidence = 3
-                        if zone['source'] == 'HORIZONTAL':
-                            base_confidence += 1
-                        if trend_analysis['direction'] == 'BEARISH':
-                            base_confidence += 1
-                        
-                        bear_patterns = [p for p in pa_patterns if 'BEARISH' in p['type']]
-                        if bear_patterns:
-                            base_confidence += 1
-                        
-                        sell_signals += 1
-                        sell_confidence += base_confidence
-                        logging.info(f"✅ SMC зона предложения: SELL +{base_confidence}")
-
-        # =============== ОРДЕР-БЛОКИ ===============
-        for ob in order_blocks:
-            ob_middle = (ob['high'] + ob['low']) / 2
-            if (ob['type'] == 'BULLISH_OB' and 
-                current_price <= ob_middle and
-                ob['low'] <= current_price <= ob['high']):
-                
-                conf_boost = 2
-                if liquidity_levels.get('near_sell_liquidity'):
-                    conf_boost += 1
-                
-                buy_signals += 1
-                buy_confidence += conf_boost
-                logging.info(f"✅ SMC бычий OB: BUY +{conf_boost}")
-                
-            elif (ob['type'] == 'BEARISH_OB' and 
-                  current_price >= ob_middle and
-                  ob['low'] <= current_price <= ob['high']):
-                
-                conf_boost = 2
-                if liquidity_levels.get('near_buy_liquidity'):
-                    conf_boost += 1
-                
-                sell_signals += 1
-                sell_confidence += conf_boost
-                logging.info(f"✅ SMC медвежий OB: SELL +{conf_boost}")
-
-        # =============== РАЗРЕШЕНИЕ КОНФЛИКТОВ ===============
-        if buy_signals > 0 and sell_signals > 0:
-            logging.info(f"⚖️ Конфликт сигналов: BUY={buy_signals}(conf:{buy_confidence}) vs SELL={sell_signals}(conf:{sell_confidence})")
+            zone_middle = (zone['top'] + zone['bottom']) / 2
+            distance_pct = abs(current_price - zone_middle) / current_price
+    
+            if distance_pct <= 0.002:  # В пределах 0.2% от зоны
+                zone_weight = WEIGHTS['ZONE_STRONG'] if zone['strength'] == 'STRONG' else WEIGHTS['ZONE_MEDIUM']
+        
+                # 🔥 ИСПРАВЛЕНИЕ: зоны должны работать только в свою сторону
+                if zone['type'] == 'DEMAND' and current_price >= zone['bottom']:
+                    # Зона спроса работает только для BUY сигналов
+                    if trend_analysis['direction'] == 'BULLISH':
+                        zone_weight += WEIGHTS['TREND_ALIGNED']
             
-            if buy_confidence > sell_confidence:
-                signal, confidence = 'BUY', buy_confidence
-                logging.info(f"✅ Разрешен конфликт в пользу BUY")
-            elif sell_confidence > buy_confidence:
-                signal, confidence = 'SELL', sell_confidence
-                logging.info(f"✅ Разрешен конфликт в пользу SELL")
-            else:
-                logging.info(f"❌ Конфликт не разрешен — равные confidence")
-                return None, None, 0, "CONFLICT_SIGNAL"
-        elif buy_signals > 0:
-            signal, confidence = 'BUY', buy_confidence
-        elif sell_signals > 0:
-            signal, confidence = 'SELL', sell_confidence
-
-        # =============== ДОПОЛНИТЕЛЬНЫЕ БОНУСЫ ===============
-        for fib in fibonacci:
-            if abs(current_price - fib["level"]) / current_price < 0.0015:
-                if fib["ratio"] in [38, 50, 61]:
-                    confidence += 1
-                    logging.info(f"✅ SMC фибо уровень: +1")
-
-        if len(structure) >= 2 and signal:
-            last_structure = structure[-1]['type']
-            if last_structure == 'HH' and signal == 'BUY':
-                confidence += 2
-                logging.info(f"✅ SMC структура HH: +2")
-            elif last_structure == 'LL' and signal == 'SELL':
-                confidence += 2
-                logging.info(f"✅ SMC структура LL: +2")
-
+                    buy_score += zone_weight
+                    signal_details.append(f"DEMAND_ZONE(+{zone_weight})")
+            
+            elif zone['type'] == 'SUPPLY' and current_price <= zone['top']:
+                # Зона предложения работает только для SELL сигналов  
+                if trend_analysis['direction'] == 'BEARISH':
+                    zone_weight += WEIGHTS['TREND_ALIGNED']
+            
+                sell_score += zone_weight
+                signal_details.append(f"SUPPLY_ZONE(+{zone_weight})")
+        
+        # =============== АНАЛИЗ ОРДЕР-БЛОКОВ ===============
+        for ob in order_blocks:
+            ob_range = ob['high'] - ob['low']
+            in_ob_range = ob['low'] <= current_price <= ob['high']
+            
+            if in_ob_range:
+                ob_weight = WEIGHTS['OB_STRONG'] if ob['strength'] == 'STRONG' else WEIGHTS['OB_MEDIUM']
+                
+                if ob['type'] == 'BULLISH_OB':
+                    buy_score += ob_weight
+                    signal_details.append(f"BULLISH_OB(+{ob_weight})")
+                elif ob['type'] == 'BEARISH_OB':
+                    sell_score += ob_weight  
+                    signal_details.append(f"BEARISH_OB(+{ob_weight})")
+        
+        # =============== АНАЛИЗ СТРУКТУРЫ РЫНКА ===============
+        if len(structure) >= 2:
+            last_point = structure[-1]
+            if last_point['type'] == 'HH' and trend_analysis['direction'] == 'BULLISH':
+                buy_score += WEIGHTS['STRUCTURE']
+                signal_details.append(f"HH_STRUCTURE(+{WEIGHTS['STRUCTURE']})")
+            elif last_point['type'] == 'LL' and trend_analysis['direction'] == 'BEARISH':
+                sell_score += WEIGHTS['STRUCTURE']
+                signal_details.append(f"LL_STRUCTURE(+{WEIGHTS['STRUCTURE']})")
+        
+        # =============== PRICE ACTION ПАТТЕРНЫ ===============
         for pattern in pa_patterns:
-            if pattern['type'] == 'BULLISH_ENGULFING' and signal == 'BUY':
-                confidence += 2
-                logging.info(f"✅ SMC бычий engulfing: +2")
-            elif pattern['type'] == 'BEARISH_ENGULFING' and signal == 'SELL':
-                confidence += 2
-                logging.info(f"✅ SMC медвежий engulfing: +2")
-            elif 'PIN' in pattern['type'] and signal:
-                confidence += 1
-                logging.info(f"✅ SMC pin bar: +1")
-
-        # =============== ВРЕМЕННОЙ БОНУС ===============
+            pattern_weight = WEIGHTS['PATTERN_STRONG'] if pattern['strength'] == 'STRONG' else WEIGHTS['PATTERN_MEDIUM']
+            
+            if 'BULLISH' in pattern['type']:
+                buy_score += pattern_weight
+                signal_details.append(f"{pattern['type']}(+{pattern_weight})")
+            elif 'BEARISH' in pattern['type']:
+                sell_score += pattern_weight
+                signal_details.append(f"{pattern['type']}(+{pattern_weight})")
+        
+        # =============== ФИБОНАЧЧИ И ЛИКВИДНОСТЬ ===============
+        for fib in fibonacci:
+            if abs(current_price - fib["level"]) / current_price < 0.001:
+                if fib["ratio"] in [38, 50, 61]:
+                    # Фибо поддерживает текущий сигнал
+                    if buy_score > sell_score:
+                        buy_score += WEIGHTS['FIBONACCI']
+                        signal_details.append(f"FIB_{fib['ratio']}(+{WEIGHTS['FIBONACCI']})")
+                    elif sell_score > buy_score:
+                        sell_score += WEIGHTS['FIBONACCI'] 
+                        signal_details.append(f"FIB_{fib['ratio']}(+{WEIGHTS['FIBONACCI']})")
+        
+        # =============== ОПРЕДЕЛЕНИЕ СИГНАЛА ===============
+        signal = None
+        confidence = 0
+        
+        min_confidence_threshold = 3  # Минимальный порог для входа
+        
+        if buy_score > sell_score and buy_score >= min_confidence_threshold:
+            signal = 'BUY'
+            confidence = min(buy_score, 10)  # Ограничиваем максимум 10
+        elif sell_score > buy_score and sell_score >= min_confidence_threshold:
+            signal = 'SELL' 
+            confidence = min(sell_score, 10)
+        
+        # =============== ФИНАЛЬНАЯ ПРОВЕРКА И ФИЛЬТРЫ ===============
         if signal:
+            # Фильтр истощения (сохраняем ваш оригинальный)
+            if is_exhausted_move(df, trend_analysis):
+                logging.warning("⏸️ Движение истощено — пропускаем сигнал")
+                return None, None, 0, "EXHAUSTED_MOVE"
+            
+            # Проверка качества тренда
+            if (signal == 'BUY' and trend_analysis['direction'] == 'BEARISH' and 
+                trend_analysis['strength'] == 'VERY_STRONG'):
+                confidence = max(1, confidence - 2)  # Ослабляем сигнал против сильного тренда
+                signal_details.append("AGAINST_STRONG_TREND(-2)")
+            
+            elif (signal == 'SELL' and trend_analysis['direction'] == 'BULLISH' and 
+                  trend_analysis['strength'] == 'VERY_STRONG'):
+                confidence = max(1, confidence - 2)
+                signal_details.append("AGAINST_STRONG_TREND(-2)")
+            
+            # Временная корректировка (сохраняем вашу логику)
             if candle_time['is_beginning']:
-                confidence -= 1
-                logging.info(f"⚠️ Начало свечи — понижаем уверенность: -1")
+                confidence = max(1, confidence - 1)
+                signal_details.append("EARLY_CANDLE(-1)")
             elif candle_time['is_ending']:
-                confidence += 1
-                logging.info(f"✅ Конец свечи — усиливаем уверенность: +1")
-
-        confidence = max(0, min(confidence, 10))
-
-        if confidence >= 2:
-            logging.info(f"🎯 SMC СИГНАЛ: {signal} (conf:{confidence})")
-            expiry = calculate_dynamic_expiry(df, confidence, signal_type)
+                confidence = min(10, confidence + 1)
+                signal_details.append("LATE_CANDLE(+1)")
+            
+            # Рассчет экспирации
+            expiry = calculate_dynamic_expiry(df, confidence, "SMC_CONFLUENCE")
+            
+            logging.info(f"🎯 ENHANCED SMC СИГНАЛ: {signal} (conf:{confidence}, score:{buy_score}-{sell_score})")
+            logging.info(f"📋 Детали: {', '.join(signal_details)}")
+            
             return signal, expiry, confidence, "ENHANCED_SMART_MONEY"
-
-        logging.info(f"❌ SMC не нашел сигналов (conf:{confidence})")
-        return None, None, 0, "NO_SMC_SIGNAL"
+        
+        else:
+            logging.info(f"❌ ENHANCED SMC: Нет сигнала (BUY:{buy_score}, SELL:{sell_score}, threshold:{min_confidence_threshold})")
+            return None, None, 0, "NO_CONFIDENT_SIGNAL"
     
     except Exception as e:
-        logging.error(f"💥 Ошибка SMC анализа: {e}")
+        logging.error(f"💥 Ошибка ENHANCED SMC анализа: {e}")
         return None, None, 0, "SMC_ERROR"
     
 # ===================== ML (SAFE + DYNAMIC FEATURES) =====================
@@ -2587,6 +2726,14 @@ def analyze_trend(df, timeframe_name="M1"):
         logging.warning(f"Ошибка анализа тренда на {timeframe_name}: {e}")
         return "NEUTRAL"
 
+def is_against_strong_trend(signal, trend_analysis):
+    """Проверка сигнала против сильного тренда"""
+    if trend_analysis['strength'] in ['VERY_STRONG', 'STRONG']:
+        if (signal == 'BUY' and trend_analysis['direction'] == 'BEARISH') or \
+           (signal == 'SELL' and trend_analysis['direction'] == 'BULLISH'):
+            return True
+    return False
+
 def analyze_pair(pair: str):
     try:
 
@@ -2706,37 +2853,49 @@ def analyze_pair(pair: str):
         final_confidence = 0
         final_source = None
 
-        # 📌 1. SMC если сильный, а ML не против → берём
-        if smc_result['signal'] and smc_result['confidence'] >= 7:
-            if not ml_result or ml_result['signal'] == smc_result['signal']:
-                final_signal = smc_result['signal']
-                final_confidence = smc_result['confidence']
-                final_expiry = smc_result['expiry']
-                final_source = "ENHANCED_SMART_MONEY"
+        # 📌 1. ВЫСОКИЙ ПРИОРИТЕТ: SMC с уверенностью >= 5
+        if smc_result['signal'] and smc_result['confidence'] >= 5:
+            final_signal = smc_result['signal']
+            final_confidence = smc_result['confidence']
+            final_expiry = smc_result['expiry']
+            final_source = "ENHANCED_SMART_MONEY"
+            logging.info(f"🎯 SMC ПРИОРИТЕТ: {final_signal} (conf={final_confidence})")
 
-        # 📌 2. ML если валидирован и не конфликтует с RSI и трендом
-        elif ml_result and ml_result['signal'] and ml_result['validated'] and ml_result['confidence'] >= 0.25:
+        # 📌 2. СРЕДНИЙ ПРИОРИТЕТ: ML если валидирован и SMC слабый/отсутствует
+        elif ml_result and ml_result['signal'] and ml_result['validated'] and ml_result['confidence'] >= 0.6:
+            # Дополнительная проверка контекста
             rsi_val = ml_features_dict.get('rsi', 50)
-            if (ml_result['signal'] == 'BUY' and rsi_val < 70 and m15_trend == 'BULLISH') or \
-               (ml_result['signal'] == 'SELL' and rsi_val > 30 and m15_trend == 'BEARISH'):
+            if (ml_result['signal'] == 'BUY' and rsi_val < 65) or \
+               (ml_result['signal'] == 'SELL' and rsi_val > 35):
                 final_signal = ml_result['signal']
-                final_confidence = int(ml_result['confidence'] * 20)
+                final_confidence = int(ml_result['confidence'] * 10)
                 final_expiry = 2
                 final_source = "ML_VALIDATED"
+                logging.info(f"🤖 ML ПРИОРИТЕТ: {final_signal} (conf={final_confidence})")
 
-        # 📌 3. GPT если ничего другого нет
-        elif gpt_result:
+        # 📌 3. 🔥 ОСТОРОЖНЫЙ ПРИОРИТЕТ: GPT с дополнительными фильтрами
+        elif (gpt_result and gpt_result['signal'] and 
+              smc_result['confidence'] >= 2 and  # SMC хотя бы слабо подтверждает
+              ml_result and ml_result['confidence'] >= 0.4 and  # ML не сильно против
+              not is_against_strong_trend(gpt_result['signal'], trend_analysis)):  # 🔥 НЕ против сильного тренда
+    
             final_signal = gpt_result['signal']
-            final_confidence = gpt_result['confidence']
+            final_confidence = gpt_result['confidence'] - 1  # Понижаем уверенность
             final_expiry = gpt_result['expiry']
-            final_source = gpt_result['source']
+            final_source = "GPT_CAREFUL"
+            logging.info(f"⚠️ ОСТОРОЖНЫЙ GPT: {final_signal} (conf={final_confidence})")
+ 
+        # 6️⃣ 🔥 ФИНАЛЬНАЯ ПРОВЕРКА: запрет сигналов против сильного тренда
+        if final_signal and is_against_strong_trend(final_signal, trend_analysis):
+            logging.warning(f"⛔ ОТМЕНА: сигнал {final_signal} против сильного тренда")
+            return None, None, 0, "AGAINST_STRONG_TREND", ml_features_data
 
-        # 6️⃣ Возврат
+        # 7️⃣ Возврат
         if final_signal:
             logging.info(f"🚀 {pair}: Окончательный сигнал = {final_signal} ({final_source}, conf={final_confidence})")
-            
+    
             return final_signal, final_expiry, final_confidence, final_source, ml_features_data
-
+        
         logging.info(f"❌ {pair}: сигналов нет или они отфильтрованы")
         return None, None, 0, "NO_SIGNAL", ml_features_data
 
