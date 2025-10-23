@@ -44,6 +44,7 @@ def job_listener(event):
         logging.debug(f"✅ Job {event.job_id} выполнен успешно")
 
 # ===================== 🤖 TELEGRAM BOT =====================
+import telegram
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, ContextTypes, filters
@@ -62,13 +63,15 @@ from sklearn.cluster import DBSCAN
 # ===================== 🧠 OPENAI API =====================
 from openai import OpenAI
 
+# ===================== 🌐 GLOBAL VARIABLES =====================
+app = None
 
 # ===================== FIXED BOT WORKING HOURS =====================
 from datetime import datetime, time, timedelta
 
 # 🕒 Рабочие часы по локальному времени (например, Молдова UTC+2)
 TRADING_START = time(4, 0)    # Начало торговли: 04:00
-TRADING_END   = time(23, 59)  # Конец торговли: 23:59
+TRADING_END   = time(22, 59)  # Конец торговли: 22:59
 
 # 🗓️ Выходные (суббота и воскресенье)
 WEEKEND_DAYS = {5, 6}  # 5 = суббота, 6 = воскресенье
@@ -465,7 +468,38 @@ def get_user_data(user_id: int = None) -> Dict:
 
 def is_admin(user_id: int) -> bool:
     """Проверяет, является ли пользователь админом"""
-    return user_id == ADMIN_USER_ID
+    return user_id == ADMIN_USER_ID  # Используем существующий ADMIN_USER_ID
+
+def check_and_restore_pocket_users():
+    """Проверяет и восстанавливает пользователей в pocket_users.json после перезапуска"""
+    try:
+        whitelist = load_whitelist()
+        updated = False
+        
+        # Проверяем всех пользователей из users_data.json
+        if MULTI_USER_MODE and users:
+            for user_id, user_data in users.items():
+                pocket_id = str(user_id)
+                
+                # Если пользователя нет в pocket_users.json, добавляем
+                if pocket_id not in whitelist:
+                    user_name = user_data.get('first_name', f"User_{user_id}")
+                    whitelist[pocket_id] = {
+                        'name': user_name,
+                        'role': "user",
+                        'telegram_id': user_id,
+                        'registered_at': user_data.get('created_at', datetime.now().isoformat()),
+                        'status': 'active'
+                    }
+                    updated = True
+                    logging.info(f"✅ Восстановлен пользователь в pocket_users.json: {user_id}")
+        
+        if updated:
+            save_whitelist(whitelist)
+            logging.info(f"♻️ Восстановление pocket_users.json завершено")
+            
+    except Exception as e:
+        logging.error(f"❌ Ошибка восстановления pocket_users.json: {e}")
 
 
 # ===================== УНИВЕРСАЛЬНЫЙ ФЛЕТТЕР ML ФИЧЕЙ =====================
@@ -706,74 +740,114 @@ def save_users_data():
     except Exception as e:
         logging.error(f"💥 Критическая ошибка save_users_data: {e}")
 
+# ===================== ⚙️ SAFE MESSAGE SENDER (ASYNC) =====================
+async def safe_send_message(bot, chat_id, text, **kwargs):
+    """Отправка сообщения с автоочисткой при блокировке и безопасным сохранением"""
+    try:
+        await bot.send_message(chat_id=chat_id, text=text, **kwargs)
+        return True
+
+    except telegram.error.Forbidden:
+        logging.warning(f"🚫 Пользователь {chat_id} заблокировал бота — удаляем из базы.")
+        if chat_id in users:
+            del users[chat_id]
+            await async_save_users_data()   # 🔄 Асинхронное сохранение
+            logging.info(f"🧹 Пользователь {chat_id} успешно удалён (бот заблокирован).")
+        return False
+
+    except telegram.error.TimedOut:
+        logging.warning(f"⏳ Таймаут при отправке пользователю {chat_id}, повторная попытка...")
+        try:
+            await bot.send_message(chat_id=chat_id, text=text, **kwargs)
+        except Exception as retry_err:
+            logging.error(f"⚠ Ошибка при повторной отправке пользователю {chat_id}: {retry_err}")
+        return False
+
+    except Exception as e:
+        logging.error(f"⚠ Ошибка при отправке сообщения пользователю {chat_id}: {e}")
+        return False
+
+
+# ===================== ⚙️ USER DATA MANAGEMENT (ASYNC-SAFE) =====================
+import aiofiles
+import asyncio
+
+save_lock = asyncio.Lock()  # 🔒 глобальный замок для асинхронной записи
+
+async def async_save_users_data():
+    """💾 Асинхронное сохранение users_data с блокировкой"""
+    global users
+    async with save_lock:
+        try:
+            filename = "users_data.json" if MULTI_USER_MODE else "single_user_data.json"
+            backup_dir = "backups"
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # Создаём бэкап
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"{os.path.splitext(filename)[0]}_backup_{timestamp}.json")
+            async with aiofiles.open(backup_path, "w", encoding="utf-8") as backup_file:
+                await backup_file.write(json.dumps(users, ensure_ascii=False, indent=2))
+
+            # Основное сохранение
+            async with aiofiles.open(filename, "w", encoding="utf-8") as f:
+                await f.write(json.dumps(users, ensure_ascii=False, indent=2))
+
+            logging.info(f"💾 Данные успешно сохранены ({len(users)} пользователей)")
+
+        except Exception as e:
+            logging.error(f"❌ Ошибка сохранения данных: {e}")
 
 def load_users_data():
     """📥 Надёжная загрузка данных с бэкапами и восстановлением счетчиков"""
     global users, single_user_data
     try:
-        if MULTI_USER_MODE:
-            if os.path.exists("users_data.json"):
-                success = load_from_file("users_data.json", "multi")
-                if not success:
-                    backups = [f for f in os.listdir("backups") if f.startswith("users_data_backup")]
-                    if backups:
-                        backups.sort(reverse=True)
-                        latest = os.path.join("backups", backups[0])
-                        logging.warning(f"⚠ Повреждён файл, пробуем бэкап: {latest}")
-                        load_from_file(latest, "multi")
-                    else:
-                        users = {}
-                        logging.warning("⚠ Нет бэкапов — пустая база")
-            else:
-                users = {}
-                logging.info("📝 users_data.json не найден — создаём новую базу")
+        path = "users_data.json" if MULTI_USER_MODE else "single_user_data.json"
+        if os.path.exists(path):
+            success = load_from_file(path, "multi" if MULTI_USER_MODE else "single")
+            if not success:
+                backups = [f for f in os.listdir("backups") if f.startswith(os.path.splitext(os.path.basename(path))[0])]
+                if backups:
+                    backups.sort(reverse=True)
+                    latest = os.path.join("backups", backups[0])
+                    logging.warning(f"⚠ Повреждён файл, пробуем бэкап: {latest}")
+                    load_from_file(latest, "multi" if MULTI_USER_MODE else "single")
+                else:
+                    users = {}
+                    logging.warning("⚠ Нет бэкапов — создаётся пустая база")
         else:
-            if os.path.exists("single_user_data.json"):
-                success = load_from_file("single_user_data.json", "single")
-                if not success:
-                    backups = [f for f in os.listdir("backups") if f.startswith("single_user_backup")]
-                    if backups:
-                        backups.sort(reverse=True)
-                        latest = os.path.join("backups", backups[0])
-                        logging.warning(f"⚠ Повреждён single файл, пробуем бэкап: {latest}")
-                        load_from_file(latest, "single")
-                    else:
-                        single_user_data = create_default_single_data()
-            else:
-                single_user_data = create_default_single_data()
-                logging.info("📝 single_user_data.json не найден — создаём новую базу")
+            users = {}
+            logging.info(f"📝 {path} не найден — создаётся новая база")
+
     except Exception as e:
         logging.error(f"💥 Ошибка загрузки данных: {e}")
         users = {}
         single_user_data = create_default_single_data()
-
 
 def load_from_file(filename, mode):
     """📥 Загружает JSON и восстанавливает счётчики"""
     try:
         with open(filename, "r", encoding="utf-8") as f:
             content = f.read().strip()
-
         if not content:
             logging.warning(f"⚠ Файл {filename} пуст")
             return False
 
         data = json.loads(content)
-
         if mode == "multi":
             users.clear()
             for uid_str, udata in data.items():
                 uid = int(uid_str)
                 users[uid] = udata
-                hist_count = len(udata.get('trade_history', []))
-                if udata.get('trade_counter', 0) != hist_count:
-                    users[uid]['trade_counter'] = hist_count
+                hist_count = len(udata.get("trade_history", []))
+                if udata.get("trade_counter", 0) != hist_count:
+                    users[uid]["trade_counter"] = hist_count
             logging.info(f"✅ Загружено {len(users)} пользователей")
         else:
             single_user_data.update(data)
-            hist_count = len(single_user_data.get('trade_history', []))
-            if single_user_data.get('trade_counter', 0) != hist_count:
-                single_user_data['trade_counter'] = hist_count
+            hist_count = len(single_user_data.get("trade_history", []))
+            if single_user_data.get("trade_counter", 0) != hist_count:
+                single_user_data["trade_counter"] = hist_count
             logging.info(f"✅ Загружены данные single ({hist_count} сделок)")
         return True
 
@@ -1360,54 +1434,54 @@ def price_action_patterns(df):
 
 def calculate_dynamic_expiry(df, confidence, signal_type=None):
     """
-    Улучшенный расчёт экспирации для бинарных сделок (1–4 мин)
-    ⚡ Приоритет 1 минуты на импульсах и сильных сигналах
+    🔁 Оптимизированный расчёт экспирации для бинарных сделок (1–3 мин)
+    ⚡ Укороченные интервалы для быстрой реакции на сигнал
     """
     try:
+        # ATR — средний истинный диапазон (волатильность)
         atr = ta.ATR(df['high'], df['low'], df['close'], timeperiod=14).iloc[-1]
         current_price = df['close'].iloc[-1]
         volatility_percent = (atr / current_price) * 100 if current_price > 0 else 0
 
-        # 📊 1. Базовая экспирация по волатильности
-        if volatility_percent >= 0.035:         # импульсное движение — часто нужен короткий вход
+        # 1️⃣ БАЗОВАЯ ЭКСПИРАЦИЯ (укороченная шкала)
+        if volatility_percent >= 0.04:         # Очень высокая волатильность
             base_expiry = 1
-        elif volatility_percent >= 0.02:       # нормальная волатильность
+        elif volatility_percent >= 0.025:      # Средне-высокая
             base_expiry = 2
-        elif volatility_percent >= 0.01:       # спокойный рынок
+        else:                                  # Спокойный рынок
             base_expiry = 3
-        else:                                  # флет, слабое движение
-            base_expiry = 4
 
-        # 📌 2. Корректировка по типу сигнала
+        # 2️⃣ КОРРЕКТИРОВКА ПО ТИПУ СИГНАЛА
         if signal_type == "BREAKOUT":
-            # На пробоях чаще лучше быстрая экспирация
             base_expiry = max(1, base_expiry - 1)
         elif signal_type == "REVERSAL":
-            # Развороты часто требуют чуть больше времени
-            base_expiry = min(base_expiry + 1, 4)
+            base_expiry = min(base_expiry + 1, 3)
+        # TREND_FOLLOWING — без изменений
 
-        # 📌 3. Корректировка по уверенности сигнала
+        # 3️⃣ КОРРЕКТИРОВКА ПО УВЕРЕННОСТИ
         if confidence >= 9:
-            # Очень сильный сигнал — часто лучше короткая экспирация (1 минута)
             final_expiry = 1
-        elif confidence >= 6:
-            # Средняя уверенность — экспирация не более 2 минут
-            final_expiry = min(base_expiry, 2)
-        else:
-            # Слабый сигнал — используем базовое значение
+        elif confidence >= 7:
+            final_expiry = max(1, base_expiry - 1)
+        elif confidence >= 5:
             final_expiry = base_expiry
+        else:
+            final_expiry = min(base_expiry + 1, 3)
 
-        # 🧠 4. Границы безопасности
-        final_expiry = max(1, min(final_expiry, 4))
+        # 4️⃣ ГРАНИЦЫ БЕЗОПАСНОСТИ
+        final_expiry = max(1, min(final_expiry, 3))
 
         logging.info(
-            f"📊 Волатильность: {volatility_percent:.4f}% | тип={signal_type} | conf={confidence} → экспирация: {final_expiry} мин"
+            f"📊 Волатильность: {volatility_percent:.4f}% | "
+            f"Тип: {signal_type or 'N/A'} | Уверенность: {confidence} → "
+            f"Экспирация: {final_expiry} мин"
         )
         return final_expiry
 
     except Exception as e:
-        logging.error(f"Ошибка расчёта динамической экспирации: {e}")
-        return 2
+        logging.error(f"❌ Ошибка расчёта динамической экспирации: {e}")
+        return 2  # дефолт 2 минуты при ошибке
+
 
 def get_candle_time_info():
     """Получает информацию о времени до закрытия текущей свечи"""
@@ -1500,7 +1574,6 @@ def check_level_breakouts(df, current_price, zones):
     except Exception as e:
         logging.error(f"Ошибка проверки пробоев: {e}")
         return []
-# ===================== EXHAUSTION FILTER =====================
 def is_exhausted_move(df, trend_analysis):
     """Определяет истощение движения для фильтрации ложных сигналов"""
     try:
@@ -1512,21 +1585,27 @@ def is_exhausted_move(df, trend_analysis):
         
         # 1. Проверка RSI в экстремумах
         if rsi < 25 or rsi > 75:
-            # 2. Проверка резкого движения
+            # 2. Проверка резкого движения (более чувствительная)
             price_change_5m = (current_price - df['close'].iloc[-5]) / df['close'].iloc[-5] * 100
             price_change_15m = (current_price - df['close'].iloc[-15]) / df['close'].iloc[-15] * 100
             
-            # 3. Проверка объема
+            # 3. Проверка объема (менее строгая)
             current_volume = df['tick_volume'].iloc[-1]
             avg_volume = df['tick_volume'].tail(20).mean()
             volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
             
+            # 4. Проверка относительно нормальной волатильности
+            atr = ta.ATR(df['high'], df['low'], df['close'], timeperiod=14).iloc[-1]
+            normal_move = (atr / current_price) * 100 * 3  # 3x от нормальной волатильности
+            
+            # 🔥 УЛУЧШЕННЫЕ КРИТЕРИИ ИСТОЩЕНИЯ:
+            is_strong_move = abs(price_change_5m) > 0.15  # Более чувствительный порог
+            is_extended_move = abs(price_change_5m) > normal_move  # Относительно ATR
+            is_volume_declining = volume_ratio < 0.9  # Менее строгий объем
+            
             # Критерии истощения:
-            # - Резкое движение (>0.3% за 5 минут)
-            # - RSI в экстремуме
-            # - Объем снижается после пика
-            if abs(price_change_5m) > 0.3 and volume_ratio < 0.8:
-                logging.info(f"⚠️ Обнаружено истощение движения: RSI={rsi:.1f}, Δ5m={price_change_5m:.2f}%, Δ15m={price_change_15m:.2f}%")
+            if (is_strong_move or is_extended_move) and is_volume_declining:
+                logging.info(f"⚠️ Обнаружено истощение движения: RSI={rsi:.1f}, Δ5m={price_change_5m:.2f}%, Объем={volume_ratio:.2f}")
                 return True
                 
         return False
@@ -2161,9 +2240,9 @@ def should_take_trade(pair: str, smc_signal: dict, ml_result: dict, rsi_value: f
         logging.error(f"[FILTER] Ошибка фильтрации сигнала для {pair}: {e}")
         return False
 
-# ===================== УТИЛИТЫ РЕМОНТА ML ФИЧЕЙ (без изменений) =====================
-def repair_ml_features():
-    """Помечает сделки для пересчета ml_features, не подставляя фейковые значения."""
+# ===================== ⚙️ REPAIR ML FEATURES (ASYNC-SAFE) =====================
+async def repair_ml_features():
+    """Помечает сделки для пересчета ml_features, без фейковых значений (асинхронная версия)."""
     try:
         needs_repair_count = 0
         if MULTI_USER_MODE:
@@ -2179,9 +2258,11 @@ def repair_ml_features():
                     needs_repair_count += 1
 
         if needs_repair_count > 0:
-            save_users_data()
+            await async_save_users_data()  # 🔄 теперь безопасно и не блокирует event loop
             logging.info(f"🔧 Помечено {needs_repair_count} сделок для пересчета ml_features")
+
         return needs_repair_count
+
     except Exception as e:
         logging.error(f"❌ Ошибка восстановления ml_features: {e}")
         return 0
@@ -2211,19 +2292,20 @@ async def repair_ml_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("ℹ️ Все сделки уже содержат ml_features, восстановление не требуется.")
 
 
-# ===================== ОБУЧЕНИЕ =====================
+# ===================== 🧠 ОБНОВЛЁННЫЙ БЛОК ОБУЧЕНИЯ ML (RandomForest + MLPClassifier + Oversampling) =====================
 def train_ml_model():
     """
     Устойчивое обучение:
     - time-based split
-    - RandomForest с регуляризацией
-    - выбор фич: используем список из pkl/истории или важности (top-K)
-    - сохраняем точный список feature_names в ml_info_last.json
+    - RandomForest и MLPClassifier (сравнение)
+    - oversampling для балансировки классов WIN/LOSS
+    - выбор фич: из pkl/истории или по важности (top-K)
+    - сохраняем победившую модель + метаинформацию
     """
     global ml_model, ml_scaler, model_info
 
     try:
-        # Сбор завершённых сделок
+        # ========== 1️⃣ СБОР ДАННЫХ ==========
         all_trades = []
         if MULTI_USER_MODE:
             for user_data in users.values():
@@ -2242,7 +2324,7 @@ def train_ml_model():
             logging.warning(f"⚠ Недостаточно данных для обучения: {len(completed)} < {MIN_SAMPLES_TO_TRAIN}")
             return
 
-        # Базовый перечень фич — берём из максимально «богатой» сделки
+        # ========== 2️⃣ ФОРМИРОВАНИЕ ФИЧ ==========
         base_feature_names = None
         for t in reversed(completed[-400:]):
             feats = t.get('ml_features')
@@ -2253,71 +2335,90 @@ def train_ml_model():
             logging.warning("❌ Нет сделок с ml_features — обучение невозможно")
             return
 
-        # Формируем матрицу
         X, y, ts = [], [], []
         for tr in completed:
             feats = tr.get('ml_features', {})
             X.append([float(feats.get(f, 0.0)) for f in base_feature_names])
             y.append(1 if tr.get('result') == 'WIN' else 0)
             ts.append(tr.get('timestamp', None))
+
         X = np.asarray(X, dtype=float)
         y = np.asarray(y, dtype=int)
         ts = pd.to_datetime(pd.Series(ts), errors='coerce').astype('int64').fillna(0).to_numpy()
 
-        # Time-based split
-        order = np.argsort(ts)
+        # ========== ⚖️ 3️⃣ БАЛАНСИРОВКА КЛАССОВ (oversampling) ==========
+        from sklearn.utils import resample
+        X_df = pd.DataFrame(X, columns=base_feature_names)
+        y_df = pd.Series(y, name='target')
+        df_balanced = pd.concat([X_df, y_df], axis=1)
+
+        minority = df_balanced[df_balanced.target == 1]
+        majority = df_balanced[df_balanced.target == 0]
+
+        # oversampling только если WIN сильно меньше
+        if len(minority) / len(majority) < 0.8:
+            minority_upsampled = resample(
+                minority,
+                replace=True,
+                n_samples=len(majority),
+                random_state=42
+            )
+            df_balanced = pd.concat([majority, minority_upsampled])
+            logging.info(f"⚖️ Балансировка классов: WIN {len(minority)} → {len(minority_upsampled)}")
+        else:
+            logging.info("⚖️ Балансировка не требуется — классы сбалансированы")
+
+        # обновляем X и y после балансировки
+        X = df_balanced[base_feature_names].values
+        y = df_balanced["target"].values
+
+        # ========== 4️⃣ TIME-BASED SPLIT ==========
+        order = np.argsort(ts[:len(X)])  # сортируем по времени
         X, y = X[order], y[order]
         split_idx = int(len(X) * 0.75)
         X_train, X_test = X[:split_idx], X[split_idx:]
         y_train, y_test = y[:split_idx], y[split_idx:]
         logging.info(f"🕒 Time-based split: train={len(X_train)}, test={len(X_test)}")
 
-        # Масштабирование
+        # ========== 5️⃣ МАСШТАБИРОВАНИЕ ==========
         scaler = StandardScaler()
         X_train_s = scaler.fit_transform(X_train)
         X_test_s = scaler.transform(X_test)
 
-        # Базовая регуляризованная модель
+        # ========== 6️⃣ RANDOM FOREST ==========
         params = {
-            'n_estimators': 140,
-            'max_depth': 6,
-            'min_samples_split': 20,
-            'min_samples_leaf': 10,
-            'max_features': 0.5,
-            'max_samples': 0.8,
-            'min_weight_fraction_leaf': 0.01,
+            'n_estimators': 250,
+            'max_depth': 7,
+            'min_samples_split': 15,
+            'min_samples_leaf': 6,
+            'max_features': 0.6,
+            'max_samples': 0.85,
+            'min_weight_fraction_leaf': 0.00,
             'random_state': 42,
-            'class_weight': 'balanced',
+            'class_weight': 'balanced_subsample',
             'n_jobs': -1,
         }
         base_model = RandomForestClassifier(**params)
         base_model.fit(X_train_s, y_train)
 
-        # Метрики до отбора
+        # оценка
         train_acc = accuracy_score(y_train, base_model.predict(X_train_s))
         test_acc = accuracy_score(y_test, base_model.predict(X_test_s))
         overfit_ratio = train_acc / max(test_acc, 1e-6)
 
-        # ----- Выбор признаков -----
-        # 1) пробуем взять существующий список (история/pkl), чтобы не ломать инференс
+        # ========== 7️⃣ ВЫБОР ПРИЗНАКОВ ==========
         preserved = _get_expected_feature_list()
         if preserved:
             selected_features = [f for f in preserved if f in base_feature_names]
             logging.info(f"📝 Используем сохранённый список признаков: {len(selected_features)} шт.")
         else:
-            # 2) иначе берём top-K по важности
             importances = base_model.feature_importances_
             pairs = list(zip(base_feature_names, importances))
             pairs.sort(key=lambda x: x[1], reverse=True)
-            if TOP_K_FEATURES and TOP_K_FEATURES > 0:
-                k = min(TOP_K_FEATURES, len(pairs))
-            else:
-                # если нет явного K — возьмём текущий размер pkl/истории (если вдруг появится)
-                k = len(pairs)
+            k = min(TOP_K_FEATURES or len(pairs), len(pairs))
             selected_features = [f for f, _ in pairs[:k]]
             logging.info(f"🏆 Выбраны top-{len(selected_features)} признаков по важности")
 
-        # Пересобираем подматрицы по выбранным признакам
         idx = {f: i for i, f in enumerate(base_feature_names)}
         cols = [idx[f] for f in selected_features if f in idx]
         X_train_top = X_train[:, cols]
@@ -2327,75 +2428,119 @@ def train_ml_model():
         X_train_top_s = scaler2.fit_transform(X_train_top)
         X_test_top_s = scaler2.transform(X_test_top)
 
-        model = RandomForestClassifier(**params)
-        model.fit(X_train_top_s, y_train)
+        model_rf = RandomForestClassifier(**params)
+        model_rf.fit(X_train_top_s, y_train)
 
-        # Метрики после отбора
-        y_tr2 = model.predict(X_train_top_s)
-        y_te2 = model.predict(X_test_top_s)
+        y_tr2 = model_rf.predict(X_train_top_s)
+        y_te2 = model_rf.predict(X_test_top_s)
         train_acc2 = accuracy_score(y_train, y_tr2)
         test_acc2 = accuracy_score(y_test, y_te2)
-        precision2 = precision_score(y_test, y_te2, zero_division=0)
-        recall2 = recall_score(y_test, y_te2, zero_division=0)
         f12 = f1_score(y_test, y_te2, zero_division=0)
         overfit_ratio2 = train_acc2 / max(test_acc2, 1e-6)
 
-        # CV на train
+        folds = min(5, max(2, len(X_train_top_s)//400))
         try:
-            folds = min(5, max(2, len(X_train_top_s)//400))
-            cv_scores = cross_val_score(model, X_train_top_s, y_train, cv=folds, scoring='accuracy')
+            cv_scores = cross_val_score(model_rf, X_train_top_s, y_train, cv=folds, scoring='accuracy')
             cv_mean, cv_std = float(np.mean(cv_scores)), float(np.std(cv_scores))
         except Exception as e:
             logging.warning(f"CV пропущен: {e}")
             cv_mean, cv_std = float('nan'), float('nan')
 
-        # ---- Сохраняем только TOP-версию ----
-        joblib.dump(model, ML_MODEL_PATH)
-        joblib.dump(scaler2, ML_SCALER_PATH)
+        logging.info(f"✅ RandomForest: Test={test_acc2:.3f} | Train={train_acc2:.3f} | Overfit={overfit_ratio2:.2f}")
 
-        # Обновим pkl со списком признаков (чтобы инференс был консистентен)
+        # ========== 8️⃣ MLP CLASSIFIER ==========
+        from sklearn.neural_network import MLPClassifier
         try:
-            with open(ML_FEATS_PKL, "wb") as f:
-                pickle.dump(selected_features, f)
-        except Exception as e:
-            logging.warning(f"⚠️ Не удалось обновить {ML_FEATS_PKL}: {e}")
+            mlp = MLPClassifier(
+                hidden_layer_sizes=(64, 32),
+                activation='tanh',
+                solver='adam',
+                learning_rate_init=0.001,
+                max_iter=400,
+                random_state=42,
+                early_stopping=True,
+                n_iter_no_change=10,
+                validation_fraction=0.15,
+            )
+            mlp.fit(X_train_top_s, y_train)
 
-        # model_info + история
-        global model_info, ml_model, ml_scaler
-        ml_model, ml_scaler = model, scaler2
+            y_pred_mlp_train = mlp.predict(X_train_top_s)
+            y_pred_mlp_test = mlp.predict(X_test_top_s)
+
+            train_acc_mlp = accuracy_score(y_train, y_pred_mlp_train)
+            test_acc_mlp = accuracy_score(y_test, y_pred_mlp_test)
+            overfit_mlp = train_acc_mlp / max(test_acc_mlp, 1e-6)
+
+            folds_mlp = min(5, max(2, len(X_train_top_s)//400))
+            try:
+                cv_scores_mlp = cross_val_score(mlp, X_train_top_s, y_train, cv=folds_mlp, scoring='accuracy')
+                cv_mean_mlp, cv_std_mlp = float(np.mean(cv_scores_mlp)), float(np.std(cv_scores_mlp))
+            except Exception as e:
+                logging.warning(f"CV (MLP) пропущен: {e}")
+                cv_mean_mlp, cv_std_mlp = float('nan'), float('nan')
+
+            logging.info(f"🤖 MLPClassifier: Test={test_acc_mlp:.3f} | Train={train_acc_mlp:.3f} | Overfit={overfit_mlp:.2f}")
+
+            # ========== 9️⃣ СРАВНЕНИЕ ==========
+            if test_acc_mlp > test_acc2:
+                best_model = mlp
+                best_scaler = scaler2
+                best_type = "MLPClassifier"
+                best_test_acc = test_acc_mlp
+                best_train_acc = train_acc_mlp
+                best_cv = cv_mean_mlp
+                best_overfit = overfit_mlp
+                logging.info(f"🏆 Выбрана модель: MLPClassifier (Test={best_test_acc:.3f}) > RandomForest (Test={test_acc2:.3f})")
+            else:
+                best_model = model_rf
+                best_scaler = scaler2
+                best_type = "RandomForestClassifier"
+                best_test_acc = test_acc2
+                best_train_acc = train_acc2
+                best_cv = cv_mean
+                best_overfit = overfit_ratio2
+                logging.info(f"🏆 Выбрана модель: RandomForestClassifier (Test={test_acc2:.3f}) ≥ MLP (Test={test_acc_mlp:.3f})")
+
+        except Exception as e:
+            logging.error(f"❌ Ошибка при обучении MLPClassifier: {e}", exc_info=True)
+            best_model = model_rf
+            best_scaler = scaler2
+            best_type = "RandomForestClassifier"
+            best_test_acc = test_acc2
+            best_train_acc = train_acc2
+            best_cv = cv_mean
+            best_overfit = overfit_ratio2
+
+        # ========== 🔟 СОХРАНЕНИЕ ==========
+        joblib.dump(best_model, ML_MODEL_PATH)
+        joblib.dump(best_scaler, ML_SCALER_PATH)
 
         win_rate_overall = float(np.mean(y)) * 100.0
-        
-        # 🔍 Определяем тип модели автоматически
-        model_type = type(model).__name__
 
         model_info = {
             "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "n_features": len(selected_features),
             "trades_used": int(len(X)),
-            "train_accuracy": round(train_acc2 * 100, 2),
-            "test_accuracy": round(test_acc2 * 100, 2),
-            "test_precision": round(precision2 * 100, 2),
-            "test_recall": round(recall2 * 100, 2),
-            "test_f1": round(f12 * 100, 2),
-            "cv_accuracy": round(cv_mean * 100, 2) if not np.isnan(cv_mean) else None,
-            "cv_std": round(cv_std * 100, 2) if not np.isnan(cv_std) else None,
-            "overfitting_ratio": round(overfit_ratio2, 2),
-            "feature_names": selected_features,  # <<< Критично: список признаков для инференса
+            "train_accuracy": round(best_train_acc * 100, 2),
+            "test_accuracy": round(best_test_acc * 100, 2),
+            "cv_accuracy": round(best_cv * 100, 2) if not np.isnan(best_cv) else None,
+            "overfitting_ratio": round(best_overfit, 2),
+            "feature_names": selected_features,
             "train_samples": int(len(y_train)),
             "test_samples": int(len(y_test)),
             "win_rate": round(win_rate_overall, 2),
-            "model_type": model_type,
-            "model_params": model.get_params()
+            "model_type": best_type
         }
+
         with open(ML_INFO_LAST, "w", encoding="utf-8") as f:
             json.dump(model_info, f, ensure_ascii=False, indent=2)
         _append_ml_info(model_info)
 
-        logging.info(f"✅ ML (features={len(selected_features)}): Test={test_acc2:.3f} | Train={train_acc2:.3f} | Overfit={overfit_ratio2:.2f}")
+        ml_model, ml_scaler = best_model, best_scaler
+        logging.info(f"✅ Финальная модель: {best_type} | Test={best_test_acc:.3f} | Train={best_train_acc:.3f}")
 
         return model_info
-    
+
     except Exception as e:
         logging.error(f"❌ Ошибка обучения ML: {e}", exc_info=True)
 
@@ -3014,207 +3159,590 @@ SIGNAL_EXPIRY_MINUTES = 2  # Сигнал действителен 2 минут�
 
 from datetime import datetime  # Убедитесь что этот импорт есть в начале файла
 
-# ===================== AUTO TRADING LOOP - ФИНАЛ =====================
-async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
-    """Финальная версия торгового цикла с ПАРАЛЛЕЛЬНОЙ проверкой фиксированного рабочего времени бота"""
-    start_time = datetime.now()  # ⏱️ ОБЯЗАТЕЛЬНО ДОБАВИТЬ ЭТУ СТРОКУ В НАЧАЛО ФУНКЦИИ
-    
-    try:
-        logging.info("🔄 ===== ЗАПУСК АВТО-ТРЕЙДИНГ ЦИКЛА =====")
+# ===================== 🧩 АНТИ-ЗАВИСАНИЕ СДЕЛОК (ASYNC-SAFE) =====================
+async def auto_close_stuck_trades():
+    """Асинхронно закрывает зависшие сделки, не блокируя event loop"""
+    global users
+    now = datetime.utcnow()
+    closed_count = 0
 
-        # 🕒 Проверяем фиксированный график работы бота
+    try:
+        for uid, udata in list(users.items()):
+            current_trade = udata.get("current_trade")
+            if not current_trade:
+                continue
+
+            start_time_str = current_trade.get("timestamp")
+            expiry_minutes = current_trade.get("expiry_minutes", 1)
+
+            try:
+                start_time = datetime.fromisoformat(start_time_str)
+            except Exception:
+                continue
+
+            elapsed = (now - start_time).total_seconds() / 60
+
+            # Если прошло больше, чем expiry + 2 минуты — считаем зависшей
+            if elapsed > expiry_minutes + 2:
+                current_trade["result"] = "LOSS"
+                current_trade["completed_at"] = now.isoformat()
+
+                udata.setdefault("trade_history", []).append(current_trade)
+                udata["current_trade"] = None
+                closed_count += 1
+
+                logging.warning(f"⚠️ Автоматически закрыта зависшая сделка у пользователя {uid}")
+
+        if closed_count > 0:
+            await async_save_users_data()  # 🔄 не блокирует event loop
+            logging.info(f"♻️ Автоматически закрыто зависших сделок: {closed_count}")
+
+    except Exception as e:
+        logging.error(f"💥 Ошибка в auto_close_stuck_trades: {e}")
+
+
+
+# ===================== 🧠 AUTO TRADING LOOP - АСИНХРОННЫЙ =====================
+async def auto_trading_loop(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Асинхронный торговый цикл с параллельной обработкой пользователей
+    ✅ Защита от зависаний, таймаутов и блокировок
+    """
+    from datetime import datetime
+    start_time = datetime.now()
+    semaphore = asyncio.Semaphore(10)  # ограничение одновременных задач
+
+    await auto_close_stuck_trades()
+
+    try:
         if not is_trading_time():
             logging.info("⏸ Вне рабочего времени бота — цикл пропущен")
             return
-
-        # 📥 Загружаем / обновляем данные пользователей
-        logging.info(f"👥 Загружено пользователей: {len(users)}")
 
         if not users or len(users) == 0:
             logging.warning("⚠ База пользователей пуста")
             return
 
-        # 🚀 ПАРАЛЛЕЛЬНАЯ обработка всех пользователей
-        tasks = []
-        user_tasks = []
+        logging.info(f"🔄 Запуск авто-трейдинг цикла для {len(users)} пользователей...")
 
-        for user_id, user_data in users.copy().items():
-            try:
-                uid = int(user_id)
-                auto_trading = user_data.get('auto_trading', False)
-                
-                if not auto_trading:
-                    logging.info(f"⏸ Пользователь {uid}: авто-трейдинг отключён")
-                    continue
-                    
-                logging.info(f"🚀 Пользователь {uid}: добавляем в параллельную обработку...")
-                # Создаем задачу для каждого пользователя
-                task = asyncio.create_task(
-                    process_auto_trade_for_user(uid, user_data, context),
-                    name=f"user_{uid}"
-                )
-                tasks.append(task)
-                user_tasks.append(uid)
+        async def process_user(uid: int, udata: dict):
+            """Асинхронная обработка одного пользователя с таймаутом и ограничением"""
+            async with semaphore:
+                try:
+                    if not udata.get("auto_trading", True):
+                        logging.debug(f"⏸ {uid}: авто-трейдинг выключен")
+                        return
 
-            except Exception as user_err:
-                logging.error(f"❌ Ошибка подготовки пользователя {user_id}: {user_err}", exc_info=True)
+                    # ограничение выполнения для одного пользователя
+                    await asyncio.wait_for(process_auto_trade_for_user(uid, udata, context), timeout=20)
 
-        # 🔥 ЗАПУСК ВСЕХ ЗАДАЧ ПАРАЛЛЕЛЬНО
-        processed_users = 0
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    logging.error(f"❌ Ошибка у пользователя {user_tasks[i]}: {result}")
-                else:
-                    processed_users += 1
+                except asyncio.TimeoutError:
+                    logging.warning(f"⏳ Таймаут обработки пользователя {uid}")
+                except Exception as err:
+                    logging.error(f"❌ Ошибка при обработке пользователя {uid}: {err}", exc_info=True)
 
-        logging.info(f"✅ АВТО-ТРЕЙДИНГ ЦИКЛ ЗАВЕРШЕН. Обработано пользователей: {processed_users}/{len(users)}")
+        # создаём задачи для всех пользователей
+        tasks = [asyncio.create_task(process_user(uid, udata)) for uid, udata in users.copy().items()]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        success = sum(1 for r in results if not isinstance(r, Exception))
+        logging.info(f"✅ Завершено пользователей: {success}/{len(users)}")
+
+        # безопасное сохранение данных без блокировки event loop
+        await asyncio.to_thread(save_users_data)
 
     except Exception as e:
-        logging.error(f"💥 Критическая ошибка авто-трейдинга: {e}", exc_info=True)
-    
-    finally:
-        execution_time = (datetime.now() - start_time).total_seconds()
-        logging.info(f"⏱️ Авто-трейдинг выполнен за {execution_time:.1f} сек")
+        logging.error(f"💥 Ошибка авто-трейдинга: {e}", exc_info=True)
 
-# ===================== TRADE RESULT CHECKER =====================
+    finally:
+        duration = (datetime.now() - start_time).total_seconds()
+        logging.info(f"⏱️ Цикл завершён за {duration:.1f} сек")
+
+
+# ===================== ⚙️ TRADE RESULT CHECKER (ASYNC VERSION) =====================
 async def check_trade_result(context: ContextTypes.DEFAULT_TYPE):
-    """Проверяет результат сделки и закрывает её с обновлением истории и статистики"""
+    """Асинхронная проверка результата сделки с таймаутами, повторными попытками и защитой от зависаний"""
     try:
         job_data = context.job.data
-        user_id = job_data['user_id']
-        pair = job_data['pair']
-        trade_id = job_data['trade_id']
+        user_id = job_data["user_id"]
+        pair = job_data["pair"]
+        trade_id = job_data["trade_id"]
+        attempt = job_data.get("attempt", 1)
+        max_attempts = job_data.get("max_attempts", 3)
 
-        logging.info(f"🔍 Проверка сделки #{trade_id} для пользователя {user_id}, пара: {pair}")
+        logging.info(f"🔍 Проверка сделки #{trade_id} для пользователя {user_id} ({pair}), попытка {attempt}/{max_attempts}")
 
+        # Получаем данные пользователя
         user_data = get_user_data(user_id)
         if not user_data:
             logging.error(f"❌ Пользователь {user_id} не найден")
             return
 
-        current_trade = user_data.get('current_trade')
+        current_trade = user_data.get("current_trade")
         if not current_trade:
-            logging.warning(f"⚠️ У пользователя {user_id} нет активной сделки")
+            # возможно, сделка уже закрыта
+            await check_if_trade_already_closed(user_id, trade_id, context)
             return
 
-        if current_trade.get('id') != trade_id:
-            logging.warning(f"⚠️ ID сделки не совпадает: ожидали {trade_id}, получили {current_trade.get('id')}")
+        if current_trade.get("id") != trade_id:
+            logging.warning(f"⚠️ Несоответствие ID: ожидалось {trade_id}, получено {current_trade.get('id')}")
+            await check_if_trade_already_closed(user_id, trade_id, context)
             return
 
-        # Получаем текущую цену
-        df = get_mt5_data(pair, 2, mt5.TIMEFRAME_M1)
-        if df is None or len(df) < 1:
-            logging.error(f"❌ Не удалось получить данные для {pair}")
+        # Получаем текущую цену с таймаутом и повторными попытками
+        try:
+            current_price = await asyncio.wait_for(
+                get_current_price_with_retry(pair, max_retries=3),
+                timeout=10
+            )
+        except asyncio.TimeoutError:
+            logging.warning(f"⏳ Таймаут получения цены для {pair}")
+            current_price = None
+
+        if current_price is None:
+            await schedule_retry_check(context.job, attempt, max_attempts, user_id, pair, trade_id)
             return
 
-        current_price = df['close'].iloc[-1]
-        entry_price = current_trade['entry_price']
-        direction = current_trade['direction']
+        entry_price = current_trade["entry_price"]
+        direction = current_trade["direction"]
 
-        # Определяем результат сделки
-        if direction == 'BUY':
-            result = 'WIN' if current_price > entry_price else 'LOSS'
-        else:  # SELL
-            result = 'WIN' if current_price < entry_price else 'LOSS'
+        # Определяем результат
+        result = "WIN" if (
+            (direction == "BUY" and current_price > entry_price) or
+            (direction == "SELL" and current_price < entry_price)
+        ) else "LOSS"
 
-        # Сумма ставки
-        stake = current_trade.get('stake', STAKE_AMOUNT)
-        profit = WIN_PROFIT if result == 'WIN' else -stake
+        stake = current_trade.get("stake", STAKE_AMOUNT)
+        profit = WIN_PROFIT if result == "WIN" else -stake
 
-        # ✅ Формируем финальную запись сделки
         closed_trade = {
-            'id': trade_id,
-            'pair': pair,
-            'direction': direction,
-            'entry_price': entry_price,
-            'exit_price': current_price,
-            'stake': stake,
-            'stake_used': stake,
-            'timestamp': current_trade.get('timestamp', datetime.now().isoformat()),
-            'completed_at': datetime.now().isoformat(),
-            'result': result,
-            'profit': profit,
-            'confidence': current_trade.get('confidence', 0),
-            'source': current_trade.get('source', 'UNKNOWN'),
-            'expiry_minutes': current_trade.get('expiry_minutes', 1),
-            'ml_features': current_trade.get('ml_features', None)
+            "id": trade_id,
+            "pair": pair,
+            "direction": direction,
+            "entry_price": entry_price,
+            "exit_price": current_price,
+            "stake": stake,
+            "timestamp": current_trade.get("timestamp", datetime.now().isoformat()),
+            "completed_at": datetime.now().isoformat(),
+            "result": result,
+            "profit": profit,
+            "confidence": current_trade.get("confidence", 0),
+            "source": current_trade.get("source", "UNKNOWN"),
+            "expiry_minutes": current_trade.get("expiry_minutes", 1),
+            "ml_features": current_trade.get("ml_features"),
+            "check_attempts": attempt,
+            "closed_successfully": True
         }
 
-        # ✅ Добавляем сделку в историю пользователя
-        if 'trade_history' not in user_data:
-            user_data['trade_history'] = []
+        # ✅ Добавляем в историю и очищаем активную сделку
+        user_data.setdefault("trade_history", []).append(closed_trade)
+        user_data["current_trade"] = None
+        user_data["trade_counter"] = len(user_data["trade_history"])
 
-        user_data['trade_history'].append(closed_trade)
-        user_data['trade_counter'] = len(user_data['trade_history'])
+        # 💾 Сохраняем безопасно
+        await asyncio.to_thread(save_users_data)
 
-        # ✅ Очищаем текущую активную сделку
-        user_data['current_trade'] = None
-
-        # ✅ Сохраняем обновлённые данные пользователя
-        save_users_data()
-
-        # ✅ Логируем сделку в файл истории (если функция есть)
+        # 📑 Логируем
         try:
-            log_trade_to_file(closed_trade, result)
+            await asyncio.to_thread(log_trade_to_file, closed_trade, result)
         except Exception as e:
-            logging.error(f"⚠️ Ошибка логирования сделки в файл: {e}")
+            logging.error(f"⚠️ Ошибка логирования сделки: {e}")
 
-        # 📝 Подсчёт текущей статистики для отображения в сообщении
-        total = len(user_data['trade_history'])
-        wins = sum(1 for t in user_data['trade_history'] if t.get('result') == 'WIN')
-        losses = sum(1 for t in user_data['trade_history'] if t.get('result') == 'LOSS')
-        win_rate = round(wins / total * 100, 1) if total > 0 else 0
+        # 📢 Отправляем уведомление пользователю
+        await send_trade_result_notification(context, user_id, closed_trade, user_data)
 
-        # 📢 Уведомление пользователя
-        result_emoji = "🟢" if result == "WIN" else "🔴"
-        result_text = (
-            f"{result_emoji} СДЕЛКА #{trade_id} ЗАВЕРШЕНА\n\n"
+        logging.info(f"✅ Сделка #{trade_id} ({pair}) успешно закрыта — {result}")
+
+    except Exception as e:
+        logging.error(f"💥 Ошибка в check_trade_result: {e}", exc_info=True)
+        try:
+            await schedule_retry_check(context.job, attempt, max_attempts, user_id, pair, trade_id)
+        except Exception as err:
+            logging.error(f"⚠️ Ошибка при планировании повторной проверки: {err}")
+
+
+# ===================== ⚡ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
+
+async def get_current_price_with_retry(pair, max_retries=3):
+    """Получение текущей цены с повторными попытками"""
+    for attempt in range(1, max_retries + 1):
+        try:
+            df = await asyncio.to_thread(get_mt5_data, pair, 2, mt5.TIMEFRAME_M1)
+            if df is not None and len(df) > 0:
+                return df["close"].iloc[-1]
+        except Exception as e:
+            logging.error(f"❌ Ошибка при получении цены {pair} (попытка {attempt}): {e}")
+        if attempt < max_retries:
+            await asyncio.sleep(2)
+    return None
+
+
+async def schedule_retry_check(job, current_attempt, max_attempts, user_id, pair, trade_id):
+    """Планирует повторную проверку сделки"""
+    if current_attempt >= max_attempts:
+        await force_close_trade_on_failure(user_id, trade_id, pair, current_attempt)
+        return
+
+    retry_delay = 30
+    job_data = {
+        "user_id": user_id,
+        "pair": pair,
+        "trade_id": trade_id,
+        "attempt": current_attempt + 1,
+        "max_attempts": max_attempts
+    }
+
+    job.job_queue.run_once(
+        check_trade_result,
+        when=retry_delay,
+        data=job_data,
+        name=f"retry_check_{trade_id}_{current_attempt + 1}"
+    )
+    logging.info(f"🔁 Повторная проверка сделки #{trade_id} через {retry_delay} сек (попытка {current_attempt + 1})")
+
+
+async def force_close_trade_on_failure(user_id, trade_id, pair, attempt):
+    """Принудительное закрытие сделки при превышении попыток"""
+    try:
+        user_data = get_user_data(user_id)
+        if not user_data or not user_data.get("current_trade"):
+            return
+
+        current_trade = user_data["current_trade"]
+
+        closed_trade = {
+            "id": trade_id,
+            "pair": pair,
+            "direction": current_trade["direction"],
+            "entry_price": current_trade["entry_price"],
+            "exit_price": current_trade["entry_price"],
+            "stake": current_trade.get("stake", STAKE_AMOUNT),
+            "timestamp": current_trade.get("timestamp", datetime.now().isoformat()),
+            "completed_at": datetime.now().isoformat(),
+            "result": "LOSS",
+            "profit": -current_trade.get("stake", STAKE_AMOUNT),
+            "force_closed": True,
+            "close_reason": "MAX_RETRIES_EXCEEDED",
+            "check_attempts": attempt
+        }
+
+        user_data.setdefault("trade_history", []).append(closed_trade)
+        user_data["current_trade"] = None
+
+        await asyncio.to_thread(save_users_data)
+        logging.warning(f"🔒 Сделка #{trade_id} принудительно закрыта (превышено {attempt} попыток)")
+
+        await send_force_close_notification(user_id, trade_id)
+
+    except Exception as e:
+        logging.error(f"💥 Ошибка принудительного закрытия сделки #{trade_id}: {e}")
+
+
+async def send_force_close_notification(user_id, trade_id):
+    """Отправка уведомления о принудительном закрытии"""
+    try:
+        await app.bot.send_message(
+            chat_id=user_id,
+            text=(f"⚠️ Сделка #{trade_id} была автоматически закрыта из-за проблем с проверкой.\n"
+                  f"Результат: LOSS\n"
+                  f"Средства возвращены."),
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+        )
+    except Exception as e:
+        logging.error(f"❌ Ошибка уведомления о принудительном закрытии сделки #{trade_id}: {e}")
+
+
+async def check_if_trade_already_closed(user_id, trade_id, context):
+    """Проверяет, не закрыта ли уже сделка"""
+    try:
+        user_data = get_user_data(user_id)
+        if not user_data:
+            return False
+
+        for trade in user_data.get("trade_history", []):
+            if trade.get("id") == trade_id:
+                logging.info(f"ℹ️ Сделка #{trade_id} уже закрыта ранее")
+                return True
+        return False
+    except Exception as e:
+        logging.error(f"❌ Ошибка проверки истории: {e}")
+        return False
+
+
+async def send_trade_result_notification(context, user_id, closed_trade, user_data):
+    """Отправка уведомления пользователю о результате сделки"""
+    try:
+        trade_id = closed_trade["id"]
+        pair = closed_trade["pair"]
+        direction = closed_trade["direction"]
+        entry = closed_trade["entry_price"]
+        exit_ = closed_trade["exit_price"]
+        result = closed_trade["result"]
+        profit = closed_trade["profit"]
+
+        total = len(user_data["trade_history"])
+        wins = sum(1 for t in user_data["trade_history"] if t["result"] == "WIN")
+        losses = total - wins
+        win_rate = round(wins / total * 100, 1) if total else 0
+
+        emoji = "🟢" if result == "WIN" else "🔴"
+        text = (
+            f"{emoji} СДЕЛКА #{trade_id} ЗАВЕРШЕНА\n\n"
             f"💼 Пара: {pair}\n"
             f"📊 Направление: {direction}\n"
-            f"💰 Вход: {entry_price:.5f}\n"
-            f"💰 Выход: {current_price:.5f}\n"
-            f"🎯 Результат: {result}\n\n"
-            f"📊 Общая статистика:\n"
+            f"💰 Вход: {entry:.5f}\n"
+            f"💰 Выход: {exit_:.5f}\n"
+            f"🎯 Результат: {result}\n"
+            f"💸 Прибыль: {profit:.2f}\n\n"
+            f"📊 Ваша статистика:\n"
             f"• Всего: {total}\n"
-            f"• 🟢 Выигрыши: {wins}\n"
-            f"• 🔴 Проигрыши: {losses}\n"
+            f"• 🟢 Победы: {wins}\n"
+            f"• 🔴 Поражения: {losses}\n"
             f"• 🎯 Win Rate: {win_rate}%"
         )
 
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=result_text,
-                reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
-            )
-            logging.info(f"✅ Сделка #{trade_id} закрыта: {result}")
-        except Exception as e:
-            logging.error(f"❌ Ошибка отправки уведомления: {e}")
+        if closed_trade.get("force_closed"):
+            text += "\n\n⚠️ Сделка закрыта автоматически (техническая ошибка)"
+
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+        )
 
     except Exception as e:
-        logging.error(f"💥 Критическая ошибка в check_trade_result: {e}", exc_info=True)
-# ===================== 🤖 PROCESS AUTO TRADE =====================
-async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE):
-    """Авто-трейдинг: анализ, открытие сделки и отложенная запись после закрытия"""
+        logging.error(f"❌ Ошибка отправки уведомления пользователю {user_id}: {e}")
+
+        
+# ===================== TRADE MONITORING & EXPIRED TRADES =====================
+async def check_expired_trades_job(context: ContextTypes.DEFAULT_TYPE):
+    """Периодическая проверка зависших и просроченных сделок"""
     try:
-        # ⏸ Проверка фиксированного рабочего времени бота
+        logging.info("🔍 Проверка просроченных сделок...")
+        expired_count = 0
+
+        # ✅ используем глобальный словарь пользователей
+        global users
+
+        for user_id, user_info in users.items():
+            current_trade = user_info.get('current_trade')
+            if not current_trade:
+                continue
+
+            trade_start_str = current_trade.get('timestamp')
+            if not trade_start_str:
+                continue
+
+            try:
+                # корректно парсим время
+                trade_start = datetime.fromisoformat(trade_start_str.replace('Z', '+00:00'))
+                trade_age = datetime.utcnow() - trade_start
+
+                # если сделка висит более 15 минут — закрываем
+                if trade_age.total_seconds() > 15 * 60:
+                    await force_close_expired_trade(context, user_id, current_trade)
+                    expired_count += 1
+
+            except Exception as e:
+                logging.error(f"❌ Ошибка проверки времени сделки пользователя {user_id}: {e}")
+
+        if expired_count > 0:
+            logging.warning(f"🕒 Автоматически закрыто просроченных сделок: {expired_count}")
+        else:
+            logging.info("✅ Активных зависших сделок не найдено")
+
+    except Exception as e:
+        logging.error(f"❌ Ошибка в check_expired_trades_job: {e}", exc_info=True)
+
+
+# ===================== 🧩 FORCE CLOSE EXPIRED TRADE (ASYNC-SAFE) =====================
+async def force_close_expired_trade(context, user_id, trade):
+    """Принудительное закрытие просроченной сделки без блокировки event loop"""
+    try:
+        user_info = users.get(user_id)
+        if not user_info:
+            logging.error(f"❌ Пользователь {user_id} не найден при закрытии сделки")
+            return
+
+        trade_id = trade.get("id")
+        pair = trade.get("pair")
+        direction = trade.get("direction")
+
+        # 🕐 Получаем текущую цену (с защитой от зависания)
+        try:
+            current_price = await asyncio.wait_for(
+                get_current_price_with_retry(pair, max_retries=2),
+                timeout=8
+            )
+        except asyncio.TimeoutError:
+            current_price = None
+
+        if current_price is None:
+            current_price = trade.get("entry_price", 0.0)
+
+        # 🧾 Формируем запись о закрытии
+        closed_trade = {
+            "id": trade_id,
+            "pair": pair,
+            "direction": direction,
+            "entry_price": trade.get("entry_price", 0.0),
+            "exit_price": current_price,
+            "stake": trade.get("stake", STAKE_AMOUNT),
+            "stake_used": trade.get("stake", STAKE_AMOUNT),
+            "timestamp": trade.get("timestamp", datetime.now().isoformat()),
+            "completed_at": datetime.now().isoformat(),
+            "result": "LOSS",
+            "profit": -trade.get("stake", STAKE_AMOUNT),
+            "confidence": trade.get("confidence", 0),
+            "source": trade.get("source", "UNKNOWN"),
+            "expiry_minutes": trade.get("expiry_minutes", 1),
+            "ml_features": trade.get("ml_features", None),
+            "closed_successfully": False,
+            "force_closed": True,
+            "close_reason": "EXPIRED_TIMEOUT"
+        }
+
+        # 💾 Сохраняем данные пользователя
+        user_info.setdefault("trade_history", []).append(closed_trade)
+        user_info["current_trade"] = None
+        await async_save_users_data()  # 🔄 безопасная асинхронная запись
+
+        logging.warning(f"🔒 Просроченная сделка #{trade_id} у пользователя {user_id} закрыта (таймаут)")
+
+        # 📢 Уведомление пользователя
+        try:
+            msg = (
+                f"⚠️ СДЕЛКА #{trade_id} ЗАКРЫТА ПО ТАЙМАУТУ\n\n"
+                f"Сделка висела более 15 минут без завершения.\n"
+                f"Результат: LOSS (принудительное закрытие)\n"
+                f"Пара: {pair} — {direction}"
+            )
+
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=msg,
+                reply_markup=ReplyKeyboardMarkup(
+                    [["❓ Помощь", "🕒 Расписание"]],
+                    resize_keyboard=True
+                )
+            )
+
+        except telegram.error.Forbidden:
+            logging.warning(f"🚫 Пользователь {user_id} заблокировал бота (не удалось уведомить)")
+            if user_id in users:
+                del users[user_id]
+                await async_save_users_data()
+
+        except Exception as e:
+            logging.error(f"⚠ Ошибка уведомления о принудительном закрытии сделки {trade_id}: {e}")
+
+    except Exception as e:
+        logging.error(f"💥 Ошибка в force_close_expired_trade для пользователя {user_id}: {e}")
+
+# ===================== COMMAND HANDLERS FOR TRADE MANAGEMENT =====================
+
+async def check_active_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать все активные сделки (только для администратора)"""
+    try:
+        user_id = str(update.effective_user.id)
+        
+        # Проверяем права администратора
+        if user_id != "5129282647":  # ID администратора
+            await update.message.reply_text("❌ Эта команда только для администратора")
+            return
+        
+        active_trades = []
+        total_active = 0
+        
+        for uid, user_info in user_data.items():
+            current_trade = user_info.get('current_trade')
+            if current_trade:
+                total_active += 1
+                trade_age = "N/A"
+                if current_trade.get('timestamp'):
+                    try:
+                        trade_start = datetime.fromisoformat(current_trade['timestamp'].replace('Z', '+00:00'))
+                        trade_age_minutes = (datetime.now() - trade_start).total_seconds() / 60
+                        trade_age = f"{trade_age_minutes:.1f} мин"
+                    except:
+                        trade_age = "N/A"
+                
+                active_trades.append(
+                    f"👤 {user_info.get('first_name', 'Unknown')} (ID: {uid})\n"
+                    f"   📈 {current_trade['pair']} {current_trade['direction']}\n"
+                    f"   🆔 #{current_trade.get('id', 'N/A')}\n"
+                    f"   ⏰ Возраст: {trade_age}\n"
+                    f"   🎯 Источник: {current_trade.get('source', 'UNKNOWN')}\n"
+                    f"   💰 Ставка: ${current_trade.get('stake', 0):.2f}"
+                )
+        
+        if active_trades:
+            message = f"🔍 АКТИВНЫЕ СДЕЛКИ ({total_active}):\n\n" + "\n\n".join(active_trades)
+        else:
+            message = "✅ Нет активных сделок"
+            
+        await update.message.reply_text(message)
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка команды check_active_trades: {e}")
+        await update.message.reply_text("❌ Ошибка получения информации о сделках")
+
+async def force_close_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Принудительно закрыть все активные сделки (только для администратора)"""
+    try:
+        user_id = str(update.effective_user.id)
+        
+        # Проверяем права администратора
+        if user_id != "5129282647":
+            await update.message.reply_text("❌ Эта команда только для администратора")
+            return
+        
+        closed_count = 0
+        for uid, user_info in user_data.items():
+            current_trade = user_info.get('current_trade')
+            if current_trade:
+                # Используем существующую функцию принудительного закрытия
+                await force_close_expired_trade(context, uid, current_trade)
+                closed_count += 1
+        
+        if closed_count > 0:
+            await update.message.reply_text(f"✅ Принудительно закрыто {closed_count} сделок")
+        else:
+            await update.message.reply_text("✅ Нет активных сделок для закрытия")
+            
+    except Exception as e:
+        logging.error(f"❌ Ошибка команды force_close_trade: {e}")
+        await update.message.reply_text("❌ Ошибка принудительного закрытия сделок")
+
+# ===================== ⚡ PROCESS AUTO TRADE FOR USER (ASYNC VERSION) =====================
+async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Асинхронная версия авто-трейдинга с таймаутами, безопасной обработкой и отсутствием блокировок
+    """
+    try:
+        # 🕒 Проверяем, разрешено ли сейчас торговать
         if not is_trading_time():
-            logging.info(f"⏸ Вне рабочего времени — пользователь {user_id}, цикл пропущен")
+            logging.debug(f"⏸ Вне рабочего времени — пользователь {user_id}")
             return
 
-        # ⏸ Проверка на уже открытую сделку
+        # 🧩 Пропускаем, если есть открытая сделка
         if user_data.get('current_trade'):
-            logging.info(f"⏸ Пользователь {user_id} уже имеет открытую сделку — пропуск")
+            logging.debug(f"⏸ Пользователь {user_id} уже имеет открытую сделку")
             return
 
-        logging.info(f"🚀 [AUTO] Старт автоанализа для user_id={user_id}")
+        logging.info(f"🚀 [AUTO] Старт анализа для пользователя {user_id}")
         random.shuffle(PAIRS)
 
         for pair in PAIRS:
             start_time = datetime.now()
-            result = analyze_pair(pair)
+
+            # 🧠 Анализ пары в отдельном потоке (чтобы не блокировать event loop)
+            try:
+                result = await asyncio.to_thread(analyze_pair, pair)
+            except Exception as e:
+                logging.warning(f"⚠ Ошибка анализа {pair} для {user_id}: {e}")
+                continue
+
             if not result or len(result) < 4:
                 continue
 
@@ -3224,16 +3752,18 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
             if not signal or conf < 6:
                 continue
 
-            # 📊 Получаем данные с MT5
-            df = get_mt5_data(pair, 300, mt5.TIMEFRAME_M1)
+            # 📊 Получаем данные с MT5 асинхронно
+            df = await asyncio.to_thread(get_mt5_data, pair, 300, mt5.TIMEFRAME_M1)
             if df is None or len(df) < 50:
                 continue
 
             entry_price = df['close'].iloc[-1]
             trade_number = user_data['trade_counter'] + 1
-            ml_features_dict = prepare_ml_features(df) or {}
 
-            # 📝 Текст сигнала
+            # 🧠 Подготовка ML-признаков
+            ml_features_dict = await asyncio.to_thread(prepare_ml_features, df)
+
+            # 📝 Формируем сообщение
             signal_text = (
                 f"🎯 СДЕЛКА #{trade_number}\n"
                 f"🤖 АВТО-ТРЕЙДИНГ СИГНАЛ\n"
@@ -3246,26 +3776,44 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
                 f"Сделка открыта! Результат через {expiry} минут..."
             )
 
-            # 📈 Отправка графика ИЗ ПАМЯТИ (BytesIO)
-            chart_stream = enhanced_plot_chart(df, pair, entry_price, signal)
-            user_markup = get_trading_keyboard(user_id)
+            # 📈 Генерация графика (в фоне)
+            chart_stream = await asyncio.to_thread(enhanced_plot_chart, df, pair, entry_price, signal)
+            markup = ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+
+            # 📤 Отправка сигнала пользователю
             try:
                 if chart_stream:
-                    # 🔥 ПРАВИЛЬНАЯ ОТПРАВКА BytesIO ИЗ ПАМЯТИ
                     await context.bot.send_photo(
-                        chat_id=user_id, 
-                        photo=chart_stream,  # Отправляем BytesIO напрямую
-                        caption=signal_text, 
-                        reply_markup=user_markup
+                        chat_id=user_id,
+                        photo=chart_stream,
+                        caption=signal_text,
+                        reply_markup=markup
                     )
-                    # 🔥 НЕ НУЖНО УДАЛЯТЬ ФАЙЛ - его нет!
-                    logging.info(f"✅ График отправлен из памяти пользователю {user_id}")
                 else:
-                    await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=user_markup)
-            except Exception as tg_err:
-                logging.error(f"⚠ Ошибка отправки сигнала пользователю {user_id}: {tg_err}")
+                    await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=markup)
 
-            # 📌 Сделка сохраняется ТОЛЬКО как текущая
+                logging.info(f"✅ Сигнал отправлен пользователю {user_id} ({pair} {signal})")
+
+            except telegram.error.Forbidden:
+                logging.warning(f"🚫 Пользователь {user_id} заблокировал бота — удаляем из базы")
+                users.pop(user_id, None)
+                await asyncio.to_thread(save_users_data)
+                return
+
+            except telegram.error.TimedOut:
+                logging.warning(f"⏳ Таймаут Telegram API для {user_id}, повторная попытка...")
+                await asyncio.sleep(2)
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=signal_text, reply_markup=markup)
+                except Exception as retry_err:
+                    logging.error(f"⚠ Ошибка повторной отправки {user_id}: {retry_err}")
+                return
+
+            except Exception as send_err:
+                logging.error(f"⚠ Ошибка отправки сигнала {user_id}: {send_err}")
+                return
+
+            # 💾 Сохраняем текущую сделку
             trade = {
                 'id': trade_number,
                 'pair': pair,
@@ -3274,17 +3822,18 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
                 'expiry_minutes': int(expiry),
                 'stake': float(STAKE_AMOUNT),
                 'timestamp': datetime.now().isoformat(),
-                'ml_features': ml_features_dict,
+                'ml_features': ml_features_dict or {},
                 'source': source,
                 'confidence': int(conf)
             }
 
             user_data['current_trade'] = trade
             user_data['trade_counter'] += 1
-            save_users_data()
-            logging.info(f"📌 Текущая сделка #{trade_number} сохранена (история — после закрытия)")
 
-            # ⏱ Планируем проверку результата сделки
+            await asyncio.to_thread(save_users_data)
+            logging.info(f"📌 Сделка #{trade_number} сохранена (история добавится после закрытия)")
+
+            # 🕒 Планируем проверку результата
             check_delay = (expiry * 60) + 5
             context.job_queue.run_once(
                 check_trade_result,
@@ -3292,17 +3841,20 @@ async def process_auto_trade_for_user(user_id: int, user_data: Dict, context: Co
                 data={'user_id': user_id, 'pair': pair, 'trade_id': trade_number}
             )
 
-            logging.info(f"🕒 План проверки сделки #{trade_number} через {check_delay} сек")
+            logging.info(f"🕒 Проверка сделки #{trade_number} через {check_delay} сек")
+
             elapsed = (datetime.now() - start_time).total_seconds()
             logging.info(f"✅ Сделка #{trade_number} ({pair} {signal}) открыта за {elapsed:.2f} сек")
 
-            # 🛑 Одна сделка за цикл
+            # 🛑 Одно срабатывание за цикл
             return
 
-        logging.info(f"🏁 [AUTO] Анализ для user_id={user_id} завершён без открытия сделок")
+        logging.info(f"🏁 [AUTO] Анализ для {user_id} завершён без открытия сделок")
 
     except Exception as e:
-        logging.error(f"❌ Ошибка process_auto_trade_for_user: {e}", exc_info=True)
+        logging.error(f"❌ Ошибка process_auto_trade_for_user({user_id}): {e}", exc_info=True)
+
+
         
 # ===================== TELEGRAM COMMANDS =====================
 # -------- WHITELIST MANAGEMENT COMMANDS --------
@@ -3486,7 +4038,65 @@ async def send_bot_status_notification(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logging.error(f"❌ Ошибка отправки уведомлений о статусе: {e}")
 
-# -------- START & STATUS --------
+# -------- START & STATUS (ASYNC-SAFE) --------
+async def register_or_update_user(user_id: int, username: str, update: Update):
+    """Регистрирует нового пользователя или обновляет данные существующего (асинхронно и безопасно)"""
+    try:
+        # Получаем данные пользователя
+        user_data = get_user_data(user_id)
+
+        # 🔥 Правильное получение имени пользователя
+        first_name = update.effective_user.first_name if update.effective_user else ''
+        
+        # Обновляем информацию
+        user_data['first_name'] = first_name
+        user_data['username'] = username
+        user_data['language'] = 'ru'
+
+        # Если пользователь новый
+        if 'created_at' not in user_data:
+            user_data['created_at'] = datetime.now().isoformat()
+            user_data['auto_trading'] = True
+            user_data['ml_enabled'] = ML_ENABLED
+            user_data['gpt_enabled'] = USE_GPT
+            user_data['smc_enabled'] = True
+
+            logging.info(f"✅ Зарегистрирован новый пользователь: {user_id} ({username})")
+
+            # 🔥 Автоматическое добавление в pocket_users.json
+            try:
+                # Загружаем whitelist асинхронно
+                whitelist = await asyncio.to_thread(load_whitelist)
+
+                pocket_id = str(user_id)
+                user_name = first_name or f"User_{user_id}"
+
+                if pocket_id not in whitelist:
+                    whitelist[pocket_id] = {
+                        "name": user_name,
+                        "role": "user",
+                        "telegram_id": user_id,
+                        "registered_at": datetime.now().isoformat(),
+                        "status": "active"
+                    }
+                    await asyncio.to_thread(save_whitelist, whitelist)
+                    logging.info(f"✅ Пользователь {user_id} добавлен в pocket_users.json")
+                else:
+                    logging.info(f"ℹ️ Пользователь {user_id} уже есть в pocket_users.json")
+
+            except Exception as e:
+                logging.error(f"❌ Ошибка добавления пользователя в pocket_users.json: {e}")
+
+        else:
+            logging.info(f"✅ Обновлены данные пользователя: {user_id}")
+
+        # 💾 Асинхронное сохранение базы
+        await async_save_users_data()
+
+    except Exception as e:
+        logging.error(f"❌ Ошибка регистрации пользователя {user_id}: {e}")
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start - ОДИНАКОВЫЕ КНОПКИ ДЛЯ ВСЕХ"""
     try:
@@ -3501,7 +4111,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         
         # Разный текст приветствия для админа и пользователей
-        if user_id in ADMIN_IDS:
+        if is_admin(user_id):  # 🔥 ИСПРАВЛЕНИЕ: используем is_admin вместо ADMIN_IDS
             welcome_text = (
                 "🛠️ **Панель администратора**\n\n"
                 "📋 **Доступные команды:**\n"
@@ -3535,7 +4145,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
         
         # Регистрация/обновление пользователя
-        await register_or_update_user(user_id, username, context)
+        await register_or_update_user(user_id, username, update)  # 🔥 ИСПРАВЛЕНИЕ: передаем update вместо context
         
     except Exception as e:
         logging.error(f"❌ Ошибка в start_command: {e}")
@@ -3578,36 +4188,36 @@ async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда показа расписания работы бота"""
     try:
         schedule_text = (
-            "🕒 **РАСПИСАНИЕ РАБОТЫ БОТА**\n\n"
+            "🕒 РАСПИСАНИЕ РАБОТЫ БОТА\n\n"
             
-            "⏰ **Рабочие часы:**\n"
+            "⏰ Рабочие часы:\n"
             "• Начало: 04:00 (по вашему времени)\n"
             "• Окончание: 23:59 (по вашему времени)\n"
             "• Ежедневно, кроме выходных\n\n"
             
-            "🗓️ **Выходные дни:**\n"
+            "🗓️ Выходные дни:\n"
             "• Суббота - не работает\n" 
             "• Воскресенье - не работает\n\n"
             
-            "📈 **Когда бот активен:**\n"
+            "📈 Когда бот активен:\n"
             "• Анализирует валютные пары\n"
             "• Ищет торговые сигналы\n"
             "• Автоматически открывает сделки\n"
             "• Отправляет уведомления\n\n"
             
-            "💤 **Когда бот неактивен:**\n"
+            "💤 Когда бот неактивен:\n"
             "• Вне рабочих часов\n"
             "• В выходные дни\n"
             "• При техническом обслуживании\n\n"
             
-            "🔔 **Статус работы:**\n"
+            "🔔 Статус работы:\n"
             f"• Сейчас бот {'🟢 АКТИВЕН' if is_trading_time() else '🔴 НЕАКТИВЕН'}\n"
-            f"• Текущее время: {datetime.now().strftime('%H:%:%S')}\n\n"
+            f"• Текущее время: {datetime.now().strftime('%H:%M:%S')}\n\n"
             
             "⚡ Бот автоматически возобновит работу согласно расписанию!"
         )
         
-        await update.message.reply_text(schedule_text, parse_mode='Markdown')
+        await update.message.reply_text(schedule_text)  # ✅ Убрал parse_mode='Markdown'
         
     except Exception as e:
         logging.error(f"❌ Ошибка в schedule_command: {e}")
@@ -3850,7 +4460,7 @@ async def model_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         await update.message.reply_text(
             stats_text,
-            reply_markup=get_models_keyboard(update.effective_user.id)
+            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True) 
         )
     except Exception as e:
         logging.error(f"Ошибка model_stats_command: {e}", exc_info=True)
@@ -3860,8 +4470,9 @@ async def model_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
 
 
+# ===================== 🔁 ОБНОВЛЁННАЯ КОМАНДА /retrain_model =====================
 async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Переобучает ML модель (доступно только администратору)"""
+    """Переобучает ML модель (доступно только администратору, с сравнением RF и MLP)"""
     user_id = update.effective_user.id
 
     # 🧩 Проверка прав доступа
@@ -3872,7 +4483,7 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
 
-    # 🔄 Сообщение о старте обучения
+    # 🔄 Уведомление о старте
     await update.message.reply_text(
         "🔄 Запускаю переобучение ML модели... Это может занять несколько минут.",
         reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
@@ -3882,7 +4493,7 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
         # 🚀 Запуск обучения
         result = train_ml_model()
 
-        # ✅ УСПЕШНОЕ ОБУЧЕНИЕ
+        # ✅ Успех
         if result and not result.get("error"):
             test_acc = result.get("test_accuracy", 0)
             cv_accuracy = result.get("cv_accuracy", 0)
@@ -3890,26 +4501,54 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
             overfit = result.get("overfitting_ratio", 0)
             f1 = result.get("f1_score", 0)
             model_type = result.get("model_type", "N/A")
+            win_rate = result.get("win_rate", 0)
+            n_features = result.get("n_features", 0)
+            train_acc = result.get("train_accuracy", 0)
+            test_samples = result.get("test_samples", 0)
+            train_samples = result.get("train_samples", 0)
 
-            # Приводим проценты в корректный формат (если не 0–1)
+            # Корректировка процентов
             if test_acc <= 1:
                 test_acc *= 100
             if cv_accuracy <= 1:
                 cv_accuracy *= 100
 
+            # 🏆 Финальное сообщение
             msg = (
-                "✅ ML модель успешно переобучена!\n"
+                f"✅ ML модель успешно переобучена!\n"
                 f"📊 Точность (тест): {test_acc:.2f}%\n"
                 f"🎯 Кросс-валидация: {cv_accuracy:.2f}%\n"
                 f"📈 Сделок использовано: {trades_used}\n"
                 f"🧠 Тип модели: {model_type}\n"
+                f"📋 Признаков: {n_features} | Train={train_samples} | Test={test_samples}\n"
+                f"📊 Win rate: {win_rate:.2f}%\n"
                 f"📊 F1 Score: {f1:.2f}% | Overfit: {overfit:.2f}\n"
             )
 
-            await update.message.reply_text(msg, reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True))
-            logging.info(f"[ML] ✅ Модель переобучена: Test={test_acc:.2f}% CV={cv_accuracy:.2f}%")
+            # Отправляем основное сообщение
+            await update.message.reply_text(
+                msg,
+                reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+            )
 
-        # ⚠️ ОБРАБОТКА ОШИБОК
+            # 🏁 Лог в консоль
+            logging.info(
+                f"[ML] ✅ Модель переобучена ({model_type}): Test={test_acc:.2f}% | CV={cv_accuracy:.2f}% | Overfit={overfit:.2f}"
+            )
+
+            # 💡 Дополнительное уведомление о сравнении моделей
+            if model_type == "MLPClassifier":
+                await update.message.reply_text(
+                    "🤖 Нейросеть (MLPClassifier) показала лучшие результаты и выбрана как основная модель 🏆",
+                    reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+                )
+            elif model_type == "RandomForestClassifier":
+                await update.message.reply_text(
+                    "🌲 RandomForestClassifier сохранил лидерство — стабильная точность и надёжность ✅",
+                    reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
+                )
+
+        # ⚠️ Ошибка в обучении
         else:
             error_msg = result.get("error", "Неизвестная ошибка") if result else "Неизвестная ошибка"
             await update.message.reply_text(
@@ -3919,17 +4558,10 @@ async def retrain_model_command(update: Update, context: ContextTypes.DEFAULT_TY
             logging.error(f"[ML] ❌ Ошибка переобучения: {error_msg}")
 
     except Exception as e:
-        # 🧨 КРИТИЧЕСКАЯ ОШИБКА
+        # 🧨 Критическая ошибка
         logging.exception(f"[ML] Ошибка при переобучении модели: {e}")
         await update.message.reply_text(
             f"❌ Критическая ошибка при переобучении: {e}",
-            reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
-        )
-            
-    except Exception as e:
-        logging.error(f"Ошибка retrain_model_command: {e}", exc_info=True)
-        await update.message.reply_text(
-            f"❌ Произошла ошибка при переобучении модели: {str(e)}",
             reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
 # -------- TOGGLE FUNCTIONS (ML / GPT / SMC) --------
@@ -3997,65 +4629,70 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда помощи с обновленной информацией"""
     try:
         help_text = (
-            "🆘 **ПОМОЩЬ И ПОДДЕРЖКА**\n\n"
+            "🆘 ПОМОЩЬ И ПОДДЕРЖКА\n\n"
             
-            "🎯 **Как работает бот:**\n"
+            "🎯 Как работает бот:\n"
             "• Автоматически анализирует рынок 24/7\n"
             "• Использует Smart Money Concepts (SMC)\n" 
             "• Ищет зоны спроса/предложения\n"
             "• Определяет ордер-блоки и уровни\n"
             "• Генерирует сигналы с уверенностью\n\n"
             
-            "📊 **Типы сигналов:**\n"
+            "📊 Типы сигналов:\n"
             "• 🎯 ENHANCED_SMART_MONEY - основные сигналы\n"
             "• 🤖 ML_VALIDATED - машинное обучение\n"
             "• 💬 GPT - анализ искусственного интеллекта\n\n"
             
-            "⏰ **График работы:**\n"
+            "⏰ График работы:\n"
             "• Бот работает по установленному расписанию\n"
             "• Используйте кнопку '🕒 Расписание' для деталей\n"
             "• Вне рабочего времени анализ приостанавливается\n\n"
             
-            "⚠️ **Важно:**\n"
+            "⚠️ Важно:\n"
             "• Всегда используйте управление рисками\n"
             "• Не инвестируйте больше, чем можете потерять\n"
             "• Сигналы не являются финансовой рекомендацией\n\n"
             
-            "📞 **Поддержка:**\n"
+            "📞 Поддержка:\n"
             "По вопросам работы бота обращайтесь в группу поддержки:\n"
             "👉 https://t.me/+hKC6n9WrE6pkMzEy"
         )
         
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+        await update.message.reply_text(help_text)  # ✅ Убрал parse_mode='Markdown'
         
     except Exception as e:
         logging.error(f"❌ Ошибка в help_command: {e}")
         await update.message.reply_text("❌ Произошла ошибка при показе помощи")
+        
+# ===================== ⚙️ USER COMMANDS (ASYNC-SAFE) =====================
 
 async def toggle_auto_trading(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Переключает авто-трейдинг для пользователя"""
+    """Переключает авто-трейдинг для пользователя (без блокировки event loop)"""
     user_id = update.effective_user.id
     user_data = get_user_data(user_id)
-    
+
     user_data['auto_trading'] = not user_data.get('auto_trading', False)
     status = "🟢 ВКЛ" if user_data['auto_trading'] else "🔴 ВЫКЛ"
-    
+
     await update.message.reply_text(
         f"🤖 Авто-трейдинг: {status}",
         reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
     )
-    save_users_data()
-    
+
+    # 💾 Асинхронное сохранение
+    await async_save_users_data()
+
+
 async def clear_active_trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Очищает активную сделку (для отладки)"""
     user_id = update.effective_user.id
     user_data = get_user_data(user_id)
-    
+
     if user_data.get('current_trade'):
         trade_info = user_data['current_trade']
         user_data['current_trade'] = None
-        save_users_data()
-        
+        await async_save_users_data()
+
         await update.message.reply_text(
             f"🔄 Активная сделка очищена:\n"
             f"Пара: {trade_info.get('pair')}\n"
@@ -4070,54 +4707,57 @@ async def clear_active_trade_command(update: Update, context: ContextTypes.DEFAU
             reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True)
         )
 
+
 async def restore_counter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Восстанавливает правильный счетчик сделок"""
+    """Восстанавливает правильный счётчик сделок (без блокировки event loop)"""
     user_id = update.effective_user.id
-    
+
     if MULTI_USER_MODE and not is_admin(user_id):
         await update.message.reply_text("❌ Эта команда доступна только администратору")
         return
-        
-    await update.message.reply_text("🔄 Восстановление счетчика сделок...")
-    
+
+    await update.message.reply_text("🔄 Восстановление счётчика сделок...")
+
     try:
         if MULTI_USER_MODE:
-            for user_id, user_data in users.items():
+            for uid, user_data in users.items():
                 actual_trades = len(user_data.get('trade_history', []))
                 current_counter = user_data.get('trade_counter', 0)
-                
+
                 if actual_trades > current_counter:
                     user_data['trade_counter'] = actual_trades
                     await update.message.reply_text(
-                        f"✅ Восстановлен счетчик для пользователя {user_id}:\n"
+                        f"✅ Восстановлен счётчик для пользователя {uid}:\n"
                         f"Было: {current_counter}\n"
                         f"Стало: {actual_trades}"
                     )
                 else:
                     await update.message.reply_text(
-                        f"ℹ️ Счетчик для пользователя {user_id} корректен: {current_counter}"
+                        f"ℹ️ Счётчик для пользователя {uid} корректен: {current_counter}"
                     )
         else:
             actual_trades = len(single_user_data.get('trade_history', []))
             current_counter = single_user_data.get('trade_counter', 0)
-            
+
             if actual_trades > current_counter:
                 single_user_data['trade_counter'] = actual_trades
                 await update.message.reply_text(
-                    f"✅ Восстановлен счетчик:\n"
+                    f"✅ Восстановлен счётчик:\n"
                     f"Было: {current_counter}\n"
                     f"Стало: {actual_trades}"
                 )
             else:
                 await update.message.reply_text(
-                    f"ℹ️ Счетчик корректен: {current_counter}"
+                    f"ℹ️ Счётчик корректен: {current_counter}"
                 )
-        
-        save_users_data()
-        
+
+        # 💾 Асинхронное сохранение базы
+        await async_save_users_data()
+
     except Exception as e:
-        logging.error(f"Ошибка восстановления счетчика: {e}")
+        logging.error(f"Ошибка восстановления счётчика: {e}")
         await update.message.reply_text(f"❌ Ошибка: {e}")
+
 
 async def check_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Проверяет целостность данных"""
@@ -4166,10 +4806,12 @@ async def check_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка проверки: {e}")
 
+# ===================== ⚙️ RESTORE FROM BACKUP (ASYNC-SAFE) =====================
 async def restore_from_backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Восстанавливает данные из последнего бэкапа"""
+    """Восстанавливает данные из последнего бэкапа (асинхронно и безопасно)"""
     user_id = update.effective_user.id
 
+    # 🔐 Только администраторы
     if MULTI_USER_MODE and not is_admin(user_id):
         await update.message.reply_text("❌ Эта команда доступна только администратору")
         return
@@ -4177,280 +4819,350 @@ async def restore_from_backup_command(update: Update, context: ContextTypes.DEFA
     await update.message.reply_text("🔄 Поиск резервных копий данных...")
 
     try:
-        backup_files = []
-        if os.path.exists("backups"):
-            backup_files = [f for f in os.listdir("backups") if f.startswith("users_data_backup")]
+        backup_dir = "backups"
+        if not os.path.exists(backup_dir):
+            await update.message.reply_text("❌ Папка backups/ не найдена")
+            return
 
+        # 📂 Ищем файлы бэкапов
+        backup_files = [f for f in os.listdir(backup_dir) if f.startswith("users_data_backup")]
         if not backup_files:
             await update.message.reply_text("❌ Резервные копии не найдены в папке backups/")
             return
 
-        # Сортируем по дате (новейшие первыми)
+        # 📅 Сортируем по дате (новейшие первыми)
         backup_files.sort(reverse=True)
-        latest_backup = os.path.join("backups", backup_files[0])
+        latest_backup = os.path.join(backup_dir, backup_files[0])
 
         await update.message.reply_text(f"📂 Найдена резервная копия: {backup_files[0]}")
 
-        # Загружаем из бэкапа
-        with open(latest_backup, "r", encoding="utf-8") as f:
-            backup_data = json.load(f)
+        # 🧠 Загружаем данные из бэкапа асинхронно
+        async with aiofiles.open(latest_backup, "r", encoding="utf-8") as f:
+            content = await f.read()
+        backup_data = json.loads(content)
 
-        # Восстанавливаем данные в память
-        global users
-        users.clear()
+        # 🔒 Блокируем сохранение, чтобы никто не записывал в этот момент
+        async with save_lock:
+            global users
+            users.clear()
+            for uid_str, user_data in backup_data.items():
+                users[int(uid_str)] = user_data
 
-        for uid_str, user_data in backup_data.items():
-            users[int(uid_str)] = user_data
+            # 💾 Асинхронно сохраняем восстановленные данные как текущие
+            await async_save_users_data()
 
-        # Сохраняем как текущие данные
-        save_users_data()
+            # ✅ Обновляем память из сохранённого файла
+            await asyncio.to_thread(load_users_data)
 
-        # ✅ 📌 ВАЖНО: сразу обновляем память из восстановленного файла
-        users.clear()
-        load_users_data()
         logging.info("♻️ Память пользователей успешно обновлена после восстановления бэкапа")
 
-        # Статистика
-        total_trades = sum(len(user_data.get('trade_history', [])) for user_data in users.values())
+        # 📊 Статистика
+        total_trades = sum(len(u.get('trade_history', [])) for u in users.values())
         await update.message.reply_text(
-            f"✅ Данные восстановлены из бэкапа!\n"
+            f"✅ Данные восстановлены из последнего бэкапа!\n"
             f"📊 Пользователей: {len(users)}\n"
             f"📈 Сделок: {total_trades}\n"
             f"♻️ Память обновлена — перезапуск не требуется"
         )
 
     except Exception as e:
-        logging.error(f"Ошибка восстановления из бэкапа: {e}", exc_info=True)
+        logging.error(f"💥 Ошибка восстановления из бэкапа: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Ошибка восстановления: {e}")
 
 
+
+# ===================== ⚙️ RECALCULATE REAL ML FEATURES (ASYNC-SAFE) =====================
 async def recalculate_real_ml_features_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пересчитывает ML фичи на РЕАЛЬНЫХ данных для всех сделок с новыми фичами"""
+    """Асинхронно пересчитывает ML-фичи на реальных данных для всех сделок"""
     user_id = update.effective_user.id
-    
+
+    # 🔐 Только админ
     if MULTI_USER_MODE and not is_admin(user_id):
         await update.message.reply_text("❌ Эта команда доступна только администратору")
         return
-        
-    await update.message.reply_text("🔄 Пересчет РЕАЛЬНЫХ ML фичей для всех сделок с новыми фичами...")
-    
+
+    await update.message.reply_text("🔄 Пересчёт РЕАЛЬНЫХ ML-фичей для всех сделок...")
+
     try:
         recalculated_count = 0
         failed_count = 0
         total_trades = 0
-        
-        # Считаем общее количество сделок для прогресса
+
+        # 📊 Подсчёт общего количества сделок
         if MULTI_USER_MODE:
-            for user_id, user_data in users.items():
-                total_trades += len(user_data.get('trade_history', []))
+            total_trades = sum(len(u.get("trade_history", [])) for u in users.values())
         else:
             total_trades = len(all_trades)
-        
+
         processed = 0
-        
+
+        # 🧠 Основной цикл
         if MULTI_USER_MODE:
-            for user_id, user_data in users.items():
-                for trade in user_data.get('trade_history', []):
-                    if trade.get('pair'):
-                        pair = trade['pair']
-                        # Получаем реальные данные для пересчета
-                        df_m1 = get_mt5_data(pair, 400, mt5.TIMEFRAME_M1)
-                        
-                        if df_m1 is not None and len(df_m1) > 100:
-                            # ⬇️⬇️⬇️ ВАЖНО: Используем новую функцию prepare_ml_features() ⬇️⬇️⬇️
-                            feats = prepare_ml_features(df_m1)
-                            if feats is not None:
-                                # ⬇️⬇️⬇️ ВАЖНО: Сохраняем ВСЕ фичи, а не только 9 ⬇️⬇️⬇️
-                                trade['ml_features'] = feats  # Сохраняем все фичи как есть
-                                recalculated_count += 1
-                                logging.info(f"✅ Пересчитаны фичи для {pair} (фичей: {len(feats)})")
-                            else:
-                                failed_count += 1
-                                logging.warning(f"❌ prepare_ml_features вернул None для {pair}")
-                        else:
-                            failed_count += 1
-                            
-                    processed += 1
-                    # Прогресс каждые 20 сделок
-                    if processed % 20 == 0:
-                        await update.message.reply_text(f"📊 Обработано {processed}/{total_trades} сделок...")
-        
-        else:
-            # Режим одного пользователя
-            for i, trade in enumerate(all_trades):
-                if trade.get('pair'):
-                    pair = trade['pair']
-                    df_m1 = get_mt5_data(pair, 400, mt5.TIMEFRAME_M1)
-                    
+            for uid, udata in users.items():
+                for trade in udata.get("trade_history", []):
+                    if not trade.get("pair"):
+                        continue
+
+                    pair = trade["pair"]
+
+                    # Получаем данные с MT5 — без блокировки event loop
+                    df_m1 = await asyncio.to_thread(get_mt5_data, pair, 400, mt5.TIMEFRAME_M1)
                     if df_m1 is not None and len(df_m1) > 100:
-                        feats = prepare_ml_features(df_m1)
-                        if feats is not None:
-                            trade['ml_features'] = feats  # Сохраняем все фичи
+                        # Подготовка фичей — CPU-нагрузка
+                        feats = await asyncio.to_thread(prepare_ml_features, df_m1)
+                        if feats:
+                            trade["ml_features"] = feats
                             recalculated_count += 1
-                            logging.info(f"✅ Пересчитаны фичи для {pair} (фичей: {len(feats)})")
+                            logging.info(f"✅ Пересчитаны фичи для {pair} ({len(feats)})")
                         else:
                             failed_count += 1
                     else:
                         failed_count += 1
-                
+
+                    processed += 1
+                    if processed % 20 == 0:
+                        await update.message.reply_text(f"📊 Обработано {processed}/{total_trades} сделок...")
+
+        else:
+            # Режим одного пользователя
+            for trade in all_trades:
+                if not trade.get("pair"):
+                    continue
+
+                pair = trade["pair"]
+                df_m1 = await asyncio.to_thread(get_mt5_data, pair, 400, mt5.TIMEFRAME_M1)
+                if df_m1 is not None and len(df_m1) > 100:
+                    feats = await asyncio.to_thread(prepare_ml_features, df_m1)
+                    if feats:
+                        trade["ml_features"] = feats
+                        recalculated_count += 1
+                        logging.info(f"✅ Пересчитаны фичи для {pair} ({len(feats)})")
+                    else:
+                        failed_count += 1
+                else:
+                    failed_count += 1
+
                 processed += 1
-                if processed % 20 == 0 and processed > 0:
+                if processed % 20 == 0:
                     await update.message.reply_text(f"📊 Обработано {processed}/{total_trades} сделок...")
-        
+
+        # 💾 Асинхронное сохранение результатов
         if recalculated_count > 0:
-            save_users_data()
-            # Проверяем количество фич в первой успешной сделке
+            await async_save_users_data()
+
+            # Проверяем пример фичей
             sample_features_count = 0
-            if MULTI_USER_MODE:
-                for user_id, user_data in users.items():
-                    for trade in user_data.get('trade_history', []):
-                        if trade.get('ml_features'):
-                            sample_features_count = len(trade['ml_features'])
-                            break
-                    if sample_features_count > 0:
-                        break
-            else:
-                for trade in all_trades:
-                    if trade.get('ml_features'):
-                        sample_features_count = len(trade['ml_features'])
-                        break
-            
+            trades_iter = (
+                (trade for u in users.values() for trade in u.get("trade_history", []))
+                if MULTI_USER_MODE
+                else all_trades
+            )
+            for trade in trades_iter:
+                if trade.get("ml_features"):
+                    sample_features_count = len(trade["ml_features"])
+                    break
+
             await update.message.reply_text(
-                f"✅ Пересчет завершен!\n"
-                f"• Успешно: {recalculated_count} сделок\n"
+                f"✅ Пересчёт завершён!\n"
+                f"• Успешно: {recalculated_count}\n"
                 f"• Ошибок: {failed_count}\n"
-                f"• Новое количество фич: {sample_features_count}\n"
-                f"💡 Теперь можно использовать /retrain"
+                f"• Кол-во фич: {sample_features_count}\n"
+                f"💡 Можно запустить /retrain"
             )
         else:
             await update.message.reply_text("❌ Не удалось пересчитать ни одной сделки")
-            
+
     except Exception as e:
-        logging.error(f"Ошибка пересчета ML фичей: {e}")
+        logging.error(f"💥 Ошибка пересчёта ML-фичей: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
+
+# ===================== ⚙️ RECALCULATE ML FEATURES (ASYNC-SAFE) =====================
 async def recalculate_ml_features_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пересчитывает ML фичи для ВСЕХ сделок"""
-    await update.message.reply_text("🔄 Начинаю пересчет ML фичей для всех сделок...")
-    
+    """Асинхронно пересчитывает ML-фичи для всех сделок"""
+    await update.message.reply_text("🔄 Начинаю пересчёт ML-фичей для всех сделок...")
+
     recalculated = 0
     errors = 0
     total = len(all_trades)
-    
-    for i, trade in enumerate(all_trades):
-        try:
-            # Пропускаем сделки без пары
-            if not trade.get('pair'):
-                continue
-                
-            # Получаем исторические данные
-            df = get_historical_data(trade['pair'])
-            if df is None or df.empty:
-                errors += 1
-                continue
-            
-            # Пересчитываем фичи
-            new_features = prepare_ml_features(df)
-            if new_features:
-                trade['ml_features'] = new_features
-                recalculated += 1
-                
-            # Прогресс каждые 10 сделок
-            if i % 10 == 0:
-                await update.message.reply_text(f"📊 Обработано {i}/{total} сделок...")
-                
-        except Exception as e:
-            errors += 1
-            logging.error(f"Ошибка пересчета фич для сделки {trade.get('pair')}: {e}")
-    
-    save_users_data()
-    
-    message = (
-        f"✅ Пересчет завершен!\n"
-        f"• Всего сделок: {total}\n"
-        f"• Успешно пересчитано: {recalculated}\n"
-        f"• Ошибок: {errors}\n"
-        f"• Новое количество фич: {len(new_features) if recalculated > 0 else 'N/A'}"
-    )
-    await update.message.reply_text(message)
 
+    try:
+        for i, trade in enumerate(all_trades):
+            try:
+                # Пропускаем сделки без пары
+                if not trade.get("pair"):
+                    continue
+
+                pair = trade["pair"]
+
+                # 🔄 Получаем исторические данные в отдельном потоке
+                df = await asyncio.to_thread(get_historical_data, pair)
+                if df is None or df.empty:
+                    errors += 1
+                    continue
+
+                # 🧠 Пересчитываем фичи — CPU-тяжёлая операция, выносим в отдельный поток
+                new_features = await asyncio.to_thread(prepare_ml_features, df)
+
+                if new_features:
+                    trade["ml_features"] = new_features
+                    recalculated += 1
+
+                # Прогресс каждые 10 сделок
+                if (i + 1) % 10 == 0:
+                    await update.message.reply_text(f"📊 Обработано {i + 1}/{total} сделок...")
+
+                # Небольшая пауза для предотвращения перегрузки CPU
+                if (i + 1) % 50 == 0:
+                    await asyncio.sleep(0.1)
+
+            except Exception as e:
+                errors += 1
+                logging.error(f"❌ Ошибка пересчёта фич для {trade.get('pair')}: {e}")
+
+        # 💾 Асинхронное сохранение всех обновлений
+        await async_save_users_data()
+
+        # 🧩 Определяем количество фич в одной из сделок
+        sample_features_count = 0
+        for trade in all_trades:
+            if trade.get("ml_features"):
+                sample_features_count = len(trade["ml_features"])
+                break
+
+        # 📢 Итоговое сообщение
+        message = (
+            f"✅ Пересчёт ML-фичей завершён!\n"
+            f"• Всего сделок: {total}\n"
+            f"• Успешно пересчитано: {recalculated}\n"
+            f"• Ошибок: {errors}\n"
+            f"• Количество фич: {sample_features_count if recalculated > 0 else 'N/A'}"
+        )
+        await update.message.reply_text(message)
+
+    except Exception as e:
+        logging.error(f"💥 Критическая ошибка пересчёта ML-фичей: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+# ===================== ⚙️ RESET ML FEATURES (ASYNC-SAFE) =====================
 async def reset_ml_features_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Удаляет случайные ML фичи и готовит для пересчета"""
+    """Асинхронно очищает старые ML-фичи и помечает сделки для пересчёта"""
     user_id = update.effective_user.id
-    
+
+    # Только администратор может использовать
     if MULTI_USER_MODE and not is_admin(user_id):
         await update.message.reply_text("❌ Эта команда доступна только администратору")
         return
-        
-    await update.message.reply_text("🔄 Сброс ML фичей для пересчета на реальных данных...")
-    
+
+    await update.message.reply_text("🔄 Сброс ML-фичей для пересчёта на реальных данных...")
+
     try:
         reset_count = 0
-        
-        if MULTI_USER_MODE:
-            for user_id, user_data in users.items():
-                for trade in user_data.get('trade_history', []):
-                    # Удаляем старые случайные фичи
-                    if trade.get('ml_features'):
-                        trade['ml_features'] = None
-                        trade['needs_ml_recalculation'] = True
+
+        async with save_lock:
+            if MULTI_USER_MODE:
+                for uid, udata in users.items():
+                    for trade in udata.get("trade_history", []):
+                        if trade.get("ml_features"):
+                            trade["ml_features"] = None
+                            trade["needs_ml_recalculation"] = True
+                            reset_count += 1
+            else:
+                for trade in single_user_data.get("trade_history", []):
+                    if trade.get("ml_features"):
+                        trade["ml_features"] = None
+                        trade["needs_ml_recalculation"] = True
                         reset_count += 1
-        
+
+            # 💾 Асинхронное сохранение
+            await async_save_users_data()
+
         if reset_count > 0:
-            save_users_data()
             await update.message.reply_text(
-                f"✅ Сброшено ML фичей: {reset_count} сделок\n"
-                f"📝 Теперь используйте /recalculateml для пересчета на реальных данных"
+                f"✅ Сброшено ML-фичей: {reset_count} сделок\n"
+                f"🧠 Теперь используйте /recalculateml для пересчёта на реальных данных"
             )
         else:
-            await update.message.reply_text("ℹ️ Нет ML фичей для сброса")
-            
+            await update.message.reply_text("ℹ️ Нет ML-фичей для сброса")
+
     except Exception as e:
-        logging.error(f"Ошибка сброса ML фичей: {e}")
+        logging.error(f"💥 Ошибка сброса ML-фичей: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
+# ===================== ⚙️ FORCE ENABLE ML (ASYNC-SAFE) =====================
 async def force_enable_ml_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Принудительно включает ML независимо от точности"""
     user_id = update.effective_user.id
     user_data = get_user_data(user_id)
-    
-    user_data['ml_enabled'] = True
-    save_users_data()
-    
+
+    user_data["ml_enabled"] = True
+
+    async with save_lock:
+        await async_save_users_data()
+
     await update.message.reply_text(
         "🟢 ML ПРИНУДИТЕЛЬНО ВКЛЮЧЕН!\n"
         "📊 Текущая точность: 50.0%\n"
         "⚠️ Модель будет использоваться даже с низкой точностью\n"
-        "🔄 Модель улучшится со временем при накоплении данных"
+        "🔄 Она улучшится со временем при накоплении данных"
     )
 
-# ===================== CLEAR ALL TRADES (ADMIN) =====================
-from telegram import Update
-from telegram.ext import ContextTypes
-
-ADMIN_IDS = [5129282647]  
-
+# ===================== ⚙️ CLEAR ALL TRADES (ASYNC-SAFE) =====================
 async def clear_all_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Принудительно очищает все открытые сделки у всех пользователей (только для админа)"""
     user_id = update.effective_user.id
 
-    # Проверка прав
-    if user_id not in ADMIN_IDS:
+    # Проверка прав через is_admin()
+    if not is_admin(user_id):
         await update.message.reply_text("⛔ У вас нет прав для выполнения этой команды.")
         return
 
     cleared_count = 0
-    for uid, data in users.items():
-        if "current_trade" in data:
-            data.pop("current_trade", None)
-            cleared_count += 1
-            logging.info(f"🧹 Принудительно очищена сделка у пользователя {uid}")
 
-    save_users_data()
-    logging.info(f"✅ Админ {user_id} очистил {cleared_count} открытых сделок у всех пользователей")
+    try:
+        async with save_lock:  # 🔒 Гарантируем, что никто другой не пишет users_data
+            for uid, data in users.items():
+                if data.get("current_trade"):
+                    data["current_trade"] = None
+                    cleared_count += 1
+                    logging.info(f"🧹 Принудительно очищена сделка у пользователя {uid}")
 
-    await update.message.reply_text(f"🧹 Принудительно очищено сделок: {cleared_count}")
+            # 💾 Асинхронное сохранение данных
+            await async_save_users_data()
 
+        logging.info(f"✅ Админ {user_id} очистил {cleared_count} открытых сделок у всех пользователей")
+
+        await update.message.reply_text(
+            f"🧹 Принудительно очищено сделок: {cleared_count}\n"
+            f"💾 Изменения сохранены успешно."
+        )
+
+    except Exception as e:
+        logging.error(f"💥 Ошибка при очистке сделок: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Ошибка при очистке сделок: {e}")
+
+async def restore_pocket_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Принудительно восстанавливает всех пользователей в pocket_users.json"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ Эта команда доступна только администратору")
+        return
+        
+    await update.message.reply_text("🔄 Принудительное восстановление pocket_users.json...")
+    
+    try:
+        check_and_restore_pocket_users()
+        whitelist = load_whitelist()
+        
+        await update.message.reply_text(
+            f"✅ Восстановление завершено!\n"
+            f"📊 Пользователей в pocket_users.json: {len(whitelist)}"
+        )
+        
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка восстановления: {e}")
+  
 # ===================== MARKET STATUS COMMAND =====================
 async def market_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает статус работы бота по фиксированному локальному графику"""
@@ -4517,6 +5229,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         logging.info(f"📨 Сообщение от {user_id}: {text}")
         
+        # 🔥 АВТОМАТИЧЕСКАЯ РЕГИСТРАЦИЯ ПРИ ЛЮБОМ СООБЩЕНИИ
+        user_data = get_user_data(user_id)
+        if 'created_at' not in user_data:
+            username = update.effective_user.username or "Unknown"
+            await register_or_update_user(user_id, username, update)
+            logging.info(f"✅ Автоматически зарегистрирован пользователь {user_id}")
+            
+            # Приветственное сообщение для новых пользователей
+            welcome_text = (
+                "🎯 **Добро пожаловать в ASPIRE TRADE!**\n\n"
+                "🤖 **О боте:**\n"
+                "• Автоматический торговый бот\n" 
+                "• Анализ рынка в реальном времени\n"
+                "• Умные сигналы на основе SMC анализа\n"
+                "• Работает 24/7 в установленные часы\n\n"
+                "📱 **Доступные функции:**\n"
+                "• ❓ Помощь - инструкция и поддержка\n"
+                "• 🕒 Расписание - график работы бота\n\n"
+                "⚡ **Бот работает автоматически** - вы будете получать сигналы согласно расписанию!"
+            )
+            
+            await update.message.reply_text(
+                welcome_text,
+                reply_markup=ReplyKeyboardMarkup([["❓ Помощь", "🕒 Расписание"]], resize_keyboard=True),
+                parse_mode='Markdown'
+            )
+        
         # 🔥 ОБРАБОТКА КНОПОК ДЛЯ ВСЕХ (только 2 кнопки)
         if text == "❓ Помощь":
             await help_command(update, context)
@@ -4534,7 +5273,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logging.error(f"❌ Ошибка в handle_message: {e}")
         await update.message.reply_text("❌ Произошла ошибка при обработке сообщения")
-
 # ===================== 🚀 ЗАГЛУШКИ ДЛЯ КОМАНД АДМИНА =====================
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4558,58 +5296,142 @@ async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def clear_trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🧹 Очистить сделки - функция доступна только администратору")
 
+# ===================== 🔍 SETUP TRADE MONITORING =====================
+def setup_trade_monitoring():
+    """Инициализация мониторинга сделок и автоочистки устаревших job'ов"""
+    from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+    global app
+
+    try:
+        if app is None or not hasattr(app, "job_queue") or app.job_queue is None:
+            logging.warning("⚠ setup_trade_monitoring: JobQueue недоступен — мониторинг не запущен")
+            return
+
+        job_queue = app.job_queue
+
+        async def cleanup_expired_trade_jobs(context: ContextTypes.DEFAULT_TYPE):
+            """Очистка устаревших job'ов старше 24 часов"""
+            try:
+                jobs = job_queue.jobs()
+                now = datetime.utcnow()
+                expired = 0
+
+                for job in jobs:
+                    next_run = getattr(job, "next_t", None)
+                    if not next_run:
+                        continue
+
+                    try:
+                        job_time = datetime.fromtimestamp(next_run)
+                    except Exception:
+                        continue
+
+                    if (now - job_time).total_seconds() > 86400:  # старше 24 часов
+                        job.schedule_removal()
+                        expired += 1
+
+                if expired > 0:
+                    logging.info(f"🧹 Удалено устаревших задач: {expired}")
+            except Exception as e:
+                logging.error(f"⚠ Ошибка очистки job'ов: {e}", exc_info=True)
+
+        # ✅ Запускаем регулярную очистку каждые 6 часов
+        job_queue.run_repeating(
+            cleanup_expired_trade_jobs,
+            interval=21600,  # 6 часов
+            first=300,       # через 5 минут после старта
+            name="cleanup_expired_trade_jobs"
+        )
+
+        # ✅ Подключаем listener для логирования статуса задач
+        job_queue.scheduler.add_listener(
+            job_listener,
+            EVENT_JOB_ERROR | EVENT_JOB_EXECUTED
+        )
+
+        logging.info("🔧 Мониторинг сделок и автоочистка job'ов инициализированы успешно")
+
+    except Exception as e:
+        logging.error(f"❌ Ошибка инициализации мониторинга сделок: {e}", exc_info=True)
+
+
+
 # ===================== MAIN =====================
 def main():
-    # Проверка прав доступа
+    global app, save_lock
+
+    # 🔒 Асинхронная блокировка для безопасного сохранения users_data.json
+    import asyncio
+    save_lock = asyncio.Lock()
+
+    # ===================== 1. ПРОВЕРКА ЛОГОВ =====================
     try:
         with open("bot_ai.log", "a", encoding="utf-8") as f:
-            f.write(f"\n{'='*50}\n")
+            f.write(f"\n{'=' * 50}\n")
             f.write(f"🔄 Перезапуск бота: {datetime.now()}\n")
-            f.write(f"{'='*50}\n")
+            f.write(f"{'=' * 50}\n")
         logging.info("✅ Права доступа к лог-файлу проверены")
     except Exception as e:
         print(f"❌ Ошибка доступа к лог-файлу: {e}")
         return
-    
-    # 🔧 6. ИНИЦИАЛИЗАЦИЯ СТАТУСА БОТА ПРИ ЗАПУСКЕ
+
+    # ===================== 2. ВОССТАНОВЛЕНИЕ ПОЛЬЗОВАТЕЛЕЙ =====================
+    try:
+        check_and_restore_pocket_users()
+    except Exception as e:
+        logging.error(f"❌ Ошибка при восстановлении пользователей: {e}")
+
+    # ===================== 3. СТАТУС БОТА =====================
     global BOT_LAST_STATUS, BOT_STATUS_NOTIFIED
     BOT_LAST_STATUS = is_trading_time()
     BOT_STATUS_NOTIFIED = False
-    
-    # Логируем начальный статус
+
     status_text = "🟢 РАБОТАЕТ" if BOT_LAST_STATUS else "🔴 ОСТАНОВЛЕН (вне рабочего времени)"
     logging.info(f"🤖 Статус бота при запуске: {status_text}")
     print(f"🤖 Статус бота при запуске: {status_text}")
-    
-    # Если бот запущен в нерабочее время - предупреждаем
+
     if not BOT_LAST_STATUS:
         now = datetime.now()
-        logging.warning(f"⏸ Бот запущен в нерабочее время: {now.strftime('%Y-%m-%d %H:%M:%S')}")
-        print("⚠ ВНИМАНИЕ: Бот запущен в нерабочее время и будет ожидать начала рабочего дня")
-    
-    # Подключение к MT5
+        logging.warning(f"⚠ Бот запущен в нерабочее время: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+        print("⚠ ВНИМАНИЕ: бот будет ждать начала торгового времени.")
+
+    # ===================== 4. ПОДКЛЮЧЕНИЕ К MT5 =====================
     if not mt5.initialize(path=MT5_PATH, login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
         logging.error(f"❌ Ошибка инициализации MT5: {mt5.last_error()}")
         return
     logging.info("✅ MT5 подключен успешно")
     print("✅ MT5 подключен успешно")
-    
-    # Создание приложения Telegram
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    
-    # Обработчики команд
+
+    # ===================== 5. ИНИЦИАЛИЗАЦИЯ TELEGRAM APP =====================
+    from telegram.request import HTTPXRequest
+    request = HTTPXRequest(
+        connect_timeout=20.0,
+        read_timeout=20.0,
+        write_timeout=20.0,
+        pool_timeout=10.0,
+    )
+    app = Application.builder().token(TELEGRAM_TOKEN).request(request).build()
+
+    # ===================== 6. МОНИТОРИНГ СДЕЛОК =====================
+    try:
+        setup_trade_monitoring()
+        logging.info("🔧 Мониторинг сделок и автоочистка job'ов инициализированы")
+    except Exception as e:
+        logging.error(f"❌ Ошибка инициализации мониторинга сделок: {e}")
+
+    # ===================== 7. РЕГИСТРАЦИЯ КОМАНД =====================
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("schedule", schedule_command))
     app.add_handler(CommandHandler("whitelist_add", whitelist_add_command))
     app.add_handler(CommandHandler("whitelist_remove", whitelist_remove_command))
     app.add_handler(CommandHandler("whitelist_stats", whitelist_stats_command))
-    app.add_handler(CommandHandler("whitelist_show", whitelist_show_command))    
+    app.add_handler(CommandHandler("whitelist_show", whitelist_show_command))
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("next", next_signal_command))
     app.add_handler(CommandHandler("stats", statistics_command))
     app.add_handler(CommandHandler("modelstats", model_stats_command))
-    app.add_handler(CommandHandler("retrain", retrain_model_command))  
+    app.add_handler(CommandHandler("retrain", retrain_model_command))
     app.add_handler(CommandHandler("settings", settings_command))
     app.add_handler(CommandHandler("stop", stop_command))
     app.add_handler(CommandHandler("help", help_command))
@@ -4623,34 +5445,99 @@ def main():
     app.add_handler(CommandHandler("forceml", force_enable_ml_command))
     app.add_handler(CommandHandler("marketstatus", market_status_command))
     app.add_handler(CommandHandler("clearalltrades", clear_all_trades_command))
+    app.add_handler(CommandHandler("restorepocket", restore_pocket_users_command))
+    app.add_handler(CommandHandler("checktrades", check_active_trades_command))
+    app.add_handler(CommandHandler("forcetradeclose", force_close_trade_command))
     app.add_handler(CommandHandler("debug", debug_user_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    # ===================== JOB QUEUE =====================
+
+    # ===================== 8. JOB QUEUE =====================
     job_queue = app.job_queue
     if job_queue:
-        job_queue.run_repeating(auto_trading_loop, interval=60, first=10)  # 60 секунд вместо 30
-        job_queue.scheduler.add_listener(job_listener, 
-                                   EVENT_JOB_MISSED | EVENT_JOB_ERROR | EVENT_JOB_EXECUTED)
-        logging.info("📅 JobQueue инициализирован — автоцикл каждые 60 сек с мониторингом")
-        
+        # ----- Основной авто-трейдинг -----
+        job_queue.run_repeating(
+            auto_trading_loop,
+            interval=90,
+            first=10,
+            name="auto_trading_loop",
+            job_kwargs={"misfire_grace_time": 15},
+        )
+
+        # ----- Проверка зависших сделок -----
+        job_queue.run_repeating(
+            check_expired_trades_job,
+            interval=300,
+            first=30,
+            name="expired_trades_check",
+            job_kwargs={"misfire_grace_time": 30},
+        )
+
+        # ----- Автоматический бэкап -----
+        async def auto_backup_job(context):
+            try:
+                await async_save_users_data()
+                backup_name = f"backups/users_data_backup_auto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                await asyncio.to_thread(shutil.copy, "users_data.json", backup_name)
+                logging.info(f"💾 Автобэкап создан: {backup_name}")
+            except Exception as e:
+                logging.error(f"⚠ Ошибка авто-бэкапа: {e}")
+
+        job_queue.run_repeating(
+            auto_backup_job,
+            interval=10800,  # каждые 3 часа
+            first=120,
+            name="auto_backup_job",
+            job_kwargs={"misfire_grace_time": 60},
+        )
+
+        # ----- Listener для отслеживания задач -----
+        from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
+
+        def job_listener(event):
+            if event.exception:
+                logging.error(f"💥 Ошибка в задаче: {event.job_id} — {event.exception}")
+            else:
+                logging.info(f"✅ Задача {event.job_id} выполнена успешно")
+
+        job_queue.scheduler.add_listener(job_listener, EVENT_JOB_ERROR | EVENT_JOB_EXECUTED)
+        logging.info("📅 JobQueue инициализирован — автоцикл каждые 90 сек с защитой от сбоев")
+
     else:
         logging.error("❌ JobQueue не инициализирован — автоцикл не запущен")
         return
 
-    # ===================== СТАРТ =====================
-    IS_RUNNING = True   # ⚡ ВАЖНО: теперь цикл реально будет работать
-    logging.info("🤖 Бот запущен и готов к работе!")
-    app.run_polling()
-    
-    # ===================== ЗАВЕРШЕНИЕ =====================
-    IS_RUNNING = False
-    save_users_data()
-    mt5.shutdown()
-    logging.info("💾 Данные сохранены, MT5 отключен")
-    print("💾 Данные сохранены, MT5 отключен")
+    # ===================== 9. СТАРТ БОТА =====================
+    try:
+        logging.info("🤖 Бот запущен и готов к работе!")
+        app.run_polling(stop_signals=None)
+    except (KeyboardInterrupt, SystemExit):
+        logging.warning("🛑 Остановка бота вручную...")
+    finally:
+        # ===================== 10. КОРРЕКТНОЕ ЗАВЕРШЕНИЕ =====================
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(async_save_users_data())
+            else:
+                loop.run_until_complete(async_save_users_data())
+        except Exception as e:
+            logging.error(f"⚠ Ошибка сохранения данных при выходе: {e}")
+
+        mt5.shutdown()
+        logging.info("💾 Данные сохранены, MT5 отключен")
+        print("💾 Данные сохранены, MT5 отключен")
+
+
+# ===================== ASYNC SAVE USERS =====================
+async def async_save_users_data():
+    """Асинхронное безопасное сохранение users_data.json"""
+    try:
+        async with save_lock:
+            await asyncio.to_thread(save_users_data)
+            logging.info("💾 Данные пользователей сохранены (async-safe)")
+    except Exception as e:
+        logging.error(f"❌ Ошибка async_save_users_data: {e}", exc_info=True)
 
 
 if __name__ == "__main__":
     main()
-
